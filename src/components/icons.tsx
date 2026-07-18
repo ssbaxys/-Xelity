@@ -147,6 +147,27 @@ export function IconChat({ className = 'h-4 w-4' }: IconProps) {
   );
 }
 
+/** Пустой список / нет чатов */
+export function IconEmpty({ className = 'h-8 w-8' }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M7.5 4h9A2.5 2.5 0 0119 6.5v6A2.5 2.5 0 0116.5 15H10l-4 4v-4H7.5A2.5 2.5 0 015 12.5v-6A2.5 2.5 0 017.5 4z" />
+      <path d="M9 9.5h6M9 12.5h3.5" opacity="0.35" />
+      <circle cx="17.5" cy="6.5" r="3.2" fill="currentColor" fillOpacity="0.08" stroke="currentColor" />
+      <path d="M16.3 6.5h2.4M17.5 5.3v2.4" />
+    </svg>
+  );
+}
+
 export function IconTrash({ className = 'h-3.5 w-3.5' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>

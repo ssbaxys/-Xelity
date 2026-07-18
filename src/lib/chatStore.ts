@@ -45,6 +45,8 @@ export type ChatThread = {
   adminSystemPrompt?: string | null;
   /** Режим «Рассуждения» — расширенный ход мысли в ответе */
   reasoning?: boolean;
+  /** Черновик поля ввода — свой для каждого чата */
+  draft?: string;
 };
 
 export type ChatFolder = {
@@ -95,6 +97,7 @@ export function normalizeChatStore(raw: unknown): ChatStore {
           adminSystemPrompt:
             typeof c.adminSystemPrompt === 'string' ? c.adminSystemPrompt : c.adminSystemPrompt ?? null,
           reasoning: Boolean(c.reasoning),
+          draft: typeof c.draft === 'string' ? c.draft.slice(0, 2000) : '',
         }))
       : [],
     folders: Array.isArray(parsed.folders) ? parsed.folders : [],

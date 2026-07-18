@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IconChevronDown } from './icons';
+import WordReveal from './WordReveal';
 
 function formatThinkDuration(ms: number): string {
   const sec = Math.max(1, Math.round(ms / 1000));
@@ -14,14 +15,17 @@ type Props = {
   reasoningMs?: number | null;
   thinkingPhase?: 'thinking' | 'answering' | null;
   startedAt: number;
+  /** плавное появление текста мыслей */
+  animateThoughts?: boolean;
 };
 
-/** Свёрнутый блок «Думает… / Думал N сек» + серые мысли на втором плане */
+/** Свёрнутый блок «Думает… / Думал N сек» + серые мысли */
 export default function ReasoningPanel({
   reasoning,
   reasoningMs,
   thinkingPhase,
   startedAt,
+  animateThoughts = true,
 }: Props) {
   const live = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
   const [open, setOpen] = useState(live);
@@ -40,7 +44,6 @@ export default function ReasoningPanel({
     return () => window.clearInterval(id);
   }, [live, thinkingPhase]);
 
-  // Перезапуск анимации, когда текст мыслей впервые появился / обновился
   useEffect(() => {
     if (!hasText) return;
     setThoughtKey((k) => k + 1);
@@ -62,7 +65,7 @@ export default function ReasoningPanel({
     : `Думал ${formatThinkDuration(doneMs)}`;
 
   return (
-    <div className="mb-2.5 max-w-[min(100%,42rem)]">
+    <div className="reasoning-panel mb-2.5 max-w-[min(100%,42rem)]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -75,23 +78,23 @@ export default function ReasoningPanel({
         <span className={live ? 'thinking-label' : ''}>{label}</span>
       </button>
 
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-350 ease-out ${
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-        style={{ transitionDuration: '380ms' }}
-      >
-        <div className="min-h-0 overflow-hidden">
+      <div className={`reasoning-collapse ${open ? 'is-open' : ''}`}>
+        <div className="reasoning-collapse-inner">
           <div className="mt-1.5 border-l border-[var(--c-border)] pl-3 text-[12.5px] leading-relaxed text-[var(--c-faint)]">
             {hasText ? (
-              <p
-                key={thoughtKey}
-                className="reasoning-thoughts-enter whitespace-pre-wrap"
-              >
-                {reasoning}
-              </p>
-            ) : live ? (
-              <p className="thinking-label opacity-70">Собираю мысли…</p>
+              <div key={thoughtKey} className="reasoning-thoughts-enter break-words">
+                {animateThoughts && live ? (
+                  <WordReveal
+                    text={reasoning || ''}
+                    mode="lines"
+                    stepMs={70}
+                    className="whitespace-pre-wrap break-words"
+                    animate
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap break-words">{reasoning}</p>
+                )}
+              </div>
             ) : null}
           </div>
         </div>

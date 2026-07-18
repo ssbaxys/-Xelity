@@ -298,6 +298,29 @@ body {
   }
 }
 
+/* Разворот «Думал» без вспышки скроллбара */
+.reasoning-panel {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+.reasoning-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: clip;
+}
+
+.reasoning-collapse.is-open {
+  grid-template-rows: 1fr;
+}
+
+.reasoning-collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+  overflow-x: clip;
+}
+
 .font-display {
   font-family: var(--font-display);
 }
@@ -815,6 +838,31 @@ body {
   animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.typing-dots {
+  transition:
+    opacity 0.32s ease,
+    transform 0.32s ease;
+}
+.typing-dots.is-enter {
+  animation: typing-dots-in 0.35s ease both;
+}
+.typing-dots.is-exit {
+  opacity: 0;
+  transform: translateY(4px) scale(0.92);
+  pointer-events: none;
+}
+
+@keyframes typing-dots-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .typing-dot {
   animation: typing 1.2s ease-in-out infinite;
 }
@@ -823,6 +871,59 @@ body {
 }
 .typing-dot:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+.chat-token-in {
+  animation: chat-token-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chat-token-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.chat-caret {
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.12em;
+  background: color-mix(in srgb, var(--c-muted) 55%, transparent);
+  animation: chat-caret-blink 0.9s step-end infinite;
+}
+
+@keyframes chat-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.answer-settle {
+  animation: answer-settle-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes answer-settle-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.assistant-answer-wrap {
+  min-height: 1.25rem;
+}
+
+.chat-thread-scroll {
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
 }
 
 /* Custom range — hide native track/thumb visuals, keep hit area */

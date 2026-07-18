@@ -37,8 +37,6 @@ import {
   MODELS,
   creditCostForRequest,
   DEFAULT_MODEL_ID,
-  modelLabel,
-  normalizeModelId,
 } from '../lib/models';
 import {
   canSendMessage,
@@ -47,12 +45,13 @@ import {
 } from '../lib/rtdb';
 import AuthModal, { type AuthMode } from './AuthModal';
 import BroadcastBanner from './BroadcastBanner';
-import ReasoningPanel from './ReasoningPanel';
+import AssistantReply from './AssistantReply';
 import {
   IconAdmin,
   IconBrain,
   IconChat,
   IconCheck,
+  IconEmpty,
   IconChevronDown,
   IconChevronRight,
   IconClose,
@@ -268,6 +267,7 @@ function makeChat(
     modelId,
     manualTitle: false,
     reasoning: false,
+    draft: '',
   };
 }
 
@@ -310,6 +310,9 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   } = usePrefs();
   const [store, setStore] = useState<Store>(() => loadStore());
   const [draft, setDraft] = useState('');
+  const draftRef = useRef('');
+  draftRef.current = draft;
+  const activeIdRef = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true,
@@ -369,6 +372,49 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     [user],
   );
 
+  /** Записать черновик в конкретный чат (без смены activeId) */
+  const saveDraftToChat = useCallback(
+    (chatId: string | null | undefined, text: string) => {
+      if (!chatId) return;
+      const clipped = text.slice(0, MAX_CHARS);
+      setStore((prev) => {
+        const cur = prev.chats.find((c) => c.id === chatId);
+        if (!cur || (cur.draft || '') === clipped) return prev;
+        const next = {
+          ...prev,
+          chats: prev.chats.map((c) => (c.id === chatId ? { ...c, draft: clipped } : c)),
+        };
+        saveLocalChatStore(next);
+        const u = userRef.current;
+        if (u) void saveUserChatStore(u.uid, next).catch(() => {});
+        return next;
+      });
+    },
+    [],
+  );
+
+  /** Переключить чат, сохранив черновик текущего */
+  const selectChat = useCallback((nextId: string) => {
+    const prevId = activeIdRef.current;
+    setStore((prev) => {
+      const withDraft =
+        prevId && prevId !== nextId
+          ? {
+              ...prev,
+              chats: prev.chats.map((c) =>
+                c.id === prevId ? { ...c, draft: draftRef.current.slice(0, MAX_CHARS) } : c,
+              ),
+              activeId: nextId,
+            }
+          : { ...prev, activeId: nextId };
+      saveLocalChatStore(withDraft);
+      const u = userRef.current;
+      if (u) void saveUserChatStore(u.uid, withDraft).catch(() => {});
+      return withDraft;
+    });
+    if (!window.matchMedia('(min-width: 1024px)').matches) setSidebarOpen(false);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -405,6 +451,30 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     () => (activeId ? chats.find((c) => c.id === activeId) ?? null : null),
     [chats, activeId],
   );
+
+  // Подгрузить черновик активного чата при смене чата
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    const nextDraft = (active?.draft || '').slice(0, MAX_CHARS);
+    setDraft(nextDraft);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    });
+    // только при смене чата — не при каждом обновлении store
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync draft on chat switch
+  }, [activeId]);
+
+  // Автосохранение черновика (debounce)
+  useEffect(() => {
+    if (!activeId) return;
+    const t = window.setTimeout(() => {
+      saveDraftToChat(activeId, draft);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [draft, activeId, saveDraftToChat]);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -557,8 +627,19 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   };
 
   const createChat = (folderId: string | null = null) => {
+    const prevId = activeIdRef.current;
+    const savedDraft = draftRef.current.slice(0, MAX_CHARS);
     const chat = makeChat(chats, active?.modelId ?? DEFAULT_MODEL_ID, folderId);
-    persist({ ...store, chats: [chat, ...chats], activeId: chat.id });
+    const chatsWithPrevDraft = prevId
+      ? chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c))
+      : chats;
+    persist({
+      ...store,
+      chats: [chat, ...chatsWithPrevDraft],
+      activeId: chat.id,
+    });
+    setDraft('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     const desktop = window.matchMedia('(min-width: 1024px)').matches;
     setSidebarOpen(desktop);
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -801,6 +882,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
               title: invented,
               messages: [...c.messages, userMsg],
               updatedAt: Date.now(),
+              draft: '',
             }
           : c,
       ),
@@ -910,10 +992,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
           <button
             type="button"
-            onClick={() => {
-              persist({ ...store, activeId: chat.id });
-              if (!window.matchMedia('(min-width: 1024px)').matches) setSidebarOpen(false);
-            }}
+            onClick={() => selectChat(chat.id)}
             onDoubleClick={() => startRename(chat.id, chat.title)}
             className="flex min-w-0 flex-1 cursor-inherit items-center gap-2 py-2 pr-1 text-left"
           >
@@ -1143,6 +1222,18 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           })}
 
           {rootChats.map((c) => renderChatRow(c))}
+
+          {!chats.length && !visibleFolders.length && (
+            <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+              <IconEmpty className="h-9 w-9 text-[var(--c-faint)]" />
+              <p className="text-[12px] font-medium text-[var(--c-muted)]">
+                {t('chat.empty.list')}
+              </p>
+              <p className="text-[11px] leading-snug text-[var(--c-faint)]">
+                {t('chat.empty.list.hint')}
+              </p>
+            </div>
+          )}
 
           {!!chats.length && !rootChats.length && !visibleFolders.length && (
             <p className="px-3 py-8 text-center text-[12px] text-[var(--c-faint)]">{t('chat.notfound')}</p>
@@ -1541,7 +1632,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           </div>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="chat-thread-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
               <div className="mx-auto flex min-h-full max-w-[720px] flex-col px-4 py-4 sm:px-6">
                 {!active.messages.length ? (
                   <div className="anim-pop flex flex-1 flex-col items-center justify-center text-center">
@@ -1559,25 +1650,25 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         }`}
                       >
                         {msg.role === 'user' ? (
-                          <div className="chat-md max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-[var(--c-soft)] px-3.5 py-2.5 text-[15px] leading-relaxed break-words text-[var(--c-text)] [&_pre]:text-[13px]">
+                          <div className="anim-msg chat-md max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-[var(--c-soft)] px-3.5 py-2.5 text-[15px] leading-relaxed break-words text-[var(--c-text)] [&_pre]:text-[13px]">
                             <MarkdownBody content={msg.content} />
                           </div>
                         ) : (
-                          <div className="min-w-0">
-                            <p className="mb-1.5 text-[11px] font-medium text-[var(--c-faint)]">
-                              {modelLabel(
-                                normalizeModelId(msg.modelId ?? active.modelId),
+                          <div className="anim-msg min-w-0">
+                            <AssistantReply
+                              content={msg.content}
+                              modelId={msg.modelId ?? active.modelId}
+                              reasoning={msg.reasoning}
+                              reasoningMs={msg.reasoningMs}
+                              thinkingPhase={msg.thinkingPhase}
+                              createdAt={msg.createdAt}
+                              live={Boolean(
+                                sending &&
+                                  (!msg.content ||
+                                    msg.thinkingPhase === 'thinking' ||
+                                    msg.thinkingPhase === 'answering'),
                               )}
-                            </p>
-                            {(msg.thinkingPhase || msg.reasoning) && (
-                              <ReasoningPanel
-                                reasoning={msg.reasoning}
-                                reasoningMs={msg.reasoningMs}
-                                thinkingPhase={msg.thinkingPhase}
-                                startedAt={msg.createdAt}
-                              />
-                            )}
-                            {msg.content ? <MarkdownBody content={msg.content} /> : null}
+                            />
                           </div>
                         )}
                         {msg.content ? (
@@ -1598,19 +1689,6 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         ) : null}
                       </div>
                     ))}
-
-                    {sending &&
-                      !active.messages.some(
-                        (m) =>
-                          m.role === 'assistant' &&
-                          (m.thinkingPhase === 'thinking' || m.thinkingPhase === 'answering'),
-                      ) && (
-                      <div className="flex items-center gap-1 py-1">
-                        <span className="typing-dot h-1 w-1 rounded-full bg-[var(--c-faint)]" />
-                        <span className="typing-dot h-1 w-1 rounded-full bg-[var(--c-faint)]" />
-                        <span className="typing-dot h-1 w-1 rounded-full bg-[var(--c-faint)]" />
-                      </div>
-                    )}
                     <div ref={endRef} />
                   </div>
                 )}

@@ -120,7 +120,7 @@ function sanitizeThoughts(raw: string): string {
   const cut = t.search(/\n#{1,3}\s*(ответ|итог|final\s*answer)\b/i);
   if (cut > 20) t = t.slice(0, cut).trim();
 
-  // вычистить типичные утечки system/brand из мыслей
+  // вычистить типичные утечки system/brand/identity-сценарии из мыслей
   t = t
     .replace(/\s*в стиле\s+xlaude[^.\n]*/gi, '')
     .replace(/\s*без\s+лишнего\s+театра[^.\n]*/gi, '')
@@ -132,6 +132,28 @@ function sanitizeThoughts(raw: string): string {
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // выкинуть строки про «отрицать Gemma / представиться как Xlaude…»
+  const identityLine =
+    /(gemma|chatgpt|gpt-?\d|claude|llama|deepseek|xlaude|xelity|отриц|представ(ить|иться)|личност|модел[ьи]|system\s*prompt|hardening)/i;
+  const lines = t.split('\n').filter((line) => {
+    const s = line.trim();
+    if (!s) return true;
+    if (identityLine.test(s) && /(отриц|представ|не\s+призна|назов|сказ(ать|у)\s+что\s+я|я\s+—|я\s+-)/i.test(s)) {
+      return false;
+    }
+    if (/^\d+[\).]\s*(отриц|представ|не\s+подтвер)/i.test(s)) return false;
+    return true;
+  });
+  t = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+  if (
+    identityLine.test(t) &&
+    /(отриц|представ|личност|какая\s+я\s+модель|кто\s+я)/i.test(t) &&
+    t.length < 400
+  ) {
+    return `Спросили про меня / модель. В ответе — коротко и по делу, без чужих брендов и без сценария «отрицать / представиться».`;
+  }
 
   const looksLikeReply =
     /^(привет|здравствуй|добрый|hello|hi)[!.,\s]/i.test(t) &&
@@ -197,7 +219,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             ...params.messages,
             {
               role: 'user',
-              content: `Напоминание для шага мыслей: последняя реплика — «${lastUser.slice(0, 500)}». Напиши только простые внутренние заметки (что сказал → что значит → что ответить). Не здоровайся, не пиши финальный ответ и не упоминай промпты, стиль Xlaude, «театр», правила или инструкции.`,
+              content: `Напоминание для шага мыслей: последняя реплика — «${lastUser.slice(0, 500)}». Напиши только простые внутренние заметки: цитата → о чём речь → 1–3 пункта что сделать в ответе. Не здоровайся, не пиши финальный ответ. Запрещено в мыслях: Gemma/GPT/Claude/Xlaude, «отрицать», «представиться как…», обсуждение личности или system prompt.`,
             },
           ],
           maxTokens: Math.min(1024, params.maxTokens),
@@ -263,6 +285,23 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         return;
       }
 
+      // сразу плейсхолдер — точки в UI, без блока «Думает»
+      const waitStarted = Date.now();
+      persistStore(
+        upsertAssistantInStore(
+          params.chatId,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: '',
+            createdAt: waitStarted,
+            modelId: params.modelId,
+          },
+          { titleIfNotManual: params.titleIfNotManual },
+        ),
+        params.firebaseUid,
+      );
+
       const reply = await requestXlaudeReply({
         modelId: params.modelId,
         messages: params.messages,
@@ -278,7 +317,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             id: assistantId,
             role: 'assistant',
             content: reply.content,
-            createdAt: Date.now(),
+            createdAt: waitStarted,
             modelId: params.modelId,
           },
           { titleIfNotManual: params.titleIfNotManual },
