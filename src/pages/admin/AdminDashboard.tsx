@@ -218,7 +218,8 @@ export default function AdminDashboard() {
 
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}. Проверь rules в Firebase и флаг <code className="text-xs">isAdmin: true</code> у
+          {error}. Проверь rules в Firebase и поле <code className="text-xs">staffRole</code> (или legacy{' '}
+          <code className="text-xs">isAdmin: true</code>) у
           аккаунта.
         </div>
       )}

@@ -1,15 +1,20 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   addTicketMessage,
+  claimTicket,
+  setTicketPriority,
   setTicketStatus,
+  unclaimTicket,
   watchTicketMessages,
   watchTickets,
   type Ticket,
   type TicketMessage,
+  type TicketPriority,
   type TicketStatus,
 } from '../../lib/rtdb';
+import { messageRoleLabel } from '../../lib/staff';
 import AdminSelect from './AdminSelect';
 import AdminUserInvestigation from './AdminUserInvestigation';
 
@@ -20,16 +25,49 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
   closed: 'Закрыт',
 };
 
+const PRIORITY_LABEL: Record<TicketPriority, string> = {
+  low: 'Низкий',
+  normal: 'Обычный',
+  high: 'Высокий',
+  urgent: 'Срочный',
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  billing: 'Оплата',
+  technical: 'Техника',
+  account: 'Аккаунт',
+  other: 'Другое',
+  appeal: 'Апелляция',
+};
+
 type Tab = 'thread' | 'investigate';
+type StatusFilter = 'all' | 'needs_reply' | TicketStatus;
+
+const STATUS_ORDER: Record<TicketStatus, number> = {
+  open: 0,
+  in_progress: 1,
+  resolved: 2,
+  closed: 3,
+};
+
+const PRIORITY_ORDER: Record<TicketPriority, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
+};
 
 export default function AdminTickets() {
-  const { user } = useAuth();
+  const { user, staffRole, can } = useAuth();
+  const canInvestigate = can('tickets.investigate');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('thread');
+  const [filter, setFilter] = useState<StatusFilter>('needs_reply');
+  const [search, setSearch] = useState('');
 
   useEffect(() => watchTickets(setTickets), []);
 
@@ -46,7 +84,50 @@ export default function AdminTickets() {
     setReply('');
   }, [activeId]);
 
+  const sorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return [...tickets]
+      .filter((t) => {
+        if (filter === 'needs_reply') {
+          return (
+            (t.status === 'open' || t.status === 'in_progress') &&
+            t.lastAuthorRole !== 'staff'
+          );
+        }
+        if (filter !== 'all' && t.status !== filter) return false;
+        if (!q) return true;
+        return (
+          t.subject.toLowerCase().includes(q) ||
+          t.email.toLowerCase().includes(q) ||
+          t.uid.toLowerCase().includes(q) ||
+          (t.assigneeName || '').toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const pa = PRIORITY_ORDER[a.priority || 'normal'];
+        const pb = PRIORITY_ORDER[b.priority || 'normal'];
+        if (pa !== pb) return pa - pb;
+        const sa = STATUS_ORDER[a.status];
+        const sb = STATUS_ORDER[b.status];
+        if (sa !== sb) return sa - sb;
+        return (b.lastMessageAt || 0) - (a.lastMessageAt || 0);
+      });
+  }, [tickets, filter, search]);
+
   const active = tickets.find((t) => t.id === activeId) ?? null;
+  const counts = useMemo(() => {
+    const c = { all: tickets.length, needs_reply: 0, open: 0, in_progress: 0, resolved: 0, closed: 0 };
+    for (const t of tickets) {
+      c[t.status] += 1;
+      if (
+        (t.status === 'open' || t.status === 'in_progress') &&
+        t.lastAuthorRole !== 'staff'
+      ) {
+        c.needs_reply += 1;
+      }
+    }
+    return c;
+  }, [tickets]);
 
   const onReply = async (e: FormEvent) => {
     e.preventDefault();
@@ -56,11 +137,33 @@ export default function AdminTickets() {
       await addTicketMessage({
         ticketId: activeId,
         uid: user.uid,
-        authorName: user.displayName || 'Admin',
-        role: 'admin',
+        authorName: user.displayName || user.email || 'Staff',
+        role: 'staff',
+        staffRole,
         body: reply,
       });
+      if (active && !active.assigneeUid) {
+        await claimTicket({
+          ticketId: activeId,
+          assigneeUid: user.uid,
+          assigneeName: user.displayName || user.email || 'Staff',
+        });
+      }
       setReply('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onClaim = async () => {
+    if (!user || !active) return;
+    setBusy(true);
+    try {
+      await claimTicket({
+        ticketId: active.id,
+        assigneeUid: user.uid,
+        assigneeName: user.displayName || user.email || 'Staff',
+      });
     } finally {
       setBusy(false);
     }
@@ -68,35 +171,96 @@ export default function AdminTickets() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Тикеты поддержки</h2>
-        <p className="text-sm text-[#9a8585]">
-          Переписка и полный разбор пользователя прямо в тикете
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Тикеты поддержки</h2>
+          <p className="text-sm text-[#9a8585]">
+            Очередь обращений · ожидают ответа: {counts.needs_reply}
+          </p>
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск: тема, email, uid…"
+          className="w-full max-w-xs rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none sm:w-64"
+        />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            ['needs_reply', `Ждут ответа (${counts.needs_reply})`],
+            ['all', `Все (${counts.all})`],
+            ['open', `Открыты (${counts.open})`],
+            ['in_progress', `В работе (${counts.in_progress})`],
+            ['resolved', `Решены (${counts.resolved})`],
+            ['closed', `Закрыты (${counts.closed})`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setFilter(id)}
+            className={`rounded-md border px-2.5 py-1 text-[11px] transition ${
+              filter === id
+                ? 'border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.2))] text-white'
+                : 'border-[#2a1c1c] text-[#9a8585] hover:bg-white/5'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="admin-panel max-h-[78vh] overflow-y-auto p-2">
-          {tickets.length === 0 ? (
+          {sorted.length === 0 ? (
             <p className="p-4 text-center text-sm text-[#6e5555]">Нет тикетов</p>
           ) : (
             <ul className="space-y-0.5">
-              {tickets.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveId(t.id)}
-                    className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-white/5 ${
-                      activeId === t.id ? 'bg-[#c62828]/15' : ''
-                    }`}
-                  >
-                    <span className="block truncate font-medium">{t.subject}</span>
-                    <span className="text-[11px] text-[#9a8585]">
-                      {STATUS_LABEL[t.status]} · {t.email}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {sorted.map((t) => {
+                const waiting =
+                  (t.status === 'open' || t.status === 'in_progress') &&
+                  t.lastAuthorRole !== 'staff';
+                return (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(t.id)}
+                      className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-white/5 ${
+                        activeId === t.id
+                          ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
+                          : ''
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {waiting && (
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--admin-accent,#c62828)]"
+                            title="Ждёт ответа"
+                          />
+                        )}
+                        <span className="block min-w-0 flex-1 truncate font-medium">
+                          {t.subject}
+                        </span>
+                        {(t.priority === 'high' || t.priority === 'urgent') && (
+                          <span className="shrink-0 text-[9px] uppercase tracking-wide text-[#ff8a80]">
+                            {t.priority === 'urgent' ? 'urgent' : 'high'}
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-[#9a8585]">
+                        {STATUS_LABEL[t.status]} · {t.email}
+                      </span>
+                      {t.assigneeName && (
+                        <span className="mt-0.5 block text-[10px] text-[#6e5555]">
+                          → {t.assigneeName}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -112,81 +276,160 @@ export default function AdminTickets() {
                 <div className="min-w-0">
                   <h3 className="font-semibold">{active.subject}</h3>
                   <p className="text-xs text-[#9a8585]">
-                    {active.email} · {active.category} · uid{' '}
-                    <Link
-                      to={`/admin/users/${active.uid}`}
-                      className="text-[#c62828] hover:underline"
-                    >
-                      {active.uid.slice(0, 8)}…
-                    </Link>
+                    {active.email} · {CATEGORY_LABEL[active.category] || active.category}
+                    {can('users.view') && (
+                      <>
+                        {' · uid '}
+                        <Link
+                          to={`/admin/users/${active.uid}`}
+                          className="text-[var(--admin-accent,#c62828)] hover:underline"
+                        >
+                          {active.uid.slice(0, 8)}…
+                        </Link>
+                      </>
+                    )}
                   </p>
+                  {active.assigneeName ? (
+                    <p className="mt-1 text-[11px] text-[#6e5555]">
+                      Взял: {active.assigneeName}{' '}
+                      {active.assigneeUid === user?.uid && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void unclaimTicket(active.id)}
+                          className="ml-1 underline hover:text-white"
+                        >
+                          отпустить
+                        </button>
+                      )}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onClaim()}
+                      className="mt-1 text-[11px] text-[var(--admin-accent,#c62828)] underline"
+                    >
+                      Взять в работу
+                    </button>
+                  )}
                 </div>
-                <AdminSelect
-                  value={active.status}
-                  options={(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => ({
-                    value: s,
-                    label: STATUS_LABEL[s],
-                  }))}
-                  onChange={(s) => void setTicketStatus(active.id, s)}
-                />
+                <div className="flex flex-wrap gap-2">
+                  <AdminSelect
+                    value={active.priority || 'normal'}
+                    options={(Object.keys(PRIORITY_LABEL) as TicketPriority[]).map((p) => ({
+                      value: p,
+                      label: PRIORITY_LABEL[p],
+                    }))}
+                    onChange={(p) => void setTicketPriority(active.id, p)}
+                  />
+                  <AdminSelect
+                    value={active.status}
+                    options={(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => ({
+                      value: s,
+                      label: STATUS_LABEL[s],
+                    }))}
+                    onChange={(s) => void setTicketStatus(active.id, s)}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-1 border-b border-[#2a1c1c] px-3 pt-2">
-                {(
-                  [
-                    ['thread', 'Переписка'],
-                    ['investigate', 'Разбор'],
-                  ] as const
-                ).map(([id, label]) => (
+                <button
+                  type="button"
+                  onClick={() => setTab('thread')}
+                  className={`admin-tab ${tab === 'thread' ? 'is-active' : ''}`}
+                >
+                  Переписка
+                </button>
+                {canInvestigate && (
                   <button
-                    key={id}
                     type="button"
-                    onClick={() => setTab(id)}
-                    className={`admin-tab ${tab === id ? 'is-active' : ''}`}
+                    onClick={() => setTab('investigate')}
+                    className={`admin-tab ${tab === 'investigate' ? 'is-active' : ''}`}
                   >
-                    {label}
+                    Разбор
                   </button>
-                ))}
+                )}
               </div>
 
-              {tab === 'thread' ? (
+              {tab === 'thread' || !canInvestigate ? (
                 <>
                   <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-                    {messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
-                          m.role === 'admin' ? 'bg-[#c62828]/15' : 'ml-auto bg-[#221616]'
-                        }`}
-                      >
-                        <p className="text-[10px] text-[#9a8585]">
-                          {m.authorName} · {m.role}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-                      </div>
-                    ))}
+                    {messages.map((m) => {
+                      const staffSide = m.role === 'admin' || m.role === 'staff';
+                      return (
+                        <div
+                          key={m.id}
+                          className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
+                            staffSide
+                              ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
+                              : 'ml-auto bg-[#221616]'
+                          }`}
+                        >
+                          <p className="text-[10px] text-[#9a8585]">
+                            {m.authorName} · {messageRoleLabel(m.role, m.staffRole)}
+                            {' · '}
+                            {new Date(m.createdAt).toLocaleString('ru-RU')}
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
+                        </div>
+                      );
+                    })}
                     {!messages.length && (
                       <p className="text-center text-sm text-[#6e5555]">Пока нет сообщений</p>
                     )}
                   </div>
-                  <form
-                    onSubmit={onReply}
-                    className="flex gap-2 border-t border-[#2a1c1c] px-4 py-3"
-                  >
-                    <input
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      placeholder="Ответ поддержки…"
-                      className="min-w-0 flex-1 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
-                    />
-                    <button
-                      type="submit"
-                      disabled={busy || !reply.trim()}
-                      className="rounded-lg bg-[#c62828] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  {active.status !== 'closed' && (
+                    <form
+                      onSubmit={onReply}
+                      className="flex flex-col gap-2 border-t border-[#2a1c1c] px-4 py-3 sm:flex-row"
                     >
-                      Ответить
-                    </button>
-                  </form>
+                      <input
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        placeholder="Ответ поддержки…"
+                        className="min-w-0 flex-1 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+                      />
+                      <div className="flex shrink-0 gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busy || !reply.trim()}
+                          onClick={() => {
+                            void (async () => {
+                              if (!user || !activeId || !reply.trim()) return;
+                              setBusy(true);
+                              try {
+                                await addTicketMessage({
+                                  ticketId: activeId,
+                                  uid: user.uid,
+                                  authorName: user.displayName || user.email || 'Staff',
+                                  role: 'staff',
+                                  staffRole,
+                                  body: reply,
+                                  keepStatus: true,
+                                });
+                                await setTicketStatus(activeId, 'resolved');
+                                setReply('');
+                              } finally {
+                                setBusy(false);
+                              }
+                            })();
+                          }}
+                          className="rounded-lg border border-[#2a1c1c] px-3 py-2 text-sm text-[#9a8585] hover:bg-white/5 disabled:opacity-40"
+                        >
+                          Ответить и решить
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={busy || !reply.trim()}
+                          className="rounded-lg bg-[var(--admin-accent,#c62828)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                        >
+                          Ответить
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">

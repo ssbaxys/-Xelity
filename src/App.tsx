@@ -17,6 +17,7 @@ import AdminUserCase from './pages/admin/AdminUserCase';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminChats from './pages/admin/AdminChats';
 import AdminBroadcasts from './pages/admin/AdminBroadcasts';
+import AdminModelPrompts from './pages/admin/AdminModelPrompts';
 import AdminTickets from './pages/admin/AdminTickets';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="payments" element={<AdminPayments />} />
                 <Route path="chats" element={<AdminChats />} />
                 <Route path="broadcasts" element={<AdminBroadcasts />} />
+                <Route path="prompts" element={<AdminModelPrompts />} />
                 <Route path="tickets" element={<AdminTickets />} />
               </Route>
               <Route path="404" element={<NotFoundPage />} />

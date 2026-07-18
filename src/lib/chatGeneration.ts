@@ -6,8 +6,6 @@ import {
   type ChatModelId,
   type ChatStore,
 } from './chatStore';
-import { creditCostForRequest } from './models';
-import { incrementGuestUsage, incrementUsage } from './rtdb';
 import { requestXlaudeReply, type ChatApiMessage } from './xlaude';
 
 const PENDING_KEY = 'xelity-chat-pending-v1';
@@ -193,7 +191,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           params.promptText ||
           '';
 
-        const rawThoughts = await requestXlaudeReply({
+        const thinkRes = await requestXlaudeReply({
           modelId: params.modelId,
           messages: [
             ...params.messages,
@@ -205,8 +203,9 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           maxTokens: Math.min(1024, params.maxTokens),
           systemExtra: params.systemExtra,
           reasoningPhase: 'think',
+          reasoning: true,
         });
-        const thoughts = sanitizeThoughts(rawThoughts);
+        const thoughts = sanitizeThoughts(thinkRes.content);
         const reasoningMs = Date.now() - thinkStarted;
 
         persistStore(
@@ -223,7 +222,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           params.firebaseUid,
         );
 
-        const answer = await requestXlaudeReply({
+        const answerRes = await requestXlaudeReply({
           modelId: params.modelId,
           messages: [
             ...params.messages,
@@ -240,6 +239,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           maxTokens: params.maxTokens,
           systemExtra: params.systemExtra,
           reasoningPhase: 'answer',
+          reasoning: true,
         });
 
         persistStore(
@@ -248,7 +248,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             {
               id: assistantId,
               role: 'assistant',
-              content: answer.trim(),
+              content: answerRes.content.trim(),
               createdAt: thinkStarted,
               modelId: params.modelId,
               thinkingPhase: null,
@@ -259,25 +259,16 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           ),
           params.firebaseUid,
         );
-
-        const tokensApprox = Math.ceil(
-          ((params.promptText?.length || 0) + thoughts.length + answer.length) / 4,
-        );
-        try {
-          const cost = creditCostForRequest(params.modelId, true);
-          if (params.firebaseUid) await incrementUsage(params.firebaseUid, tokensApprox, cost);
-          else incrementGuestUsage(tokensApprox, cost);
-        } catch {
-          /* optional */
-        }
+        // списание кредитов — только на VPS
         return;
       }
 
-      const content = await requestXlaudeReply({
+      const reply = await requestXlaudeReply({
         modelId: params.modelId,
         messages: params.messages,
         maxTokens: params.maxTokens,
         systemExtra: params.systemExtra,
+        reasoning: false,
       });
 
       persistStore(
@@ -286,7 +277,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           {
             id: assistantId,
             role: 'assistant',
-            content,
+            content: reply.content,
             createdAt: Date.now(),
             modelId: params.modelId,
           },
@@ -294,17 +285,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         ),
         params.firebaseUid,
       );
-
-      const tokensApprox = Math.ceil(
-        ((params.promptText?.length || 0) + content.length) / 4,
-      );
-      try {
-        const cost = creditCostForRequest(params.modelId, params.reasoning);
-        if (params.firebaseUid) await incrementUsage(params.firebaseUid, tokensApprox, cost);
-        else incrementGuestUsage(tokensApprox, cost);
-      } catch {
-        /* optional */
-      }
+      // списание кредитов — только на VPS
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Не удалось получить ответ';
       persistStore(

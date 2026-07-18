@@ -3,60 +3,78 @@
     "users": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)",
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
         "isAdmin": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || ((!data.exists() || data.val() == false) && newData.val() == false))"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || ((!data.exists() || data.val() == false) && newData.val() == false))"
+        },
+        "staffRole": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (root.child('users').child(auth.uid).child('staffRole').val() == 'admin' && newData.val() != 'owner' && (!data.exists() || data.val() != 'owner')) || ((!data.exists() || data.val() == null) && newData.val() == null))"
         },
         "admin": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "banned": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "banReason": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "banUntil": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "bannedAt": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "flagged": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "muted": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "adminWarning": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "adminWarningAt": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         },
         "reviewPriority": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+        },
+        "plan": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || ((!data.exists() || data.val() == 'free') && newData.val() == 'free'))"
+        },
+        "planExpiresAt": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (!data.exists() && newData.val() == null))"
+        },
+        "planUpdatedAt": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || !data.exists())"
+        },
+        "planMonths": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (!data.exists() && newData.val() == null))"
+        },
+        "usage": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
         }
       }
     },
     "userChats": {
-      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)",
-        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
       }
     },
     "adminNotes": {
-      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
     },
     "adminAudit": {
-      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
     },
     "broadcasts": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
     },
     "broadcastSeen": {
       "$uid": {
@@ -67,19 +85,26 @@
     "payments": {
       ".read": "auth != null",
       "$id": {
-        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() == auth.uid && newData.child('status').val() == 'pending') || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() == auth.uid && newData.child('status').val() == 'pending') || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
       }
     },
     "tickets": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
       "$id": {
-        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() == auth.uid) || data.child('uid').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+        ".read": "auth != null && (data.child('uid').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() == auth.uid) || data.child('uid').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+      }
+    },
+    "userTickets": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
       }
     },
     "ticketMessages": {
       "$ticketId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".read": "auth != null && (root.child('tickets').child($ticketId).child('uid').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+        ".write": "auth != null && (root.child('tickets').child($ticketId).child('uid').val() == auth.uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'helper' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
       }
     },
     "chatMeta": {
@@ -93,8 +118,14 @@
       ".write": "auth != null"
     },
     "adminStats": {
-      ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true)"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+    },
+    "config": {
+      "modelPrompts": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+      }
     }
   }
 }

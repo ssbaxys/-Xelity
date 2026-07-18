@@ -18,6 +18,11 @@ import {
   type BillingMonths,
   type PlanId,
 } from './plans';
+import {
+  isStaffRole,
+  resolveStaffRole,
+  type StaffRole,
+} from './staff';
 
 export type UserProfile = {
   uid: string;
@@ -35,9 +40,17 @@ export type UserProfile = {
   planExpiresAt?: number | null;
   /** на сколько месяцев была последняя оплата / выдача */
   planMonths?: number | null;
-  /** Доступ к /admin. У всех новых аккаунтов false. */
+  /**
+   * Роль персонала: helper | moderator | admin | owner.
+   * null/absent = обычный пользователь.
+   */
+  staffRole?: StaffRole | null;
+  /**
+   * Legacy-флаг доступа к панели. Синхронизируется с staffRole
+   * (true у любого staff). Не назначай вручную — используй staffRole.
+   */
   isAdmin?: boolean;
-  /** @deprecated старое поле — мигрируется в isAdmin */
+  /** @deprecated старое поле — мигрируется в isAdmin / staffRole */
   admin?: boolean;
   banned?: boolean;
   /** Причина блокировки (показывается пользователю) */
@@ -94,7 +107,8 @@ export type PaymentRecord = {
 };
 
 export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
-export type TicketCategory = 'billing' | 'technical' | 'account' | 'other';
+export type TicketCategory = 'billing' | 'technical' | 'account' | 'other' | 'appeal';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export type Ticket = {
   id: string;
@@ -103,6 +117,12 @@ export type Ticket = {
   subject: string;
   category: TicketCategory;
   status: TicketStatus;
+  priority?: TicketPriority;
+  /** uid сотрудника, взявшего тикет */
+  assigneeUid?: string | null;
+  assigneeName?: string | null;
+  /** роль автора последнего сообщения: user | staff */
+  lastAuthorRole?: 'user' | 'staff';
   createdAt: number;
   updatedAt: number;
   lastMessageAt: number;
@@ -112,7 +132,9 @@ export type TicketMessage = {
   id: string;
   uid: string;
   authorName: string;
-  role: 'user' | 'admin';
+  /** user | admin (legacy) | staff */
+  role: 'user' | 'admin' | 'staff';
+  staffRole?: StaffRole | null;
   body: string;
   createdAt: number;
 };
@@ -552,6 +574,7 @@ export async function createTicket(input: {
   category: TicketCategory;
   body: string;
   authorName: string;
+  priority?: TicketPriority;
 }): Promise<string> {
   const id = uidShort();
   const now = Date.now();
@@ -562,11 +585,14 @@ export async function createTicket(input: {
     subject: input.subject.trim(),
     category: input.category,
     status: 'open',
+    priority: input.priority || 'normal',
+    lastAuthorRole: 'user',
     createdAt: now,
     updatedAt: now,
     lastMessageAt: now,
   };
   await set(ref(database, `tickets/${id}`), ticket);
+  await set(ref(database, `userTickets/${input.uid}/${id}`), true);
   const msgId = uidShort();
   const msg: TicketMessage = {
     id: msgId,
@@ -584,16 +610,21 @@ export async function addTicketMessage(input: {
   ticketId: string;
   uid: string;
   authorName: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'staff';
+  staffRole?: StaffRole | null;
   body: string;
+  /** не менять статус автоматически */
+  keepStatus?: boolean;
 }): Promise<void> {
   const msgId = uidShort();
   const now = Date.now();
+  const isStaffMsg = input.role === 'admin' || input.role === 'staff';
   const msg: TicketMessage = {
     id: msgId,
     uid: input.uid,
     authorName: input.authorName,
-    role: input.role,
+    role: isStaffMsg ? 'staff' : 'user',
+    staffRole: isStaffMsg ? input.staffRole ?? null : null,
     body: input.body.trim(),
     createdAt: now,
   };
@@ -601,8 +632,9 @@ export async function addTicketMessage(input: {
   const patch: Partial<Ticket> = {
     updatedAt: now,
     lastMessageAt: now,
+    lastAuthorRole: isStaffMsg ? 'staff' : 'user',
   };
-  if (input.role === 'admin') {
+  if (isStaffMsg && !input.keepStatus) {
     patch.status = 'in_progress';
   }
   await update(ref(database, `tickets/${input.ticketId}`), patch);
@@ -615,18 +647,55 @@ export async function setTicketStatus(ticketId: string, status: TicketStatus): P
   });
 }
 
+export async function setTicketPriority(
+  ticketId: string,
+  priority: TicketPriority,
+): Promise<void> {
+  await update(ref(database, `tickets/${ticketId}`), {
+    priority,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function claimTicket(input: {
+  ticketId: string;
+  assigneeUid: string;
+  assigneeName: string;
+}): Promise<void> {
+  await update(ref(database, `tickets/${input.ticketId}`), {
+    assigneeUid: input.assigneeUid,
+    assigneeName: input.assigneeName,
+    status: 'in_progress',
+    updatedAt: Date.now(),
+  });
+}
+
+export async function unclaimTicket(ticketId: string): Promise<void> {
+  await update(ref(database, `tickets/${ticketId}`), {
+    assigneeUid: null,
+    assigneeName: null,
+    updatedAt: Date.now(),
+  });
+}
+
 export function watchUserTickets(uid: string, cb: (list: Ticket[]) => void): Unsubscribe {
-  return onValue(ref(database, 'tickets'), (snap) => {
-    if (!snap.exists()) {
+  return onValue(ref(database, `userTickets/${uid}`), (indexSnap) => {
+    if (!indexSnap.exists()) {
       cb([]);
       return;
     }
-    const val = snap.val() as Record<string, Ticket>;
-    cb(
-      Object.values(val)
-        .filter((t) => t.uid === uid)
-        .sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
-    );
+    const ids = Object.keys(indexSnap.val() as Record<string, boolean>);
+    if (!ids.length) {
+      cb([]);
+      return;
+    }
+    void Promise.all(ids.map((id) => get(ref(database, `tickets/${id}`)))).then((snaps) => {
+      const list = snaps
+        .map((s) => (s.exists() ? (s.val() as Ticket) : null))
+        .filter((t): t is Ticket => Boolean(t))
+        .sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+      cb(list);
+    });
   });
 }
 
@@ -687,7 +756,16 @@ export function watchTickets(
         return;
       }
       const val = snap.val() as Record<string, Ticket>;
-      cb(Object.values(val).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)));
+      const list = Object.values(val).sort(
+        (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0),
+      );
+      cb(list);
+      // backfill userTickets index for legacy tickets
+      for (const t of list) {
+        if (t?.uid && t?.id) {
+          void set(ref(database, `userTickets/${t.uid}/${t.id}`), true).catch(() => {});
+        }
+      }
     },
     (err) => onError?.(err),
   );
@@ -711,7 +789,7 @@ export function watchBroadcasts(
   );
 }
 
-/** Ensure plan + isAdmin defaults; migrate legacy `admin` → `isAdmin` */
+/** Ensure plan + staffRole / isAdmin defaults; migrate legacy flags */
 export async function ensurePlanDefaults(uid: string): Promise<void> {
   const snap = await get(ref(database, `users/${uid}`));
   if (!snap.exists()) return;
@@ -723,9 +801,17 @@ export async function ensurePlanDefaults(uid: string): Promise<void> {
     patch.planUpdatedAt = Date.now();
   }
 
-  if (typeof v.isAdmin !== 'boolean') {
-    // legacy `admin: true` → isAdmin; иначе всегда false
-    patch.isAdmin = v.admin === true;
+  const resolved = resolveStaffRole(v);
+  if (resolved) {
+    if (v.staffRole !== resolved) patch.staffRole = resolved;
+    if (v.isAdmin !== true) patch.isAdmin = true;
+  } else {
+    if (typeof v.isAdmin !== 'boolean') {
+      patch.isAdmin = false;
+    }
+    if (v.staffRole != null && !isStaffRole(v.staffRole)) {
+      patch.staffRole = null;
+    }
   }
 
   if (Object.keys(patch).length) {
@@ -733,10 +819,9 @@ export async function ensurePlanDefaults(uid: string): Promise<void> {
   }
 }
 
+/** @deprecated используй isStaff / resolveStaffRole — true для любой staff-роли */
 export function profileIsAdmin(profile: UserProfile | null | undefined): boolean {
-  if (!profile) return false;
-  if (typeof profile.isAdmin === 'boolean') return profile.isAdmin;
-  return profile.admin === true;
+  return resolveStaffRole(profile) != null;
 }
 
 /* ——— Broadcasts ——— */
@@ -861,9 +946,18 @@ export function formatBanCountdown(msLeft: number): string {
   return parts.join(' ');
 }
 
+/** @deprecated → setUserStaffRole */
 export async function setUserIsAdmin(uid: string, isAdmin: boolean): Promise<void> {
+  await setUserStaffRole(uid, isAdmin ? 'admin' : null);
+}
+
+export async function setUserStaffRole(
+  uid: string,
+  role: StaffRole | null,
+): Promise<void> {
   await update(ref(database, `users/${uid}`), {
-    isAdmin,
+    staffRole: role,
+    isAdmin: role != null,
     updatedAt: Date.now(),
   });
 }
@@ -1048,6 +1142,63 @@ export async function fetchUserUsageHistory(
       credits: typeof u.credits === 'number' ? u.credits : u.messages || 0,
     }))
     .sort((a, b) => b.day.localeCompare(a.day));
+}
+
+/* ——— Per-model system prompts (admin) ——— */
+
+export type ModelSystemPrompt = {
+  modelId: string;
+  text: string;
+  updatedAt: number;
+  updatedBy?: string;
+  updatedByEmail?: string;
+};
+
+export function watchModelPrompts(
+  cb: (map: Record<string, ModelSystemPrompt>) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onValue(
+    ref(database, 'config/modelPrompts'),
+    (snap) => {
+      if (!snap.exists()) {
+        cb({});
+        return;
+      }
+      const val = snap.val() as Record<string, Partial<ModelSystemPrompt>>;
+      const out: Record<string, ModelSystemPrompt> = {};
+      for (const [modelId, row] of Object.entries(val)) {
+        out[modelId] = {
+          modelId,
+          text: typeof row?.text === 'string' ? row.text : '',
+          updatedAt: typeof row?.updatedAt === 'number' ? row.updatedAt : 0,
+          updatedBy: row?.updatedBy,
+          updatedByEmail: row?.updatedByEmail,
+        };
+      }
+      cb(out);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveModelSystemPrompt(input: {
+  modelId: string;
+  text: string;
+  updatedBy: string;
+  updatedByEmail?: string;
+}): Promise<void> {
+  const modelId = input.modelId.trim();
+  const text = input.text.trim().slice(0, 8000);
+  if (!modelId) throw new Error('modelId обязателен');
+  const record: ModelSystemPrompt = {
+    modelId,
+    text,
+    updatedAt: Date.now(),
+    updatedBy: input.updatedBy,
+  };
+  if (input.updatedByEmail) record.updatedByEmail = input.updatedByEmail;
+  await set(ref(database, `config/modelPrompts/${modelId}`), record);
 }
 
 export { push, ref, get, set, update };

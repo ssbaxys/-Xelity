@@ -4,13 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import {
   addTicketMessage,
   createTicket,
+  setTicketStatus,
   watchTicketMessages,
   watchUserTickets,
   type Ticket,
   type TicketCategory,
   type TicketMessage,
+  type TicketPriority,
   type TicketStatus,
 } from '../lib/rtdb';
+import { messageRoleLabel } from '../lib/staff';
 import AuthModal, { type AuthMode } from '../components/AuthModal';
 import { setPageMeta } from '../lib/seo';
 
@@ -21,12 +24,26 @@ const STATUS_LABEL: Record<TicketStatus, string> = {
   closed: 'Закрыт',
 };
 
+const PRIORITY_LABEL: Record<TicketPriority, string> = {
+  low: 'Низкий',
+  normal: 'Обычный',
+  high: 'Высокий',
+  urgent: 'Срочный',
+};
+
 const CATEGORIES: { id: TicketCategory; label: string }[] = [
   { id: 'billing', label: 'Оплата / тариф' },
   { id: 'technical', label: 'Техническая' },
   { id: 'account', label: 'Аккаунт' },
   { id: 'other', label: 'Другое' },
 ];
+
+function statusClass(status: TicketStatus) {
+  if (status === 'open') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
+  if (status === 'in_progress') return 'bg-sky-500/15 text-sky-700';
+  if (status === 'resolved') return 'bg-emerald-500/15 text-emerald-700';
+  return 'bg-slate-500/15 text-slate';
+}
 
 export default function SupportPage() {
   useEffect(() => {
@@ -45,6 +62,7 @@ export default function SupportPage() {
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState<TicketCategory>('technical');
+  const [priority, setPriority] = useState<TicketPriority>('normal');
   const [body, setBody] = useState('');
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
@@ -85,11 +103,13 @@ export default function SupportPage() {
         email: (user.email || '').toLowerCase(),
         subject,
         category,
+        priority,
         body,
         authorName: user.displayName || user.email || 'User',
       });
       setSubject('');
       setBody('');
+      setPriority('normal');
       setActiveId(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания');
@@ -110,6 +130,10 @@ export default function SupportPage() {
         role: 'user',
         body: reply,
       });
+      const t = tickets.find((x) => x.id === activeId);
+      if (t?.status === 'resolved') {
+        await setTicketStatus(activeId, 'open');
+      }
       setReply('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка отправки');
@@ -119,6 +143,7 @@ export default function SupportPage() {
   };
 
   const active = tickets.find((t) => t.id === activeId) ?? null;
+  const canReply = active && active.status !== 'closed';
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -128,7 +153,7 @@ export default function SupportPage() {
         </Link>
         <h1 className="mt-3 font-display text-3xl font-bold">Поддержка</h1>
         <p className="mt-2 text-sm text-slate">
-          Тикеты хранятся в Firebase. Админ отвечает из панели управления.
+          Создайте тикет — команда Xelity ответит в этой же переписке.
         </p>
 
         {!loading && !user && (
@@ -147,7 +172,7 @@ export default function SupportPage() {
           </div>
         )}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr]">
+        <div className="mt-8 grid gap-6 lg:grid-cols-[300px_1fr]">
           <div className="space-y-4">
             <form onSubmit={onCreate} className="rounded-2xl border border-line bg-elevated p-4">
               <h2 className="text-sm font-semibold">Новый тикет</h2>
@@ -156,6 +181,7 @@ export default function SupportPage() {
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
+                  maxLength={120}
                   className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-signal"
                 />
               </label>
@@ -174,11 +200,26 @@ export default function SupportPage() {
                 </select>
               </label>
               <label className="mt-3 block text-xs text-slate">
+                Приоритет
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-signal"
+                >
+                  {(Object.keys(PRIORITY_LABEL) as TicketPriority[]).map((p) => (
+                    <option key={p} value={p}>
+                      {PRIORITY_LABEL[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="mt-3 block text-xs text-slate">
                 Описание
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   rows={4}
+                  maxLength={4000}
                   className="mt-1 w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-signal"
                 />
               </label>
@@ -194,7 +235,7 @@ export default function SupportPage() {
 
             <div className="rounded-2xl border border-line bg-elevated p-2">
               <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-slate">
-                Мои тикеты
+                Мои тикеты ({tickets.length})
               </p>
               {tickets.length === 0 ? (
                 <p className="px-2 py-4 text-center text-xs text-slate">Пока пусто</p>
@@ -210,7 +251,14 @@ export default function SupportPage() {
                         }`}
                       >
                         <span className="block truncate font-medium">{t.subject}</span>
-                        <span className="text-[11px] text-slate">{STATUS_LABEL[t.status]}</span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className={`rounded px-1.5 py-0.5 ${statusClass(t.status)}`}>
+                            {STATUS_LABEL[t.status]}
+                          </span>
+                          {t.lastAuthorRole === 'staff' && t.status !== 'closed' && (
+                            <span className="text-signal">есть ответ</span>
+                          )}
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -228,33 +276,46 @@ export default function SupportPage() {
               <div className="flex h-full min-h-[380px] flex-col">
                 <div className="border-b border-line pb-3">
                   <h2 className="font-semibold">{active.subject}</h2>
-                  <p className="text-xs text-slate">
-                    {STATUS_LABEL[active.status]} · {active.email}
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate">
+                    <span className={`rounded px-1.5 py-0.5 ${statusClass(active.status)}`}>
+                      {STATUS_LABEL[active.status]}
+                    </span>
+                    <span>{PRIORITY_LABEL[active.priority || 'normal']}</span>
+                    {active.assigneeName && <span>· отвечает {active.assigneeName}</span>}
                   </p>
                 </div>
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
-                        m.role === 'admin'
-                          ? 'bg-signal/10 text-ink'
-                          : 'ml-auto bg-mist text-ink'
-                      }`}
-                    >
-                      <p className="text-[10px] text-slate">
-                        {m.authorName} · {m.role === 'admin' ? 'поддержка' : 'вы'}
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                  ))}
+                  {messages.map((m) => {
+                    const staffSide = m.role === 'admin' || m.role === 'staff';
+                    return (
+                      <div
+                        key={m.id}
+                        className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
+                          staffSide ? 'bg-signal/10 text-ink' : 'ml-auto bg-mist text-ink'
+                        }`}
+                      >
+                        <p className="text-[10px] text-slate">
+                          {staffSide
+                            ? `${m.authorName} · ${messageRoleLabel(m.role, m.staffRole)}`
+                            : 'вы'}
+                          {' · '}
+                          {new Date(m.createdAt).toLocaleString('ru-RU')}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
+                      </div>
+                    );
+                  })}
                 </div>
-                {active.status !== 'closed' && (
+                {canReply ? (
                   <form onSubmit={onReply} className="flex gap-2 border-t border-line pt-3">
                     <input
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      placeholder="Ответ…"
+                      placeholder={
+                        active.status === 'resolved'
+                          ? 'Написать снова (тикет откроется)…'
+                          : 'Ваш ответ…'
+                      }
                       className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-signal"
                     />
                     <button
@@ -265,6 +326,10 @@ export default function SupportPage() {
                       Отправить
                     </button>
                   </form>
+                ) : (
+                  <p className="border-t border-line pt-3 text-center text-xs text-slate">
+                    Тикет закрыт. Создайте новый, если вопрос остался.
+                  </p>
                 )}
               </div>
             )}

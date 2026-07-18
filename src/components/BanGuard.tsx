@@ -5,14 +5,14 @@ import { useAuth } from '../context/AuthContext';
 const ALLOWED = new Set(['/', '/banned', '/404']);
 
 export default function BanGuard({ children }: { children: React.ReactNode }) {
-  const { isBanned, isAdmin, loading } = useAuth();
+  const { isBanned, isStaff, loading } = useAuth();
   const location = useLocation();
 
   if (loading) return <>{children}</>;
 
   const path = location.pathname;
-  /** Админ может работать в панели даже если аккаунт забанен */
-  const adminPanel = isAdmin && (path === '/admin' || path.startsWith('/admin/'));
+  /** Staff может работать в панели даже если аккаунт забанен */
+  const adminPanel = isStaff && (path === '/admin' || path.startsWith('/admin/'));
   const allowed = ALLOWED.has(path) || path.startsWith('/404') || adminPanel;
 
   if (isBanned && !allowed) {

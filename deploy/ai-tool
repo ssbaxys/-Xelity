@@ -187,6 +187,32 @@ edit_env() {
   c_ok "Сохранено и перезапущено"
 }
 
+install_firebase_sa() {
+  need_root
+  local dest="${APP_DIR}/firebase-service-account.json"
+  echo
+  echo "Firebase Console → Project settings → Service accounts → Generate new private key"
+  echo "Скопируй JSON на VPS, затем укажи путь к файлу."
+  echo
+  local src
+  src=$(ask "Путь к JSON на этом сервере (например /root/xelity-sa.json): ")
+  src=$(echo "${src}" | xargs)
+  if [[ -z "${src}" || ! -f "${src}" ]]; then
+    c_err "Файл не найден"
+    return
+  fi
+  if ! grep -q '"private_key"' "${src}"; then
+    c_err "Это не похоже на Firebase service account JSON"
+    return
+  fi
+  install -m 600 -o www-data -g www-data "${src}" "${dest}"
+  mkdir -p "${APP_DIR}/data"
+  chown www-data:www-data "${APP_DIR}/data"
+  systemctl restart "${SERVICE}"
+  c_ok "Установлен ${dest}, сервис перезапущен"
+  echo "Не забудь в Firebase Console → Realtime Database → Rules вставить database.rules.json из репо"
+}
+
 menu() {
   while true; do
     c_title
@@ -203,6 +229,7 @@ menu() {
     echo "  9) Логи"
     echo " 10) Открыть .env в редакторе"
     echo " 11) Включить HTTPS (api.xelity.ru) — нужно для сайта на https"
+    echo " 12) Firebase Admin (service account) — доверие серверу, не клиенту"
     echo "  0) Выход"
     echo
     choice=$(ask "Выбор: ")
@@ -218,6 +245,7 @@ menu() {
       9) open_logs ;;
       10) edit_env ;;
       11) need_root; bash "${APP_DIR}/deploy/setup-https.sh" ;;
+      12) install_firebase_sa ;;
       0|q|Q) exit 0 ;;
       *) c_warn "Неизвестный пункт" ;;
     esac

@@ -65,9 +65,9 @@ export default function Company() {
                       horizontalPadding={0}
                       borderRadius={0}
                       gradientHeight={8}
-                      gradientFrom={isLight ? '#faf6f6' : '#0c0808'}
+                      gradientFrom={isLight ? '#ffffff' : '#0c0808'}
                       gradientTo="transparent"
-                      textColor={isLight ? '#1a1010' : '#f3ecec'}
+                      textColor={isLight ? '#121212' : '#f3ecec'}
                       fontWeight={700}
                       counterStyle={{ letterSpacing: '-0.02em', fontFamily: 'Syne, sans-serif' }}
                     />

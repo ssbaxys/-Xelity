@@ -24,7 +24,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
     blurb: 'Для знакомства с линейкой Xlaude.',
     features: [
       '40 кредитов в сутки',
-      'Mini K1 — 1 кр., Pro K1 — 2 кр., Mini K2 — 4 кр. (с рассуждениями ×2)',
+      'Mini K1 — 1 кр., Pro K1 — 2 кр., Mini K2 — 4 кр., Pro K2 — 8 кр. (с рассуждениями ×2)',
       'Ответы до ~2k токенов',
     ],
   },
@@ -78,6 +78,32 @@ export const ADMIN_DURATIONS: { days: number; label: string; months?: BillingMon
 export function getPlan(id: PlanId | string | null | undefined): PlanDef {
   if (id === 'pro' || id === 'max' || id === 'free') return PLANS[id];
   return PLANS.free;
+}
+
+/** free < pro < max */
+export function planRank(id: PlanId | string | null | undefined): number {
+  const p = getPlan(id).id;
+  if (p === 'max') return 2;
+  if (p === 'pro') return 1;
+  return 0;
+}
+
+export type PurchaseAction = 'buy' | 'renew' | 'upgrade' | 'blocked';
+
+/**
+ * Что можно сделать с целевым тарифом при текущем.
+ * Более низкий, чем текущий — нельзя (только продление своего / апгрейд выше).
+ */
+export function purchaseActionFor(
+  currentPlan: PlanId | string | null | undefined,
+  targetPlan: PlanId,
+): PurchaseAction {
+  if (targetPlan === 'free') return 'blocked';
+  const cur = getPlan(currentPlan).id;
+  if (cur === 'free') return 'buy';
+  if (cur === targetPlan) return 'renew';
+  if (planRank(targetPlan) > planRank(cur)) return 'upgrade';
+  return 'blocked';
 }
 
 export function periodDiscount(months: BillingMonths): number {

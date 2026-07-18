@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PlanCountdown from '../../components/PlanCountdown';
+import { useAuth } from '../../context/AuthContext';
 import { ADMIN_DURATIONS, PLANS, todayKey, type PlanId } from '../../lib/plans';
 import {
   getDayUsage,
   isUserBanned,
   setUserBanned,
-  setUserIsAdmin,
   setUserPlan,
+  setUserStaffRole,
   watchAllUsers,
   type UserProfile,
 } from '../../lib/rtdb';
+import {
+  canAssignRole,
+  resolveStaffRole,
+  STAFF_ROLE_LABEL,
+  STAFF_ROLE_ORDER,
+  type StaffRole,
+} from '../../lib/staff';
+import AdminSelect from './AdminSelect';
 
 type SubModal = {
   user: UserProfile;
@@ -60,6 +69,12 @@ function openSubModal(user: UserProfile): SubModal {
 }
 
 export default function AdminUsers() {
+  const { staffRole: actorRole, can } = useAuth();
+  const canPlan = can('users.plan');
+  const canModerate = can('users.moderate');
+  const canRoles = can('users.roles');
+  const canGod = can('chats.god');
+  const canChats = can('chats.view');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [usageMap, setUsageMap] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -243,12 +258,26 @@ export default function AdminUsers() {
           <tbody>
             {filtered.map((u) => {
               const plan = (u.plan === 'pro' || u.plan === 'max' ? u.plan : 'free') as PlanId;
-              const isAdm = Boolean(u.isAdmin || u.admin);
+              const targetRole = resolveStaffRole(u);
               const active =
                 plan !== 'free' &&
                 typeof u.planExpiresAt === 'number' &&
                 u.planExpiresAt > Date.now();
               const bannedNow = isUserBanned(u);
+              const roleOptions: { value: string; label: string }[] = [
+                { value: '', label: 'User' },
+                ...STAFF_ROLE_ORDER.filter((r) => canAssignRole(actorRole, r)).map((r) => ({
+                  value: r,
+                  label: STAFF_ROLE_LABEL[r],
+                })),
+              ];
+              // если у цели роль выше / owner — показать текущую даже если нельзя назначить
+              if (targetRole && !roleOptions.some((o) => o.value === targetRole)) {
+                roleOptions.push({
+                  value: targetRole,
+                  label: `${STAFF_ROLE_LABEL[targetRole]} (недоступно)`,
+                });
+              }
               return (
                 <tr key={u.uid} className="border-t border-[#2a1c1c]">
                   <td className="px-3 py-2">
@@ -287,8 +316,14 @@ export default function AdminUsers() {
                       {bannedNow ? 'ban' : 'ok'}
                     </span>
                     {' · '}
-                    <span className={isAdm ? 'text-[#c62828]' : 'text-[#9a8585]'}>
-                      {isAdm ? 'admin' : 'user'}
+                    <span
+                      className={
+                        targetRole
+                          ? 'text-[var(--admin-accent,#c62828)]'
+                          : 'text-[#9a8585]'
+                      }
+                    >
+                      {targetRole ? STAFF_ROLE_LABEL[targetRole] : 'user'}
                     </span>
                     {bannedNow && u.banReason && (
                       <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-[#e57373]/80" title={u.banReason}>
@@ -308,61 +343,86 @@ export default function AdminUsers() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        disabled={busy === u.uid}
-                        onClick={() => {
-                          setError(null);
-                          setModal(openSubModal(u));
-                        }}
-                        className="rounded-md border border-[#c62828]/40 bg-[#c62828]/10 px-2 py-1 text-[11px] text-[#ff8a80] hover:bg-[#c62828]/20 disabled:opacity-40"
-                      >
-                        {active ? 'Изменить подписку' : 'Выдать подписку'}
-                      </button>
-                      <Link
-                        to={`/admin/chats?uid=${u.uid}&god=1`}
-                        className="rounded-md border border-[#c62828]/50 bg-[#c62828]/15 px-2 py-1 text-[11px] font-medium text-[#ff8a80] hover:bg-[#c62828]/25"
-                      >
-                        Режим бога
-                      </Link>
-                      <Link
-                        to={`/admin/chats?uid=${u.uid}`}
-                        className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
-                      >
-                        Чаты
-                      </Link>
-                      <button
-                        type="button"
-                        disabled={busy === u.uid}
-                        onClick={() => {
-                          if (bannedNow) {
-                            void run(u.uid, () => setUserBanned(u.uid, false));
-                          } else {
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {canPlan && (
+                        <button
+                          type="button"
+                          disabled={busy === u.uid}
+                          onClick={() => {
                             setError(null);
-                            setBanModal({
-                              user: u,
-                              reason: '',
-                              duration: '7d',
-                              customDays: '3',
-                              customHours: '0',
-                            });
-                          }
-                        }}
+                            setModal(openSubModal(u));
+                          }}
+                          className="rounded-md border border-[var(--admin-accent,#c62828)]/40 bg-[var(--admin-accent-soft,rgba(198,40,40,0.1))] px-2 py-1 text-[11px] text-[#ff8a80] hover:brightness-110 disabled:opacity-40"
+                        >
+                          {active ? 'Изменить подписку' : 'Выдать подписку'}
+                        </button>
+                      )}
+                      {canGod && (
+                        <Link
+                          to={`/admin/chats?uid=${u.uid}&god=1`}
+                          className="rounded-md border border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))] px-2 py-1 text-[11px] font-medium text-[#ff8a80] hover:brightness-110"
+                        >
+                          Режим бога
+                        </Link>
+                      )}
+                      {canChats && (
+                        <Link
+                          to={`/admin/chats?uid=${u.uid}`}
+                          className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
+                        >
+                          Чаты
+                        </Link>
+                      )}
+                      {canModerate && (
+                        <button
+                          type="button"
+                          disabled={busy === u.uid}
+                          onClick={() => {
+                            if (bannedNow) {
+                              void run(u.uid, () => setUserBanned(u.uid, false));
+                            } else {
+                              setError(null);
+                              setBanModal({
+                                user: u,
+                                reason: '',
+                                duration: '7d',
+                                customDays: '3',
+                                customHours: '0',
+                              });
+                            }
+                          }}
+                          className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
+                        >
+                          {bannedNow ? 'Разбан' : 'Бан'}
+                        </button>
+                      )}
+                      {canRoles && (
+                        <div className="min-w-[120px]">
+                          <AdminSelect
+                            value={targetRole || ''}
+                            options={roleOptions}
+                            disabled={busy === u.uid || !canAssignRole(actorRole, targetRole)}
+                            onChange={(v) => {
+                              const next = (v || null) as StaffRole | null;
+                              if (!canAssignRole(actorRole, next)) {
+                                setError('Недостаточно прав для этой роли');
+                                return;
+                              }
+                              if (targetRole === 'owner' && actorRole !== 'owner') {
+                                setError('Только Owner может менять Owner');
+                                return;
+                              }
+                              void run(u.uid, () => setUserStaffRole(u.uid, next));
+                            }}
+                          />
+                        </div>
+                      )}
+                      <Link
+                        to={`/admin/users/${u.uid}`}
                         className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
                       >
-                        {bannedNow ? 'Разбан' : 'Бан'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy === u.uid}
-                        onClick={() =>
-                          void run(u.uid, () => setUserIsAdmin(u.uid, !isAdm))
-                        }
-                        className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
-                      >
-                        {isAdm ? 'Снять admin' : 'Сделать admin'}
-                      </button>
+                        Карточка
+                      </Link>
                     </div>
                   </td>
                 </tr>

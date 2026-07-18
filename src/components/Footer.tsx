@@ -7,7 +7,7 @@ const columns = [
     links: [
       { label: 'Тарифы', to: '/pricing', desc: 'Free, Pro и Max' },
       { label: 'Обзор', to: '/product', desc: 'Возможности и сценарии' },
-      { label: 'Xlaude', to: '/model', desc: 'Mini K1 · Pro K1 · Mini K2' },
+      { label: 'Xlaude', to: '/model', desc: 'Mini · Pro · K1 · K2' },
     ],
   },
   {
@@ -46,7 +46,7 @@ const social = [
 ];
 
 export default function Footer() {
-  const { isAdmin } = useAuth();
+  const { isStaff } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -116,7 +116,7 @@ export default function Footer() {
             </p>
             <p className="mt-1 break-words text-[11px] text-slate/50">
               Открытая бета · Сан-Франциско ·{' '}
-              {isAdmin ? (
+              {isStaff ? (
                 <button
                   type="button"
                   onClick={() => navigate('/admin')}

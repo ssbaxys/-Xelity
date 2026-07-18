@@ -1,6 +1,10 @@
 /** Линейка Xlaude K1 / K2 */
 
-export type UiModelId = 'xlaude-mini-k1' | 'xlaude-pro-k1' | 'xlaude-mini-k2';
+export type UiModelId =
+  | 'xlaude-mini-k1'
+  | 'xlaude-pro-k1'
+  | 'xlaude-mini-k2'
+  | 'xlaude-pro-k2';
 export type ChatModelId = UiModelId;
 
 export type ModelDef = {
@@ -47,6 +51,16 @@ export const MODELS: ModelDef[] = [
     defaultMaxTokens: 8192,
     temperature: 0.45,
   },
+  {
+    id: 'xlaude-pro-k2',
+    name: 'Xlaude Pro K2',
+    tab: 'Pro K2',
+    desc: 'Профессиональная линейка нового поколения',
+    generation: 'K2',
+    creditCost: 8,
+    defaultMaxTokens: 12288,
+    temperature: 0.28,
+  },
 ];
 
 export const MODEL_ORDER: UiModelId[] = MODELS.map((m) => m.id);
@@ -63,7 +77,12 @@ const LEGACY_MODEL_MAP: Record<string, UiModelId> = {
 };
 
 export function isUiModelId(value: string | null | undefined): value is UiModelId {
-  return value === 'xlaude-mini-k1' || value === 'xlaude-pro-k1' || value === 'xlaude-mini-k2';
+  return (
+    value === 'xlaude-mini-k1' ||
+    value === 'xlaude-pro-k1' ||
+    value === 'xlaude-mini-k2' ||
+    value === 'xlaude-pro-k2'
+  );
 }
 
 export function normalizeModelId(value: string | null | undefined): UiModelId {
@@ -93,4 +112,8 @@ export function creditCostForRequest(
 
 export function modelLabel(id: string | null | undefined): string {
   return getModel(id).tab;
+}
+
+export function modelDisplayName(id: string | null | undefined): string {
+  return getModel(id).name;
 }

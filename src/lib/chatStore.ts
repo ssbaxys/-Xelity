@@ -24,6 +24,8 @@ export type ChatMessage = {
    * null/undefined — обычное сообщение или всё готово
    */
   thinkingPhase?: 'thinking' | 'answering' | null;
+  /** пользователь отправил с включённым режимом «Рассуждения» */
+  usedReasoning?: boolean;
 };
 
 export type ChatThread = {
@@ -83,6 +85,7 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                   m.thinkingPhase === 'thinking' || m.thinkingPhase === 'answering'
                     ? m.thinkingPhase
                     : null,
+                usedReasoning: Boolean(m.usedReasoning),
               }))
             : [],
           manualTitle: Boolean(c.manualTitle),

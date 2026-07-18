@@ -26,6 +26,9 @@ export default function ReasoningPanel({
   const live = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
   const [open, setOpen] = useState(live);
   const [tick, setTick] = useState(0);
+  const [thoughtKey, setThoughtKey] = useState(0);
+
+  const hasText = Boolean(reasoning?.trim());
 
   useEffect(() => {
     if (!live) {
@@ -37,23 +40,26 @@ export default function ReasoningPanel({
     return () => window.clearInterval(id);
   }, [live, thinkingPhase]);
 
-  const elapsedMs = live
-    ? Math.max(0, Date.now() - startedAt)
-    : typeof reasoningMs === 'number'
-      ? reasoningMs
-      : 0;
+  // Перезапуск анимации, когда текст мыслей впервые появился / обновился
+  useEffect(() => {
+    if (!hasText) return;
+    setThoughtKey((k) => k + 1);
+    setOpen(true);
+  }, [hasText, reasoning]);
 
-  // tick used to re-render live timer
+  const liveElapsedMs = Math.max(0, Date.now() - startedAt);
+  const doneMs =
+    typeof reasoningMs === 'number' && reasoningMs > 0 ? reasoningMs : liveElapsedMs;
+
   void tick;
 
-  const hasText = Boolean(reasoning?.trim());
   if (!live && !hasText) return null;
 
   const label = live
     ? thinkingPhase === 'answering'
-      ? `Думал ${formatThinkDuration(elapsedMs)} · пишу ответ…`
-      : `Думает… ${formatThinkDuration(elapsedMs)}`
-    : `Думал ${formatThinkDuration(elapsedMs)}`;
+      ? `Думает… пишу ответ`
+      : `Думает… ${formatThinkDuration(liveElapsedMs)}`
+    : `Думал ${formatThinkDuration(doneMs)}`;
 
   return (
     <div className="mb-2.5 max-w-[min(100%,42rem)]">
@@ -70,14 +76,20 @@ export default function ReasoningPanel({
       </button>
 
       <div
-        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+        className={`grid transition-[grid-template-rows,opacity] duration-350 ease-out ${
           open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         }`}
+        style={{ transitionDuration: '380ms' }}
       >
         <div className="min-h-0 overflow-hidden">
           <div className="mt-1.5 border-l border-[var(--c-border)] pl-3 text-[12.5px] leading-relaxed text-[var(--c-faint)]">
             {hasText ? (
-              <p className="whitespace-pre-wrap">{reasoning}</p>
+              <p
+                key={thoughtKey}
+                className="reasoning-thoughts-enter whitespace-pre-wrap"
+              >
+                {reasoning}
+              </p>
             ) : live ? (
               <p className="thinking-label opacity-70">Собираю мысли…</p>
             ) : null}

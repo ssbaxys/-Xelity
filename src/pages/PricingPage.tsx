@@ -12,6 +12,7 @@ import {
   formatPriceRub,
   getPlan,
   priceForPeriod,
+  purchaseActionFor,
   type BillingMonths,
   type PlanId,
 } from '../lib/plans';
@@ -45,7 +46,7 @@ export default function PricingPage() {
     setPageMeta({
       title: 'Тарифы',
       description:
-        'Тарифы Xelity: Free, Pro и Max. Дневные кредиты для Xlaude Mini K1, Pro K1 и Mini K2.',
+        'Тарифы Xelity: Free, Pro и Max. Дневные кредиты для Xlaude Mini/Pro K1 и K2.',
       path: '/pricing',
     });
   }, []);
@@ -84,6 +85,13 @@ export default function PricingPage() {
     setOkMsg(null);
     setError(null);
     if (plan === 'free') return;
+    const action = purchaseActionFor(planId, plan);
+    if (action === 'blocked') {
+      setError(
+        `У вас уже ${current.name}. Можно только продлить текущий тариф или перейти на более высокий.`,
+      );
+      return;
+    }
     if (!user) {
       setAuthMode('login');
       setAuthOpen(true);
@@ -98,6 +106,12 @@ export default function PricingPage() {
     e.preventDefault();
     if (!user || !checkoutPlan) return;
     setError(null);
+    if (purchaseActionFor(planId, checkoutPlan) === 'blocked') {
+      setError(
+        `Нельзя оформить ${PLANS[checkoutPlan].name}: у вас уже более высокий тариф ${current.name}. Только продление.`,
+      );
+      return;
+    }
     const digits = onlyCardDigits(cardNumber);
     if (!cardholder.trim()) {
       setError('Укажите имя на карте.');
@@ -207,11 +221,27 @@ export default function PricingPage() {
           {PLAN_ORDER.map((id) => {
             const p = PLANS[id];
             const active = id === planId;
+            const action = purchaseActionFor(planId, id);
+            const blocked = action === 'blocked';
+            const btnLabel =
+              id === 'free'
+                ? 'Базовый'
+                : action === 'renew'
+                  ? 'Продлить'
+                  : action === 'upgrade'
+                    ? 'Улучшить'
+                    : action === 'blocked'
+                      ? 'Недоступно'
+                      : 'Оплатить';
             return (
               <div
                 key={id}
                 className={`flex flex-col rounded-2xl border p-5 ${
-                  active ? 'border-signal/50 bg-elevated' : 'border-line bg-elevated/60'
+                  active
+                    ? 'border-signal/50 bg-elevated'
+                    : blocked
+                      ? 'border-line bg-elevated/40 opacity-70'
+                      : 'border-line bg-elevated/60'
                 }`}
               >
                 <div className="flex items-baseline justify-between gap-2">
@@ -239,6 +269,12 @@ export default function PricingPage() {
                   </div>
                 )}
                 <p className="mt-2 text-sm text-slate">{p.blurb}</p>
+                {blocked && id !== 'free' && (
+                  <p className="mt-2 text-[12px] text-slate">
+                    У вас уже {current.name} — доступно только продление текущего тарифа
+                    {planId !== 'max' ? ' или переход выше' : ''}.
+                  </p>
+                )}
                 <ul className="mt-4 flex-1 space-y-2 text-sm text-slate">
                   {p.features.map((f) => (
                     <li key={f} className="flex gap-2">
@@ -249,11 +285,11 @@ export default function PricingPage() {
                 </ul>
                 <button
                   type="button"
-                  disabled={id === 'free'}
+                  disabled={id === 'free' || blocked}
                   onClick={() => startCheckout(id)}
                   className="mt-5 rounded-lg bg-signal px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {id === 'free' ? 'Базовый' : active ? 'Продлить' : 'Оплатить'}
+                  {btnLabel}
                 </button>
               </div>
             );
@@ -304,10 +340,26 @@ export default function PricingPage() {
             onSubmit={onSubmit}
             className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-elevated p-5 shadow-2xl"
           >
-            <h3 className="font-display text-lg font-bold">
-              Оплата · {PLANS[checkoutPlan].name}
-            </h3>
-            <p className="mt-1 text-sm text-slate">Выберите срок и заполните данные карты.</p>
+            {(() => {
+              const checkoutAction = purchaseActionFor(planId, checkoutPlan);
+              return (
+                <>
+                  <h3 className="font-display text-lg font-bold">
+                    {checkoutAction === 'renew'
+                      ? 'Продление'
+                      : checkoutAction === 'upgrade'
+                        ? 'Улучшение'
+                        : 'Оплата'}{' '}
+                    · {PLANS[checkoutPlan].name}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate">
+                    {checkoutAction === 'renew'
+                      ? 'Срок добавится к текущей подписке. Выберите период и карту.'
+                      : 'Выберите срок и заполните данные карты.'}
+                  </p>
+                </>
+              );
+            })()}
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               {BILLING_PERIODS.map((bp) => {

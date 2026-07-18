@@ -23,12 +23,17 @@ import { effectivePlanId, type PlanId } from '../lib/plans';
 import {
   ensurePlanDefaults,
   isUserBanned,
-  profileIsAdmin,
   syncExpiredBan,
   syncExpiredPlan,
   watchUserProfile,
   type UserProfile,
 } from '../lib/rtdb';
+import {
+  hasPermission,
+  resolveStaffRole,
+  type StaffPermission,
+  type StaffRole,
+} from '../lib/staff';
 
 interface RegisterPayload {
   name: string;
@@ -42,7 +47,11 @@ interface AuthContextValue {
   profile: UserProfile | null;
   planId: PlanId;
   planExpiresAt: number | null;
+  /** Любая staff-роль (helper…owner). Legacy-имя isAdmin. */
   isAdmin: boolean;
+  isStaff: boolean;
+  staffRole: StaffRole | null;
+  can: (perm: StaffPermission) => boolean;
   isBanned: boolean;
   loading: boolean;
   register: (payload: RegisterPayload) => Promise<void>;
@@ -116,6 +125,7 @@ async function upsertUserProfile(user: User, extras?: { company?: string | null;
       plan: 'free',
       planUpdatedAt: now,
       isAdmin: false,
+      staffRole: null,
     });
     return;
   }
@@ -215,6 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const planExpiresAt =
     planId !== 'free' && typeof profile?.planExpiresAt === 'number' ? profile.planExpiresAt : null;
   const isBanned = isUserBanned(profile);
+  const staffRole = resolveStaffRole(profile);
+  const isStaff = staffRole != null;
 
   const value = useMemo(
     () => ({
@@ -222,7 +234,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       planId,
       planExpiresAt,
-      isAdmin: profileIsAdmin(profile),
+      isAdmin: isStaff,
+      isStaff,
+      staffRole,
+      can: (perm: StaffPermission) => hasPermission(staffRole, perm),
       isBanned,
       loading,
       register,
@@ -230,7 +245,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle,
       logout,
     }),
-    [user, profile, planId, planExpiresAt, isBanned, loading, register, login, loginWithGoogle, logout],
+    [
+      user,
+      profile,
+      planId,
+      planExpiresAt,
+      isStaff,
+      staffRole,
+      isBanned,
+      loading,
+      register,
+      login,
+      loginWithGoogle,
+      logout,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

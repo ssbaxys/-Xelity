@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { getModel, normalizeModelId } from '../src/lib/models';
+import {
+  assertCanGenerate,
+  chargeAfterSuccess,
+  getModelSystemPrompt,
+  maxTokensFor,
+} from './firebaseAdmin';
 import { AITUNNEL_MODEL_ID, buildSystemPrompt, type ReasoningPhase } from './prompts';
 
 export type ChatBody = {
@@ -7,9 +13,10 @@ export type ChatBody = {
   messages?: { role: string; content: string }[];
   maxTokens?: number;
   systemExtra?: string;
-  /** Игнорируется — нельзя переопределять system с клиента */
   systemOverride?: string;
   reasoningPhase?: ReasoningPhase;
+  /** клиент сообщает режим рассуждений — стоимость считает сервер */
+  reasoning?: boolean;
 };
 
 const rateBucket = new Map<string, { count: number; resetAt: number }>();
@@ -31,6 +38,13 @@ function rateLimitOk(ip: string): boolean {
   }
   cur.count += 1;
   return cur.count <= RATE_LIMIT;
+}
+
+function bearerToken(req: IncomingMessage): string | null {
+  const h = req.headers.authorization;
+  if (!h || typeof h !== 'string') return null;
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m?.[1]?.trim() || null;
 }
 
 function readJsonBody(req: IncomingMessage): Promise<ChatBody> {
@@ -114,7 +128,6 @@ export async function handleChat(
   try {
     const body = await readJsonBody(req);
 
-    // Клиентский systemOverride всегда отклоняем (даже если прислали)
     if (typeof body.systemOverride === 'string' && body.systemOverride.trim()) {
       sendJson(res, 400, { error: 'systemOverride запрещён' });
       return;
@@ -137,20 +150,47 @@ export async function handleChat(
       return;
     }
 
-    const maxTokensRaw = Number(body.maxTokens);
-    const maxTokens = Number.isFinite(maxTokensRaw)
-      ? Math.min(model.defaultMaxTokens, Math.max(256, Math.round(maxTokensRaw)))
-      : model.defaultMaxTokens;
+    const reasoning =
+      body.reasoning === true ||
+      body.reasoningPhase === 'think' ||
+      body.reasoningPhase === 'answer';
 
+    // Шаг think не списываем отдельно — списываем один раз на answer / обычный ответ
+    const chargeNow = body.reasoningPhase !== 'think';
+
+    const gateResult = await assertCanGenerate({
+      idToken: bearerToken(req),
+      ip,
+      modelId,
+      reasoning: body.reasoning === true,
+    });
+
+    if (!gateResult.ok) {
+      sendJson(res, gateResult.status, { error: gateResult.error });
+      return;
+    }
+
+    const { gate } = gateResult;
+    // Админ не тратит кредиты; гости и юзеры — да
+    const shouldCharge = chargeNow && !gate.isAdmin;
+
+    if (shouldCharge && gate.limit != null && gate.used + gate.cost > gate.limit) {
+      sendJson(res, 402, { error: 'Недостаточно кредитов' });
+      return;
+    }
+
+    const maxTokens = maxTokensFor(gate, model.defaultMaxTokens);
     const systemExtra =
       typeof body.systemExtra === 'string' ? body.systemExtra.trim().slice(0, 2000) : '';
     const phase =
       body.reasoningPhase === 'think' || body.reasoningPhase === 'answer'
         ? body.reasoningPhase
         : undefined;
+    const modelSystemExtra = await getModelSystemPrompt(modelId);
 
     const systemContent = buildSystemPrompt(modelId, systemExtra || null, {
       reasoningPhase: phase,
+      modelSystemExtra: modelSystemExtra || null,
     });
 
     const upstream = await fetch('https://api.aitunnel.ru/v1/chat/completions', {
@@ -187,8 +227,22 @@ export async function handleChat(
       return;
     }
 
-    // Не отдаём upstream model id клиенту
-    sendJson(res, 200, { content, modelId });
+    let usage = { used: gate.used, limit: gate.limit };
+    if (shouldCharge) {
+      const tokensApprox = Math.ceil(content.length / 4);
+      usage = await chargeAfterSuccess(gate, tokensApprox, ip);
+    }
+
+    sendJson(res, 200, {
+      content,
+      modelId,
+      usage: {
+        used: usage.used,
+        limit: usage.limit,
+        cost: shouldCharge ? gate.cost : 0,
+        planId: gate.planId,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Ошибка прокси';
     sendJson(res, 500, { error: message });

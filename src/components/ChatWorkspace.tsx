@@ -232,7 +232,9 @@ function inventChatTitle(raw: string, modelId: ModelId): string {
     title = `${title.slice(0, 45).trim()}…`;
   }
 
-  if (modelId === 'xlaude-pro-k1' && !/про|задач|план|отчёт|документ/i.test(title)) {
+  if (modelId === 'xlaude-pro-k2' && !/pro|k2|архит|стратег|спец/i.test(title)) {
+    if (picked.length <= 4) title = `Pro: ${title}`;
+  } else if (modelId === 'xlaude-pro-k1' && !/про|задач|план|отчёт|документ/i.test(title)) {
     if (picked.length <= 4) title = `Рабочий: ${title}`;
   } else if (modelId === 'xlaude-mini-k2' && !/k2|разбор|анализ|обзор/i.test(title)) {
     if (picked.length <= 4) title = `Разбор: ${title}`;
@@ -269,6 +271,16 @@ function makeChat(
   };
 }
 
+/** Новая Папка → Новая Папка(1) → Новая Папка(2) … */
+function nextFolderTitle(existing: ChatFolder[]): string {
+  const base = 'Новая Папка';
+  const taken = new Set(existing.map((f) => f.title));
+  if (!taken.has(base)) return base;
+  let n = 1;
+  while (taken.has(`${base}(${n})`)) n += 1;
+  return `${base}(${n})`;
+}
+
 function MarkdownBody({ content }: { content: string }) {
   return (
     <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[15px] leading-[1.65] text-[var(--c-text)]">
@@ -282,7 +294,7 @@ type Props = {
 };
 
 export default function ChatWorkspace({ homeSlot }: Props) {
-  const { user, profile, loading: authLoading, logout, planId, planExpiresAt, isAdmin, isBanned } = useAuth();
+  const { user, profile, loading: authLoading, logout, planId, planExpiresAt, isStaff, staffRole, isBanned } = useAuth();
   const plan = getPlan(planId);
   const banned = isBanned;
   const muted = Boolean(profile?.muted);
@@ -674,13 +686,17 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         return;
       }
 
-      const folder: ChatFolder = {
-        id: uid('folder'),
-        title: `Папка ${Date.now().toString().slice(-4)}`,
-        createdAt: Date.now(),
-        expanded: true,
-      };
+      let createdFolderId = '';
+      let createdFolderTitle = '';
       setStore((prev) => {
+        const folder: ChatFolder = {
+          id: uid('folder'),
+          title: nextFolderTitle(prev.folders),
+          createdAt: Date.now(),
+          expanded: true,
+        };
+        createdFolderId = folder.id;
+        createdFolderTitle = folder.title;
         const next = {
           ...prev,
           folders: [folder, ...prev.folders],
@@ -691,12 +707,12 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           ),
         };
         saveLocalChatStore(next);
-          const u = userRef.current;
-          if (u) void saveUserChatStore(u.uid, next).catch(() => {});
+        const u = userRef.current;
+        if (u) void saveUserChatStore(u.uid, next).catch(() => {});
         return next;
       });
       setFoldAnim(null);
-      startRename(folder.id, folder.title);
+      if (createdFolderId) startRename(createdFolderId, createdFolderTitle);
     }, 420);
   };
 
@@ -764,6 +780,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       role: 'user',
       content: text,
       createdAt: Date.now(),
+      usedReasoning: Boolean(active.reasoning),
     };
 
     const nameNow = shouldAutoName(active);
@@ -1237,14 +1254,20 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         <IconSupport className="h-3.5 w-3.5" />
                         Поддержка
                       </Link>
-                      {isAdmin && (
+                      {isStaff && (
                         <Link
                           to="/admin"
                           onClick={() => setProfileOpen(false)}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[#c62828] transition hover:bg-[var(--c-hover)]"
                         >
                           <IconAdmin className="h-3.5 w-3.5" />
-                          Админ-панель
+                          {staffRole === 'helper'
+                            ? 'Панель Helper'
+                            : staffRole === 'moderator'
+                              ? 'Панель Moderator'
+                              : staffRole === 'owner'
+                                ? 'Панель Owner'
+                                : 'Админ-панель'}
                         </Link>
                       )}
                       <button
@@ -1651,7 +1674,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                           />
                         </button>
                         {modelOpen && (
-                          <div className="anim-pop absolute bottom-full left-0 z-40 mb-2 w-56 overflow-hidden rounded-xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] py-1 shadow-2xl">
+                          <div className="anim-pop absolute bottom-full left-0 z-40 mb-2 w-60 overflow-hidden rounded-xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] py-1 shadow-2xl">
                             {MODELS.map((m) => (
                               <button
                                 key={m.id}
@@ -1665,8 +1688,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                                 <span className="min-w-0 flex-1">
                                   <span className="block text-[var(--c-text)]">{m.name}</span>
                                   <span className="block text-[11px] text-[var(--c-faint)]">
-                                    {m.desc} · {m.creditCost} кр.
-                                    {active.reasoning ? ` · с рассужд. ${m.creditCost * 2}` : ''}
+                                    {m.desc}
                                   </span>
                                 </span>
                               </button>
@@ -1677,21 +1699,21 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                       <button
                         type="button"
                         onClick={() => setReasoning(!active.reasoning)}
-                        className={`inline-flex h-7 items-center gap-1 overflow-hidden rounded-md border px-2 text-[11px] font-medium transition-all duration-300 ease-out ${
+                        className={`inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md border text-[11px] font-medium transition-all duration-300 ease-out ${
                           active.reasoning
-                            ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] text-[var(--c-text)]'
-                            : 'border-[var(--c-border)] bg-[var(--c-soft)] text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)]'
+                            ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] px-2 text-[var(--c-text)]'
+                            : 'w-7 border-[var(--c-border)] bg-[var(--c-soft)] px-0 text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)]'
                         }`}
                         aria-label="Рассуждения"
                         aria-pressed={Boolean(active.reasoning)}
                         title="Сначала мысли, потом ответ"
                       >
-                        <IconBrain className="h-3.5 w-3.5 shrink-0" />
+                        <IconBrain className="h-3.5 w-3.5 shrink-0 translate-x-0" />
                         <span
                           className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
                             active.reasoning
-                              ? 'max-w-[6.5rem] translate-x-0 opacity-100'
-                              : 'max-w-0 -translate-x-1 opacity-0'
+                              ? 'max-w-[6.5rem] opacity-100'
+                              : 'max-w-0 opacity-0'
                           }`}
                         >
                           Рассуждения

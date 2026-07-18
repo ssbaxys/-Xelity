@@ -48,7 +48,8 @@ export default function BannedPage() {
         uid: user.uid,
         email: (user.email || '').toLowerCase(),
         subject: 'Апелляция блокировки',
-        category: 'account',
+        category: 'appeal',
+        priority: 'high',
         body: body.trim(),
         authorName: user.displayName || user.email || 'User',
       });
@@ -63,29 +64,29 @@ export default function BannedPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0707] px-4 py-10 text-[#f5ecec]">
-      <div className="w-full max-w-lg rounded-2xl border border-[#2a1c1c] bg-[#140f0f] p-6 shadow-2xl sm:p-8">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#c62828]">
+    <div className="chat-app flex min-h-screen items-center justify-center bg-[var(--c-bg)] px-4 py-10 text-[var(--c-text)]">
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--c-border)] bg-[var(--c-panel)] p-6 shadow-2xl sm:p-8">
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-signal">
           Xelity
         </p>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">Доступ ограничен</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#9a8585]">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--c-muted)]">
           Доступ к аккаунту ограничен в связи с:
         </p>
-        <blockquote className="mt-3 rounded-xl border border-[#5c2a2a]/60 bg-[#2a1212]/50 px-4 py-3 text-sm text-[#ff8a80]">
+        <blockquote className="mt-3 rounded-xl border border-signal/30 bg-signal/10 px-4 py-3 text-sm text-signal">
           {reason}
         </blockquote>
 
-        <div className="mt-5 rounded-xl border border-[#2a1c1c] bg-[#0d0a0a] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-wider text-[#6e5555]">Срок блокировки</p>
+        <div className="mt-5 rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-4 py-4">
+          <p className="text-[11px] uppercase tracking-wider text-[var(--c-faint)]">Срок блокировки</p>
           {permanent ? (
-            <p className="mt-1 text-xl font-medium text-[#e8d5d5]">Бессрочно</p>
+            <p className="mt-1 text-xl font-medium text-[var(--c-text)]">Бессрочно</p>
           ) : (
             <>
-              <p className="mt-1 font-mono text-2xl tabular-nums tracking-tight text-[#e8d5d5]">
+              <p className="mt-1 font-mono text-2xl tabular-nums tracking-tight text-[var(--c-text)]">
                 {formatBanCountdown(msLeft)}
               </p>
-              <p className="mt-1 text-[11px] text-[#6e5555]">
+              <p className="mt-1 text-[11px] text-[var(--c-faint)]">
                 до {new Date(until!).toLocaleString('ru-RU')}
               </p>
             </>
@@ -107,22 +108,22 @@ export default function BannedPage() {
                 onChange={(e) => setBody(e.target.value)}
                 rows={4}
                 placeholder="Объясните ситуацию…"
-                className="mt-1.5 w-full resize-y rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm text-[#f5ecec] outline-none focus:border-[#c62828]/50"
+                className="mt-1.5 w-full resize-y rounded-lg border border-[var(--c-border)] bg-[var(--c-input)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-signal/50"
               />
             </label>
-            {error && <p className="text-sm text-[#e57373]">{error}</p>}
+            {error && <p className="text-sm text-signal">{error}</p>}
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-lg bg-[#c62828] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#b71c1c] disabled:opacity-50"
+                className="rounded-lg bg-signal px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50"
               >
                 {busy ? 'Отправка…' : 'Отправить апелляцию'}
               </button>
               <button
                 type="button"
                 onClick={() => setAppealOpen(false)}
-                className="rounded-lg border border-[#2a1c1c] px-4 py-2.5 text-sm text-[#9a8585] hover:bg-white/5"
+                className="rounded-lg border border-[var(--c-border)] px-4 py-2.5 text-sm text-[var(--c-muted)] hover:bg-[var(--c-hover)]"
               >
                 Отмена
               </button>
@@ -137,13 +138,13 @@ export default function BannedPage() {
                 setError(null);
               }}
               disabled={sent}
-              className="flex-1 rounded-lg bg-[#c62828] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#b71c1c] disabled:opacity-40"
+              className="flex-1 rounded-lg bg-signal px-4 py-2.5 text-sm font-medium text-white hover:brightness-110 disabled:opacity-40"
             >
               Отправить апелляцию
             </button>
             <Link
               to="/"
-              className="flex flex-1 items-center justify-center rounded-lg border border-[#2a1c1c] px-4 py-2.5 text-sm text-[#9a8585] hover:bg-white/5"
+              className="flex flex-1 items-center justify-center rounded-lg border border-[var(--c-border)] px-4 py-2.5 text-sm text-[var(--c-muted)] hover:bg-[var(--c-hover)]"
             >
               На главную
             </Link>

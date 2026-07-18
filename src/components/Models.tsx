@@ -13,12 +13,12 @@ export default function Models() {
             Линейка Xlaude
           </h2>
           <p className="mt-5 text-base leading-relaxed text-slate sm:text-lg">
-            Три модели в одном чате: компактный Mini K1, профессиональный Pro K1 и анонсированное
-            новое поколение Mini K2. Стоимость ответа — в кредитах.
+            Четыре модели в одном чате: Mini и Pro в поколениях K1 и K2 — от быстрых ответов до
+            глубокой профессиональной работы.
           </p>
         </Reveal>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {MODELS.map((m, i) => (
             <Reveal key={m.id} delay={80 + i * 80}>
               <div className="h-full rounded-2xl border border-signal/25 bg-elevated p-6 shadow-[0_0_0_1px_rgba(198,40,40,0.08),0_18px_48px_rgba(0,0,0,0.28)] sm:p-7">
@@ -29,15 +29,9 @@ export default function Models() {
                   </span>
                 </div>
                 <p className="mb-6 text-sm leading-relaxed text-slate">{m.desc}</p>
-                <div className="grid grid-cols-2 gap-3 border-t border-line pt-5">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate">Кредиты</p>
-                    <p className="mt-1 text-sm font-semibold text-ink">{m.creditCost} / ответ</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate">Поколение</p>
-                    <p className="mt-1 text-sm font-semibold text-ink">{m.generation}</p>
-                  </div>
+                <div className="border-t border-line pt-5">
+                  <p className="text-[10px] uppercase tracking-wider text-slate">Поколение</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">{m.generation}</p>
                 </div>
               </div>
             </Reveal>

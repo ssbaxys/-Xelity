@@ -15,13 +15,14 @@ const linkDefs = [
 
 export default function Navbar() {
   const { user, loading, logout } = useAuth();
-  const { t } = usePrefs();
+  const { t, theme } = usePrefs();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('register');
   const onHome = location.pathname === '/';
+  const isLight = theme === 'light';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -59,7 +60,8 @@ export default function Navbar() {
     setOpen(false);
   };
 
-  const solid = scrolled || !onHome || open;
+  const solid = scrolled || !onHome || open || isLight;
+  const onDarkHero = !solid && !isLight;
 
   return (
     <>
@@ -68,7 +70,9 @@ export default function Navbar() {
           open ? 'z-[60]' : 'z-50'
         } ${
           solid
-            ? 'border-b border-line bg-paper/90 shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-xl'
+            ? `border-b border-line bg-paper/95 backdrop-blur-xl ${
+                isLight ? 'shadow-[0_8px_30px_rgba(0,0,0,0.06)]' : 'shadow-[0_8px_30px_rgba(0,0,0,0.25)]'
+              }`
             : 'bg-transparent'
         }`}
       >
@@ -90,7 +94,7 @@ export default function Navbar() {
             </div>
             <span
               className={`font-display text-[15px] font-bold tracking-tight ${
-                solid ? 'text-ink' : 'text-white'
+                onDarkHero ? 'text-white' : 'text-ink'
               }`}
             >
               Xelity

@@ -1,7 +1,7 @@
 const SITE = 'https://xelity.ru';
 const DEFAULT_TITLE = 'Xelity — меньше театра, больше ответа';
 const DEFAULT_DESCRIPTION =
-  'Xelity — чат на моделях Xlaude Mini K1, Pro K1 и Mini K2. Ясные ответы, дневные кредиты и рабочее пространство без лишнего шума.';
+  'Xelity — чат на моделях Xlaude Mini и Pro (K1 / K2). Ясные ответы, дневные кредиты и рабочее пространство без лишнего шума.';
 
 type PageMeta = {
   title?: string;

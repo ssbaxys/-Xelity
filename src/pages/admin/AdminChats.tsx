@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { getPlan } from '../../lib/plans';
 import {
   adminAppendAssistantMessage,
@@ -14,6 +15,7 @@ import {
 import { modelLabel, normalizeModelId } from '../../lib/models';
 import { watchAllUsers, type UserProfile } from '../../lib/rtdb';
 import { requestXlaudeReply } from '../../lib/xlaude';
+import { IconBrain } from '../../components/icons';
 import AdminSelect from './AdminSelect';
 import AdminCheckbox from './AdminCheckbox';
 
@@ -37,13 +39,17 @@ function IconWand({ className = 'h-4 w-4' }: { className?: string }) {
 }
 
 export default function AdminChats() {
+  const { can } = useAuth();
+  const allowGod = can('chats.god');
   const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [indexes, setIndexes] = useState<
     { uid: string; updatedAt: number; threadCount: number; messageCount: number }[]
   >([]);
   const [selectedUid, setSelectedUid] = useState<string>(() => searchParams.get('uid') || '');
-  const [godMode, setGodMode] = useState(() => searchParams.get('god') === '1');
+  const [godMode, setGodMode] = useState(
+    () => allowGod && searchParams.get('god') === '1',
+  );
   const [store, setStore] = useState<ChatStore | null>(null);
   const [threadId, setThreadId] = useState<string>('');
   const [draft, setDraft] = useState('');
@@ -59,8 +65,8 @@ export default function AdminChats() {
   useEffect(() => {
     const fromUrl = searchParams.get('uid');
     if (fromUrl && fromUrl !== selectedUid) setSelectedUid(fromUrl);
-    setGodMode(searchParams.get('god') === '1');
-  }, [searchParams]);
+    setGodMode(allowGod && searchParams.get('god') === '1');
+  }, [searchParams, allowGod]);
 
   useEffect(() => {
     if (!selectedUid) {
@@ -178,7 +184,7 @@ export default function AdminChats() {
           content: `[Подсказка для ответа ассистента]\n${hint}`,
         });
       }
-      const content = await requestXlaudeReply({
+      const { content } = await requestXlaudeReply({
         modelId: chat.modelId,
         messages: apiMessages,
         maxTokens: plan.maxTokens,
@@ -223,11 +229,13 @@ export default function AdminChats() {
               : 'Просмотр облачных чатов и отправка от лица пользователя'}
           </p>
         </div>
-        <AdminCheckbox
-          checked={godMode}
-          onChange={setGodMode}
-          label="Режим бога"
-        />
+        {allowGod && (
+          <AdminCheckbox
+            checked={godMode}
+            onChange={setGodMode}
+            label="Режим бога"
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -315,22 +323,52 @@ export default function AdminChats() {
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-              {thread?.messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`max-w-[92%] rounded-xl px-3 py-2 text-sm ${
-                    m.role === 'user' ? 'ml-auto bg-[#221616]' : 'bg-[#c62828]/10'
-                  }`}
-                >
-                  <p className="text-[10px] text-[#6e5555]">
-                    {m.role === 'user' ? 'user' : `assistant · ${modelName}`}
-                    {m.viaAdmin ? ' · via admin' : ''}
-                  </p>
-                  <div className="mt-1">
-                    <MarkdownBody content={m.content} />
+              {thread?.messages.map((m, i) => {
+                const next = thread.messages[i + 1];
+                const usedReasoning =
+                  m.role === 'user' &&
+                  (Boolean(m.usedReasoning) ||
+                    (next?.role === 'assistant' && Boolean(next.reasoning?.trim())));
+                return (
+                  <div
+                    key={m.id}
+                    className={`max-w-[92%] rounded-xl px-3 py-2 text-sm ${
+                      m.role === 'user' ? 'ml-auto bg-[#221616]' : 'bg-[#c62828]/10'
+                    }`}
+                  >
+                    <p className="flex items-center gap-1.5 text-[10px] text-[#6e5555]">
+                      <span>
+                        {m.role === 'user' ? 'user' : `assistant · ${modelName}`}
+                        {m.viaAdmin ? ' · via admin' : ''}
+                      </span>
+                      {usedReasoning && (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded bg-[#c62828]/20 px-1 py-0.5 text-[#ff8a80]"
+                          title="Пользователь включил «Рассуждения»"
+                        >
+                          <IconBrain className="h-3 w-3" />
+                          <span className="text-[9px] font-medium uppercase tracking-wide">
+                            reason
+                          </span>
+                        </span>
+                      )}
+                    </p>
+                    <div className="mt-1">
+                      <MarkdownBody content={m.content} />
+                    </div>
+                    {m.role === 'assistant' && m.reasoning?.trim() && (
+                      <details className="mt-2 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a]/60 px-2 py-1.5">
+                        <summary className="cursor-pointer text-[10px] text-[#9a8585]">
+                          Мысли модели
+                        </summary>
+                        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-[#6e5555]">
+                          {m.reasoning}
+                        </p>
+                      </details>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {!thread?.messages.length && (
                 <p className="text-center text-sm text-[#6e5555]">Пустой чат</p>
               )}
