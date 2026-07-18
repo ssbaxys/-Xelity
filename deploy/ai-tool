@@ -202,6 +202,7 @@ menu() {
     echo "  8) Тест чата"
     echo "  9) Логи"
     echo " 10) Открыть .env в редакторе"
+    echo " 11) Включить HTTPS (api.xelity.ru) — нужно для сайта на https"
     echo "  0) Выход"
     echo
     choice=$(ask "Выбор: ")
@@ -216,6 +217,7 @@ menu() {
       8) test_chat ;;
       9) open_logs ;;
       10) edit_env ;;
+      11) need_root; bash "${APP_DIR}/deploy/setup-https.sh" ;;
       0|q|Q) exit 0 ;;
       *) c_warn "Неизвестный пункт" ;;
     esac
