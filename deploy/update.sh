@@ -16,7 +16,11 @@ git checkout "${BRANCH}"
 git pull --ff-only origin "${BRANCH}"
 npm ci
 npm run build
+install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
+install -m 644 "${APP_DIR}/deploy/xelity.service" /etc/systemd/system/xelity.service
+systemctl daemon-reload
 chown -R www-data:www-data "${APP_DIR}"
+# не затираем .env
 systemctl restart xelity
 systemctl --no-pager --full status xelity || true
-echo "Обновлено."
+echo "Обновлено. Меню: sudo ai-tool"

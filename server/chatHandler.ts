@@ -1,20 +1,53 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { buildSystemPrompt, AITUNNEL_MODEL_ID } from '../src/lib/xlaude';
 import { getModel, normalizeModelId } from '../src/lib/models';
+import { AITUNNEL_MODEL_ID, buildSystemPrompt, type ReasoningPhase } from './prompts';
 
 export type ChatBody = {
   modelId?: string;
   messages?: { role: string; content: string }[];
   maxTokens?: number;
   systemExtra?: string;
+  /** Игнорируется — нельзя переопределять system с клиента */
   systemOverride?: string;
-  reasoningPhase?: 'think' | 'answer';
+  reasoningPhase?: ReasoningPhase;
 };
+
+const rateBucket = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 40;
+const RATE_WINDOW_MS = 60_000;
+
+function clientIp(req: IncomingMessage): string {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function rateLimitOk(ip: string): boolean {
+  const now = Date.now();
+  const cur = rateBucket.get(ip);
+  if (!cur || now >= cur.resetAt) {
+    rateBucket.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  cur.count += 1;
+  return cur.count <= RATE_LIMIT;
+}
 
 function readJsonBody(req: IncomingMessage): Promise<ChatBody> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    let size = 0;
+    const MAX = 512_000;
+    req.on('data', (c) => {
+      const buf = Buffer.isBuffer(c) ? c : Buffer.from(c);
+      size += buf.length;
+      if (size > MAX) {
+        reject(new Error('Слишком большой запрос'));
+        req.destroy();
+        return;
+      }
+      chunks.push(buf);
+    });
     req.on('end', () => {
       try {
         const raw = Buffer.concat(chunks).toString('utf8') || '{}';
@@ -38,7 +71,7 @@ function applyCors(req: IncomingMessage, res: ServerResponse) {
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 export function sendJson(res: ServerResponse, status: number, payload: unknown) {
@@ -67,13 +100,26 @@ export async function handleChat(
 
   if (!apiKey) {
     sendJson(res, 500, {
-      error: 'AITUNNEL_API_KEY не задан. Добавьте ключ в .env на VPS',
+      error: 'AITUNNEL_API_KEY не задан. Запусти: ai-tool → Настройки',
     });
+    return;
+  }
+
+  const ip = clientIp(req);
+  if (!rateLimitOk(ip)) {
+    sendJson(res, 429, { error: 'Слишком много запросов. Подожди минуту.' });
     return;
   }
 
   try {
     const body = await readJsonBody(req);
+
+    // Клиентский systemOverride всегда отклоняем (даже если прислали)
+    if (typeof body.systemOverride === 'string' && body.systemOverride.trim()) {
+      sendJson(res, 400, { error: 'systemOverride запрещён' });
+      return;
+    }
+
     const modelId = normalizeModelId(body.modelId);
     const model = getModel(modelId);
     const history = (body.messages ?? [])
@@ -93,20 +139,19 @@ export async function handleChat(
 
     const maxTokensRaw = Number(body.maxTokens);
     const maxTokens = Number.isFinite(maxTokensRaw)
-      ? Math.min(8192, Math.max(256, Math.round(maxTokensRaw)))
+      ? Math.min(model.defaultMaxTokens, Math.max(256, Math.round(maxTokensRaw)))
       : model.defaultMaxTokens;
 
-    const systemOverride =
-      typeof body.systemOverride === 'string' ? body.systemOverride.trim() : '';
     const systemExtra =
-      typeof body.systemExtra === 'string' ? body.systemExtra.trim() : '';
+      typeof body.systemExtra === 'string' ? body.systemExtra.trim().slice(0, 2000) : '';
     const phase =
       body.reasoningPhase === 'think' || body.reasoningPhase === 'answer'
         ? body.reasoningPhase
         : undefined;
-    const systemContent = systemOverride
-      ? systemOverride.slice(0, 12000)
-      : buildSystemPrompt(modelId, systemExtra || null, { reasoningPhase: phase });
+
+    const systemContent = buildSystemPrompt(modelId, systemExtra || null, {
+      reasoningPhase: phase,
+    });
 
     const upstream = await fetch('https://api.aitunnel.ru/v1/chat/completions', {
       method: 'POST',
@@ -142,7 +187,8 @@ export async function handleChat(
       return;
     }
 
-    sendJson(res, 200, { content, model: AITUNNEL_MODEL_ID, modelId });
+    // Не отдаём upstream model id клиенту
+    sendJson(res, 200, { content, modelId });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Ошибка прокси';
     sendJson(res, 500, { error: message });

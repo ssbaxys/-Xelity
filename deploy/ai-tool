@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# Xelity control panel — run: ai-tool
+set -euo pipefail
+
+APP_DIR="${XELITY_DIR:-/opt/xelity}"
+ENV_FILE="${APP_DIR}/.env"
+SERVICE="xelity"
+
+c_title() { printf '\n\033[1;36m══ Xelity ai-tool ══\033[0m\n'; }
+c_ok() { printf '\033[32m%s\033[0m\n' "$*"; }
+c_warn() { printf '\033[33m%s\033[0m\n' "$*"; }
+c_err() { printf '\033[31m%s\033[0m\n' "$*"; }
+
+ask() {
+  local prompt="$1"
+  local __out
+  if [[ -r /dev/tty ]]; then
+    read -r -p "${prompt}" __out < /dev/tty
+  else
+    read -r -p "${prompt}" __out
+  fi
+  printf '%s' "${__out}"
+}
+
+need_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    c_err "Нужен root: sudo ai-tool"
+    exit 1
+  fi
+}
+
+ensure_env() {
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    mkdir -p "${APP_DIR}"
+    cat > "${ENV_FILE}" <<'EOF'
+PORT=8088
+AITUNNEL_API_KEY=
+CORS_ORIGIN=https://xelity.ru,https://www.xelity.ru
+EOF
+    chmod 600 "${ENV_FILE}"
+  fi
+}
+
+get_env() {
+  local key="$1"
+  grep -E "^${key}=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true
+}
+
+set_env() {
+  local key="$1"
+  local val="$2"
+  ensure_env
+  if grep -qE "^${key}=" "${ENV_FILE}"; then
+    # escape for sed
+    local esc
+    esc=$(printf '%s' "${val}" | sed -e 's/[\/&]/\\&/g')
+    sed -i "s/^${key}=.*/${key}=${esc}/" "${ENV_FILE}"
+  else
+    printf '%s=%s\n' "${key}" "${val}" >> "${ENV_FILE}"
+  fi
+}
+
+mask_key() {
+  local k="$1"
+  if [[ -z "${k}" ]]; then
+    echo "(не задан)"
+  elif [[ ${#k} -le 12 ]]; then
+    echo "****"
+  else
+    echo "${k:0:12}…${k: -4}"
+  fi
+}
+
+show_status() {
+  echo
+  echo "Каталог:  ${APP_DIR}"
+  echo "Порт:     $(get_env PORT)"
+  echo "API key:  $(mask_key "$(get_env AITUNNEL_API_KEY)")"
+  echo "CORS:     $(get_env CORS_ORIGIN)"
+  echo -n "Сервис:   "
+  if systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then
+    c_ok "active (running)"
+  else
+    c_warn "$(systemctl is-active "${SERVICE}" 2>/dev/null || echo stopped)"
+  fi
+  local port
+  port=$(get_env PORT)
+  port=${port:-8088}
+  if curl -fsS -m 3 "http://127.0.0.1:${port}/" >/dev/null 2>&1; then
+    c_ok "HTTP :${port} отвечает"
+  else
+    c_warn "HTTP :${port} не отвечает"
+  fi
+}
+
+set_api_key() {
+  need_root
+  ensure_env
+  echo
+  key=$(ask "Вставь AITUNNEL API ключ (sk-aitunnel-…): ")
+  key=$(echo "${key}" | tr -d '[:space:]')
+  if [[ -z "${key}" ]]; then
+    c_err "Пусто — отмена"
+    return
+  fi
+  if [[ "${key}" != sk-aitunnel-* ]]; then
+    c_warn "Ключ обычно начинается с sk-aitunnel-"
+    yn=$(ask "Всё равно сохранить? [y/N] ")
+    [[ "${yn}" =~ ^[Yy]$ ]] || return
+  fi
+  set_env AITUNNEL_API_KEY "${key}"
+  chmod 600 "${ENV_FILE}"
+  chown www-data:www-data "${ENV_FILE}" 2>/dev/null || true
+  systemctl restart "${SERVICE}"
+  c_ok "Ключ сохранён, сервис перезапущен"
+}
+
+set_cors() {
+  need_root
+  ensure_env
+  echo
+  echo "Текущий: $(get_env CORS_ORIGIN)"
+  val=$(ask "Новый CORS_ORIGIN (через запятую): ")
+  val=$(echo "${val}" | xargs)
+  [[ -z "${val}" ]] && { c_err "Пусто"; return; }
+  set_env CORS_ORIGIN "${val}"
+  systemctl restart "${SERVICE}"
+  c_ok "CORS обновлён"
+}
+
+set_port() {
+  need_root
+  ensure_env
+  echo
+  echo "Текущий: $(get_env PORT)"
+  val=$(ask "Новый PORT: ")
+  val=$(echo "${val}" | tr -d '[:space:]')
+  [[ "${val}" =~ ^[0-9]+$ ]] || { c_err "Нужно число"; return; }
+  set_env PORT "${val}"
+  systemctl restart "${SERVICE}"
+  c_ok "Порт ${val}, сервис перезапущен"
+  c_warn "Не забудь: ufw allow ${val}/tcp и VITE_API_BASE_URL на Render"
+}
+
+do_update() {
+  need_root
+  bash "${APP_DIR}/deploy/update.sh"
+}
+
+test_chat() {
+  local port key
+  port=$(get_env PORT)
+  port=${port:-8088}
+  key=$(get_env AITUNNEL_API_KEY)
+  if [[ -z "${key}" ]]; then
+    c_err "Сначала задай API ключ (пункт меню)"
+    return
+  fi
+  echo
+  echo "Тестовый запрос к http://127.0.0.1:${port}/api/chat …"
+  local out
+  out=$(curl -sS -m 60 -X POST "http://127.0.0.1:${port}/api/chat" \
+    -H "Content-Type: application/json" \
+    -d '{"modelId":"xlaude-mini-k1","messages":[{"role":"user","content":"Скажи ок одним словом"}]}' || true)
+  if echo "${out}" | grep -q '"content"'; then
+    c_ok "OK: ${out}"
+  else
+    c_err "Ошибка: ${out}"
+  fi
+}
+
+open_logs() {
+  need_root
+  journalctl -u "${SERVICE}" -n 80 --no-pager || true
+  echo
+  yn=$(ask "Следить live? [y/N] ")
+  if [[ "${yn}" =~ ^[Yy]$ ]]; then
+    journalctl -u "${SERVICE}" -f
+  fi
+}
+
+edit_env() {
+  need_root
+  ensure_env
+  "${EDITOR:-nano}" "${ENV_FILE}"
+  systemctl restart "${SERVICE}"
+  c_ok "Сохранено и перезапущено"
+}
+
+menu() {
+  while true; do
+    c_title
+    show_status
+    echo
+    echo "  1) Задать / сменить API ключ"
+    echo "  2) CORS (домены фронта)"
+    echo "  3) Порт"
+    echo "  4) Старт сервиса"
+    echo "  5) Стоп сервиса"
+    echo "  6) Рестарт"
+    echo "  7) Обновить с GitHub"
+    echo "  8) Тест чата"
+    echo "  9) Логи"
+    echo " 10) Открыть .env в редакторе"
+    echo "  0) Выход"
+    echo
+    choice=$(ask "Выбор: ")
+    case "${choice}" in
+      1) set_api_key ;;
+      2) set_cors ;;
+      3) set_port ;;
+      4) need_root; systemctl start "${SERVICE}"; c_ok "started" ;;
+      5) need_root; systemctl stop "${SERVICE}"; c_ok "stopped" ;;
+      6) need_root; systemctl restart "${SERVICE}"; c_ok "restarted" ;;
+      7) do_update ;;
+      8) test_chat ;;
+      9) open_logs ;;
+      10) edit_env ;;
+      0|q|Q) exit 0 ;;
+      *) c_warn "Неизвестный пункт" ;;
+    esac
+    echo
+    ask "Enter…" >/dev/null
+  done
+}
+
+# non-interactive shortcuts: ai-tool status|restart|stop|start|update
+cmd="${1:-}"
+case "${cmd}" in
+  "") menu ;;
+  status) show_status ;;
+  start) need_root; systemctl start "${SERVICE}"; show_status ;;
+  stop) need_root; systemctl stop "${SERVICE}"; show_status ;;
+  restart) need_root; systemctl restart "${SERVICE}"; show_status ;;
+  update) do_update ;;
+  menu) menu ;;
+  *)
+    echo "Usage: ai-tool [status|start|stop|restart|update|menu]"
+    exit 1
+    ;;
+esac

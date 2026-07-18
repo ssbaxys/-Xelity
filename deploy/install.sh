@@ -1,46 +1,91 @@
 #!/usr/bin/env bash
 # Xelity VPS install — Ubuntu 24.04
+# Спросит только API-ключ, остальное сделает сам.
 #
-# Репозиторий приватный — raw.githubusercontent.com даст 404.
-# Ставь так (нужен доступ git к GitHub: SSH-ключ или PAT):
+#   curl -fsSL https://raw.githubusercontent.com/ssbaxys/-Xelity/main/deploy/install.sh | sudo bash
 #
-#   git clone git@github.com:ssbaxys/-Xelity.git /tmp/xelity
-#   sudo bash /tmp/xelity/deploy/install.sh
-#
-# Или с уже склонированной папки:
-#   sudo bash deploy/install.sh
-
 set -euo pipefail
 
 APP_DIR="${XELITY_DIR:-/opt/xelity}"
 REPO_URL="${XELITY_REPO:-https://github.com/ssbaxys/-Xelity.git}"
 BRANCH="${XELITY_BRANCH:-main}"
 NODE_MAJOR="${XELITY_NODE:-22}"
+DEFAULT_PORT="${XELITY_PORT:-8088}"
+DEFAULT_CORS="${XELITY_CORS:-https://xelity.ru,https://www.xelity.ru}"
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Запусти от root: sudo bash deploy/install.sh"
+  echo "Запусти от root: curl … | sudo bash"
   exit 1
 fi
 
+echo
+echo "══════════════════════════════════════"
+echo "  Xelity — установка бэкенда на VPS"
+echo "══════════════════════════════════════"
+echo
+
+# stdin может быть pipe (curl|bash) — читаем с tty
+ask() {
+  local prompt="$1"
+  local __out
+  if [[ -r /dev/tty ]]; then
+    read -r -p "${prompt}" __out < /dev/tty
+  else
+    read -r -p "${prompt}" __out
+  fi
+  printf '%s' "${__out}"
+}
+
+# --- ask only for API key ---
+API_KEY="${AITUNNEL_API_KEY:-}"
+if [[ -z "${API_KEY}" ]]; then
+  if [[ -f "${APP_DIR}/.env" ]] && grep -qE '^AITUNNEL_API_KEY=sk-' "${APP_DIR}/.env" 2>/dev/null; then
+    echo "Найден существующий ключ в ${APP_DIR}/.env"
+    keep=$(ask "Оставить его? [Y/n] ")
+    if [[ ! "${keep}" =~ ^[Nn]$ ]]; then
+      API_KEY=$(grep -E '^AITUNNEL_API_KEY=' "${APP_DIR}/.env" | head -1 | cut -d= -f2-)
+    fi
+  fi
+fi
+
+if [[ -z "${API_KEY}" ]]; then
+  echo "Вставь ключ AITUNNEL (из https://aitunnel.ru → Ключи)"
+  API_KEY=$(ask "API key: ")
+  API_KEY=$(echo "${API_KEY}" | tr -d '[:space:]')
+fi
+
+if [[ -z "${API_KEY}" ]]; then
+  echo "Ошибка: ключ обязателен"
+  exit 1
+fi
+
+if [[ "${API_KEY}" != sk-aitunnel-* ]]; then
+  echo "Предупреждение: ключ обычно начинается с sk-aitunnel-"
+  yn=$(ask "Продолжить? [y/N] ")
+  [[ "${yn}" =~ ^[Yy]$ ]] || exit 1
+fi
+
+echo
+echo ">> Ставлю зависимости…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y ca-certificates curl git build-essential
 
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | sed 's/v//;s/\..*//')" -lt 20 ]]; then
-  echo ">> Installing Node.js ${NODE_MAJOR}"
+  echo ">> Node.js ${NODE_MAJOR}"
   curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
   apt-get install -y nodejs
 fi
 
-echo ">> Node $(node -v) / npm $(npm -v)"
+echo ">> Node $(node -v)"
 
 if [[ -d "${APP_DIR}/.git" ]]; then
-  echo ">> Updating ${APP_DIR}"
+  echo ">> Обновляю ${APP_DIR}"
   git -C "${APP_DIR}" fetch origin
   git -C "${APP_DIR}" checkout "${BRANCH}"
   git -C "${APP_DIR}" pull --ff-only origin "${BRANCH}"
 else
-  echo ">> Cloning into ${APP_DIR}"
+  echo ">> Клонирую в ${APP_DIR}"
   rm -rf "${APP_DIR}"
   git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
 fi
@@ -49,41 +94,48 @@ cd "${APP_DIR}"
 npm ci
 npm run build
 
-if [[ ! -f "${APP_DIR}/.env" ]]; then
-  cat > "${APP_DIR}/.env" <<'EOF'
-PORT=8088
-AITUNNEL_API_KEY=sk-aitunnel-ЗАМЕНИ_НА_СВОЙ_КЛЮЧ
-CORS_ORIGIN=https://xelity.ru,https://www.xelity.ru
-EOF
-  echo ">> Создан ${APP_DIR}/.env — обязательно впиши AITUNNEL_API_KEY"
-else
-  echo ">> .env уже есть, не трогаю"
+# preserve PORT/CORS if existed
+PORT_VAL="${DEFAULT_PORT}"
+CORS_VAL="${DEFAULT_CORS}"
+if [[ -f "${APP_DIR}/.env" ]]; then
+  old_port=$(grep -E '^PORT=' "${APP_DIR}/.env" | head -1 | cut -d= -f2- || true)
+  old_cors=$(grep -E '^CORS_ORIGIN=' "${APP_DIR}/.env" | head -1 | cut -d= -f2- || true)
+  [[ -n "${old_port}" ]] && PORT_VAL="${old_port}"
+  [[ -n "${old_cors}" ]] && CORS_VAL="${old_cors}"
 fi
+
+umask 077
+cat > "${APP_DIR}/.env" <<EOF
+PORT=${PORT_VAL}
+AITUNNEL_API_KEY=${API_KEY}
+CORS_ORIGIN=${CORS_VAL}
+EOF
+chmod 600 "${APP_DIR}/.env"
 
 id -u www-data >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/sbin/nologin www-data
 chown -R www-data:www-data "${APP_DIR}"
 
 install -m 644 "${APP_DIR}/deploy/xelity.service" /etc/systemd/system/xelity.service
+install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
+
+# firewall if ufw active
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi 'Status: active'; then
+  ufw allow "${PORT_VAL}/tcp" comment 'xelity' || true
+fi
+
 systemctl daemon-reload
 systemctl enable xelity
 systemctl restart xelity
-
 sleep 1
-systemctl --no-pager --full status xelity || true
 
 echo
-echo "============================================"
-echo " Xelity установлен"
-echo " Каталог:  ${APP_DIR}"
-echo " Порт:     смотри PORT в ${APP_DIR}/.env (по умолчанию 8088)"
-echo " Статус:   sudo systemctl status xelity"
-echo " Стоп:     sudo systemctl stop xelity"
-echo " Старт:    sudo systemctl start xelity"
-echo " Рестарт:  sudo systemctl restart xelity"
-echo " Логи:     sudo journalctl -u xelity -f"
-echo " Обновить: sudo bash ${APP_DIR}/deploy/update.sh"
-echo "============================================"
-echo "Пропиши ключ: sudo nano ${APP_DIR}/.env"
-echo "Потом:        sudo systemctl restart xelity"
-echo "Открой порт:  sudo ufw allow 8088/tcp   (если ufw включён)"
-echo "============================================"
+echo "══════════════════════════════════════"
+echo "  Готово"
+echo "══════════════════════════════════════"
+systemctl --no-pager --full status xelity || true
+echo
+echo " Меню настроек:  sudo ai-tool"
+echo " Статус:         sudo ai-tool status"
+echo " Порт API:       ${PORT_VAL}"
+echo " Render env:     VITE_API_BASE_URL=http://IP_VPS:${PORT_VAL}"
+echo "══════════════════════════════════════"
