@@ -76,6 +76,11 @@ if [[ -z "${API_KEY}" ]]; then
   exit 1
 fi
 
+if [[ "${API_KEY}" == *"ТВОЙ"* ]] || [[ "${API_KEY}" == *"xxx"* ]] || [[ "${API_KEY}" == *"XXX"* ]]; then
+  echo "Это пример-заглушка, не настоящий ключ. Вставь свой sk-aitunnel-… из aitunnel.ru"
+  exit 1
+fi
+
 if [[ "${API_KEY}" != sk-aitunnel-* ]]; then
   echo "Предупреждение: ключ обычно начинается с sk-aitunnel-"
   yn=$(ask "Продолжить? [y/N] ")
@@ -95,15 +100,30 @@ fi
 
 echo ">> Node $(node -v)"
 
+# root ставит в каталог www-data — без safe.directory git падает
+git config --global --add safe.directory "${APP_DIR}"
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=safe.directory
+export GIT_CONFIG_VALUE_0="${APP_DIR}"
+
 if [[ -d "${APP_DIR}/.git" ]]; then
   echo ">> Обновляю ${APP_DIR}"
-  git -C "${APP_DIR}" fetch origin
-  git -C "${APP_DIR}" checkout "${BRANCH}"
-  git -C "${APP_DIR}" pull --ff-only origin "${BRANCH}"
+  # git от root по репо www-data
+  chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
+  git -C "${APP_DIR}" -c safe.directory="${APP_DIR}" fetch origin
+  git -C "${APP_DIR}" -c safe.directory="${APP_DIR}" checkout "${BRANCH}"
+  git -C "${APP_DIR}" -c safe.directory="${APP_DIR}" pull --ff-only origin "${BRANCH}"
 else
   echo ">> Клонирую в ${APP_DIR}"
+  # сохранить .env если был
+  if [[ -f "${APP_DIR}/.env" ]]; then
+    cp -a "${APP_DIR}/.env" /tmp/xelity.env.bak
+  fi
   rm -rf "${APP_DIR}"
   git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+  if [[ -f /tmp/xelity.env.bak ]]; then
+    cp -a /tmp/xelity.env.bak "${APP_DIR}/.env"
+  fi
 fi
 
 cd "${APP_DIR}"

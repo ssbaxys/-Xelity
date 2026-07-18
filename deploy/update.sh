@@ -10,10 +10,12 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+git config --global --add safe.directory "${APP_DIR}"
 cd "${APP_DIR}"
-git fetch origin
-git checkout "${BRANCH}"
-git pull --ff-only origin "${BRANCH}"
+chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
+git -c safe.directory="${APP_DIR}" fetch origin
+git -c safe.directory="${APP_DIR}" checkout "${BRANCH}"
+git -c safe.directory="${APP_DIR}" pull --ff-only origin "${BRANCH}"
 npm ci
 npm run build
 install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
