@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IconChevronDown } from './icons';
-import WordReveal from './WordReveal';
+import { BlurText } from './BlurMarkdown';
 
 function formatThinkDuration(ms: number): string {
   const sec = Math.max(1, Math.round(ms / 1000));
@@ -15,11 +15,9 @@ type Props = {
   reasoningMs?: number | null;
   thinkingPhase?: 'thinking' | 'answering' | null;
   startedAt: number;
-  /** плавное появление текста мыслей */
   animateThoughts?: boolean;
 };
 
-/** Свёрнутый блок «Думает… / Думал N сек» + серые мысли */
 export default function ReasoningPanel({
   reasoning,
   reasoningMs,
@@ -82,18 +80,8 @@ export default function ReasoningPanel({
         <div className="reasoning-collapse-inner">
           <div className="mt-1.5 border-l border-[var(--c-border)] pl-3 text-[12.5px] leading-relaxed text-[var(--c-faint)]">
             {hasText ? (
-              <div key={thoughtKey} className="reasoning-thoughts-enter break-words">
-                {animateThoughts && live ? (
-                  <WordReveal
-                    text={reasoning || ''}
-                    mode="lines"
-                    stepMs={70}
-                    className="whitespace-pre-wrap break-words"
-                    animate
-                  />
-                ) : (
-                  <p className="whitespace-pre-wrap break-words">{reasoning}</p>
-                )}
+              <div key={thoughtKey}>
+                <BlurText text={reasoning || ''} animate={animateThoughts && live} />
               </div>
             ) : null}
           </div>

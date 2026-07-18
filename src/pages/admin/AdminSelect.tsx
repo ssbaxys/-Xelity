@@ -27,6 +27,7 @@ export default function AdminSelect<T extends string>({
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -72,6 +73,9 @@ export default function AdminSelect<T extends string>({
       left,
       width,
     });
+    setPortalRoot(
+      (btnRef.current?.closest('.admin-shell') as HTMLElement | null) || document.body,
+    );
     setOpen(true);
   };
 
@@ -85,19 +89,18 @@ export default function AdminSelect<T extends string>({
         aria-expanded={open}
         aria-controls={listId}
         onClick={toggle}
-        className={`inline-flex min-w-[7.5rem] items-center justify-between gap-2 rounded-xl border border-[#2a1c1c] bg-[#0d0a0a]/95 px-2.5 py-1.5 text-left text-xs text-[#f3ecec] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[#3a2424] hover:shadow-[0_0_0_3px_rgba(198,40,40,0.08)] disabled:opacity-40 ${
-          open ? 'border-[#c62828]/50 shadow-[0_0_0_3px_rgba(198,40,40,0.12)]' : ''
-        } ${className}`}
+        className={`admin-select-trigger ${open ? 'is-open' : ''} ${className}`}
       >
         <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
         <IconChevronDown
-          className={`h-3 w-3 shrink-0 text-[#6e5555] transition duration-300 ${
-            open ? 'rotate-180 text-[#ff8a80]' : ''
+          className={`h-3 w-3 shrink-0 text-[var(--a-faint)] transition duration-300 ${
+            open ? 'rotate-180 text-[var(--a-accent-fg)]' : ''
           }`}
         />
       </button>
       {open &&
         pos &&
+        portalRoot &&
         createPortal(
           <div
             ref={menuRef}
@@ -119,23 +122,23 @@ export default function AdminSelect<T extends string>({
                     setOpen(false);
                   }}
                   className={`admin-select-option flex w-full items-start gap-2 px-3 py-2 text-left text-xs ${
-                    active ? 'bg-[#c62828]/12 text-white' : 'text-[#c5b0b0]'
+                    active ? 'is-active' : ''
                   }`}
                 >
-                  <span className="mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center text-[#c62828]">
+                  <span className="mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center text-[var(--admin-accent)]">
                     {active ? <IconCheck className="h-3 w-3" /> : null}
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-medium text-[#f3ecec]">{opt.label}</span>
+                    <span className="block font-medium text-[var(--a-text)]">{opt.label}</span>
                     {opt.hint && (
-                      <span className="mt-0.5 block text-[10px] text-[#6e5555]">{opt.hint}</span>
+                      <span className="mt-0.5 block text-[10px] text-[var(--a-faint)]">{opt.hint}</span>
                     )}
                   </span>
                 </button>
               );
             })}
           </div>,
-          document.body,
+          portalRoot,
         )}
     </>
   );

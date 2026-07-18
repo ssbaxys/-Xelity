@@ -174,7 +174,7 @@ export default function AdminTickets() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Тикеты поддержки</h2>
-          <p className="text-sm text-[#9a8585]">
+          <p className="text-sm text-[var(--a-muted)]">
             Очередь обращений · ожидают ответа: {counts.needs_reply}
           </p>
         </div>
@@ -182,7 +182,7 @@ export default function AdminTickets() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск: тема, email, uid…"
-          className="w-full max-w-xs rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none sm:w-64"
+          className="w-full max-w-xs rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none sm:w-64"
         />
       </div>
 
@@ -204,7 +204,7 @@ export default function AdminTickets() {
             className={`rounded-md border px-2.5 py-1 text-[11px] transition ${
               filter === id
                 ? 'border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.2))] text-white'
-                : 'border-[#2a1c1c] text-[#9a8585] hover:bg-white/5'
+                : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
             }`}
           >
             {label}
@@ -215,7 +215,7 @@ export default function AdminTickets() {
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="admin-panel max-h-[78vh] overflow-y-auto p-2">
           {sorted.length === 0 ? (
-            <p className="p-4 text-center text-sm text-[#6e5555]">Нет тикетов</p>
+            <p className="p-4 text-center text-sm text-[var(--a-faint)]">Нет тикетов</p>
           ) : (
             <ul className="space-y-0.5">
               {sorted.map((t) => {
@@ -227,7 +227,7 @@ export default function AdminTickets() {
                     <button
                       type="button"
                       onClick={() => setActiveId(t.id)}
-                      className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-white/5 ${
+                      className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-[var(--a-hover)] ${
                         activeId === t.id
                           ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
                           : ''
@@ -244,16 +244,16 @@ export default function AdminTickets() {
                           {t.subject}
                         </span>
                         {(t.priority === 'high' || t.priority === 'urgent') && (
-                          <span className="shrink-0 text-[9px] uppercase tracking-wide text-[#ff8a80]">
+                          <span className="shrink-0 text-[9px] uppercase tracking-wide text-[var(--a-accent-fg)]">
                             {t.priority === 'urgent' ? 'urgent' : 'high'}
                           </span>
                         )}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-[#9a8585]">
+                      <span className="mt-0.5 block text-[11px] text-[var(--a-muted)]">
                         {STATUS_LABEL[t.status]} · {t.email}
                       </span>
                       {t.assigneeName && (
-                        <span className="mt-0.5 block text-[10px] text-[#6e5555]">
+                        <span className="mt-0.5 block text-[10px] text-[var(--a-faint)]">
                           → {t.assigneeName}
                         </span>
                       )}
@@ -267,15 +267,15 @@ export default function AdminTickets() {
 
         <div className="admin-panel min-h-[520px]">
           {!active ? (
-            <div className="flex h-full min-h-[480px] items-center justify-center text-sm text-[#6e5555]">
+            <div className="flex h-full min-h-[480px] items-center justify-center text-sm text-[var(--a-faint)]">
               Выберите тикет
             </div>
           ) : (
             <div className="flex h-full min-h-[520px] flex-col">
-              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#2a1c1c] px-4 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--a-border)] px-4 py-3">
                 <div className="min-w-0">
                   <h3 className="font-semibold">{active.subject}</h3>
-                  <p className="text-xs text-[#9a8585]">
+                  <p className="text-xs text-[var(--a-muted)]">
                     {active.email} · {CATEGORY_LABEL[active.category] || active.category}
                     {can('users.view') && (
                       <>
@@ -290,7 +290,7 @@ export default function AdminTickets() {
                     )}
                   </p>
                   {active.assigneeName ? (
-                    <p className="mt-1 text-[11px] text-[#6e5555]">
+                    <p className="mt-1 text-[11px] text-[var(--a-faint)]">
                       Взял: {active.assigneeName}{' '}
                       {active.assigneeUid === user?.uid && (
                         <button
@@ -334,7 +334,7 @@ export default function AdminTickets() {
                 </div>
               </div>
 
-              <div className="flex gap-1 border-b border-[#2a1c1c] px-3 pt-2">
+              <div className="flex gap-1 border-b border-[var(--a-border)] px-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setTab('thread')}
@@ -364,10 +364,10 @@ export default function AdminTickets() {
                           className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
                             staffSide
                               ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
-                              : 'ml-auto bg-[#221616]'
+                              : 'ml-auto bg-[var(--a-chip)]'
                           }`}
                         >
-                          <p className="text-[10px] text-[#9a8585]">
+                          <p className="text-[10px] text-[var(--a-muted)]">
                             {m.authorName} · {messageRoleLabel(m.role, m.staffRole)}
                             {' · '}
                             {new Date(m.createdAt).toLocaleString('ru-RU')}
@@ -377,19 +377,19 @@ export default function AdminTickets() {
                       );
                     })}
                     {!messages.length && (
-                      <p className="text-center text-sm text-[#6e5555]">Пока нет сообщений</p>
+                      <p className="text-center text-sm text-[var(--a-faint)]">Пока нет сообщений</p>
                     )}
                   </div>
                   {active.status !== 'closed' && (
                     <form
                       onSubmit={onReply}
-                      className="flex flex-col gap-2 border-t border-[#2a1c1c] px-4 py-3 sm:flex-row"
+                      className="flex flex-col gap-2 border-t border-[var(--a-border)] px-4 py-3 sm:flex-row"
                     >
                       <input
                         value={reply}
                         onChange={(e) => setReply(e.target.value)}
                         placeholder="Ответ поддержки…"
-                        className="min-w-0 flex-1 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+                        className="min-w-0 flex-1 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
                       />
                       <div className="flex shrink-0 gap-1.5">
                         <button
@@ -416,7 +416,7 @@ export default function AdminTickets() {
                               }
                             })();
                           }}
-                          className="rounded-lg border border-[#2a1c1c] px-3 py-2 text-sm text-[#9a8585] hover:bg-white/5 disabled:opacity-40"
+                          className="rounded-lg border border-[var(--a-border)] px-3 py-2 text-sm text-[var(--a-muted)] hover:bg-[var(--a-hover)] disabled:opacity-40"
                         >
                           Ответить и решить
                         </button>

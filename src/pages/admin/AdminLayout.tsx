@@ -1,5 +1,6 @@
-import { useEffect, useMemo, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { IconMoon, IconSun } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
 import { setPageMeta } from '../../lib/seo';
 import {
@@ -9,11 +10,22 @@ import {
   staffBrand,
 } from '../../lib/staff';
 
+const APPEARANCE_KEY = 'xelity-admin-appearance';
+
+function readAppearance(): 'dark' | 'light' {
+  try {
+    return localStorage.getItem(APPEARANCE_KEY) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
 export default function AdminLayout() {
   const { user, isStaff, staffRole, loading } = useAuth();
   const location = useLocation();
   const brand = staffBrand(staffRole);
   const links = useMemo(() => navForRole(staffRole), [staffRole]);
+  const [appearance, setAppearance] = useState<'dark' | 'light'>(readAppearance);
 
   useEffect(() => {
     setPageMeta({
@@ -23,9 +35,26 @@ export default function AdminLayout() {
     });
   }, [location.pathname, brand.code]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(APPEARANCE_KEY, appearance);
+    } catch {
+      /* ignore */
+    }
+  }, [appearance]);
+
+  const shellClass = `admin-shell admin-theme-${brand.theme} admin-scroll ${
+    appearance === 'light' ? 'is-light' : ''
+  }`;
+
+  // только accent — soft задаётся CSS (.admin-theme-* / .is-light)
+  const shellStyle = {
+    '--admin-accent': brand.accent,
+  } as CSSProperties;
+
   if (loading) {
     return (
-      <div className={`admin-shell admin-theme-${brand.theme} flex min-h-screen items-center justify-center`}>
+      <div className={`${shellClass} flex min-h-screen items-center justify-center`} style={shellStyle}>
         <div className="admin-loading h-10 w-40" />
       </div>
     );
@@ -48,47 +77,47 @@ export default function AdminLayout() {
   }
 
   return (
-    <div
-      className={`admin-shell admin-theme-${brand.theme} admin-scroll min-h-screen`}
-      style={
-        {
-          '--admin-accent': brand.accent,
-          '--admin-accent-soft': brand.accentSoft,
-        } as CSSProperties
-      }
-    >
+    <div className={`${shellClass} min-h-screen`} style={shellStyle}>
       <header className="admin-header sticky top-0 z-40">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 xl:max-w-7xl">
           <div className="flex min-w-0 items-center gap-3">
             <NavLink
               to="/"
-              className="text-sm text-[#9a8585] transition hover:text-white hover:-translate-x-0.5"
+              className="text-sm text-[var(--a-muted)] transition hover:-translate-x-0.5 hover:text-[var(--a-text)]"
             >
               ← Сайт
             </NavLink>
-            <div className="h-4 w-px bg-[#2a1c1c]" />
+            <div className="h-4 w-px bg-[var(--a-border)]" />
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold tracking-[0.08em] text-[#f3ecec]">
-                XELITY{' '}
-                <span className="admin-brand-code">{brand.code}</span>
+              <h1 className="text-sm font-semibold tracking-[0.08em] text-[var(--a-text)]">
+                XELITY <span className="admin-brand-code">{brand.code}</span>
               </h1>
-              <p className="truncate text-[10px] text-[#6e5555]">{brand.hint}</p>
+              <p className="truncate text-[10px] text-[var(--a-faint)]">{brand.hint}</p>
             </div>
           </div>
-          <nav className="flex flex-wrap gap-1">
-            {links.map((l) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                end={l.end}
-                className={({ isActive }) =>
-                  `admin-nav-link ${isActive ? 'is-active' : ''}`
-                }
-              >
-                {l.label}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="admin-theme-toggle"
+              aria-label={appearance === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+              title={appearance === 'light' ? 'Тёмная тема' : 'Светлая тема'}
+              onClick={() => setAppearance((a) => (a === 'light' ? 'dark' : 'light'))}
+            >
+              {appearance === 'light' ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
+            </button>
+            <nav className="flex flex-wrap gap-1">
+              {links.map((l) => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  end={l.end}
+                  className={({ isActive }) => `admin-nav-link ${isActive ? 'is-active' : ''}`}
+                >
+                  {l.label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 xl:max-w-7xl">

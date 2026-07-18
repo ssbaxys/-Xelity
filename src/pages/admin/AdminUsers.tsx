@@ -227,25 +227,25 @@ export default function AdminUsers() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Пользователи</h2>
-          <p className="text-sm text-[#9a8585]">Подписки, бан, права админа</p>
+          <p className="text-sm text-[var(--a-muted)]">Подписки, бан, права админа</p>
         </div>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Поиск…"
-          className="rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-1.5 text-sm outline-none"
+          className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-1.5 text-sm outline-none"
         />
       </div>
 
       {error && (
-        <p className="rounded-lg border border-[#5c2a2a] bg-[#2a1212] px-3 py-2 text-sm text-[#e57373]">
+        <p className="rounded-lg border border-[var(--a-danger-border)] bg-[var(--a-danger-soft)] px-3 py-2 text-sm text-[var(--a-danger)]">
           {error}
         </p>
       )}
 
       <div className="overflow-x-auto admin-panel">
         <table className="w-full min-w-[800px] text-left text-sm">
-          <thead className="bg-[#140f0f] text-[11px] uppercase tracking-wider text-[#6e5555]">
+          <thead className="bg-[var(--a-surface)] text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
             <tr>
               <th className="px-3 py-2 font-medium">Пользователь</th>
               <th className="px-3 py-2 font-medium">Тариф</th>
@@ -279,25 +279,25 @@ export default function AdminUsers() {
                 });
               }
               return (
-                <tr key={u.uid} className="border-t border-[#2a1c1c]">
+                <tr key={u.uid} className="border-t border-[var(--a-border)]">
                   <td className="px-3 py-2">
                     <p className="font-medium">{u.name || '—'}</p>
-                    <p className="text-[11px] text-[#9a8585]">{u.email}</p>
+                    <p className="text-[11px] text-[var(--a-muted)]">{u.email}</p>
                   </td>
                   <td className="px-3 py-2">
                     <span
                       className={
-                        plan === 'free' ? 'text-[#9a8585]' : 'font-medium text-[#e8d5d5]'
+                        plan === 'free' ? 'text-[var(--a-muted)]' : 'font-medium text-[var(--a-strong)]'
                       }
                     >
                       {PLANS[plan].name}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-[#9a8585]">
+                  <td className="px-3 py-2 text-[11px] text-[var(--a-muted)]">
                     {active && u.planExpiresAt ? (
                       <div>
                         <PlanCountdown expiresAt={u.planExpiresAt} prefix="" />
-                        <p className="mt-0.5 text-[10px] text-[#6e5555]">
+                        <p className="mt-0.5 text-[10px] text-[var(--a-faint)]">
                           до {new Date(u.planExpiresAt).toLocaleString('ru-RU')}
                         </p>
                       </div>
@@ -305,14 +305,14 @@ export default function AdminUsers() {
                       '—'
                     )}
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-[#9a8585]">
+                  <td className="px-3 py-2 tabular-nums text-[var(--a-muted)]">
                     {usageMap[u.uid] ?? '—'}
                     {PLANS[plan].creditsPerDay != null
                       ? ` / ${PLANS[plan].creditsPerDay} кр.`
                       : ' / ∞ кр.'}
                   </td>
                   <td className="px-3 py-2 text-[11px]">
-                    <span className={bannedNow ? 'text-[#e57373]' : 'text-[#9a8585]'}>
+                    <span className={bannedNow ? 'text-[var(--a-danger)]' : 'text-[var(--a-muted)]'}>
                       {bannedNow ? 'ban' : 'ok'}
                     </span>
                     {' · '}
@@ -320,18 +320,18 @@ export default function AdminUsers() {
                       className={
                         targetRole
                           ? 'text-[var(--admin-accent,#c62828)]'
-                          : 'text-[#9a8585]'
+                          : 'text-[var(--a-muted)]'
                       }
                     >
                       {targetRole ? STAFF_ROLE_LABEL[targetRole] : 'user'}
                     </span>
                     {bannedNow && u.banReason && (
-                      <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-[#e57373]/80" title={u.banReason}>
+                      <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-[var(--a-danger)]/80" title={u.banReason}>
                         {u.banReason}
                       </p>
                     )}
                     {(u.flagged || u.muted || u.reviewPriority) && (
-                      <p className="mt-0.5 text-[10px] text-[#c9a8a8]">
+                      <p className="mt-0.5 text-[10px] text-[var(--a-soft)]">
                         {[
                           u.flagged ? 'flag' : null,
                           u.muted ? 'mute' : null,
@@ -352,7 +352,7 @@ export default function AdminUsers() {
                             setError(null);
                             setModal(openSubModal(u));
                           }}
-                          className="rounded-md border border-[var(--admin-accent,#c62828)]/40 bg-[var(--admin-accent-soft,rgba(198,40,40,0.1))] px-2 py-1 text-[11px] text-[#ff8a80] hover:brightness-110 disabled:opacity-40"
+                          className="rounded-md border border-[var(--admin-accent,#c62828)]/40 bg-[var(--admin-accent-soft,rgba(198,40,40,0.1))] px-2 py-1 text-[11px] text-[var(--a-accent-fg)] hover:brightness-110 disabled:opacity-40"
                         >
                           {active ? 'Изменить подписку' : 'Выдать подписку'}
                         </button>
@@ -360,7 +360,7 @@ export default function AdminUsers() {
                       {canGod && (
                         <Link
                           to={`/admin/chats?uid=${u.uid}&god=1`}
-                          className="rounded-md border border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))] px-2 py-1 text-[11px] font-medium text-[#ff8a80] hover:brightness-110"
+                          className="rounded-md border border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))] px-2 py-1 text-[11px] font-medium text-[var(--a-accent-fg)] hover:brightness-110"
                         >
                           Режим бога
                         </Link>
@@ -368,7 +368,7 @@ export default function AdminUsers() {
                       {canChats && (
                         <Link
                           to={`/admin/chats?uid=${u.uid}`}
-                          className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
+                          className="rounded-md border border-[var(--a-border)] px-2 py-1 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
                         >
                           Чаты
                         </Link>
@@ -391,7 +391,7 @@ export default function AdminUsers() {
                               });
                             }
                           }}
-                          className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
+                          className="rounded-md border border-[var(--a-border)] px-2 py-1 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
                         >
                           {bannedNow ? 'Разбан' : 'Бан'}
                         </button>
@@ -419,7 +419,7 @@ export default function AdminUsers() {
                       )}
                       <Link
                         to={`/admin/users/${u.uid}`}
-                        className="rounded-md border border-[#2a1c1c] px-2 py-1 text-[11px] text-[#9a8585] hover:bg-white/5"
+                        className="rounded-md border border-[var(--a-border)] px-2 py-1 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
                       >
                         Карточка
                       </Link>
@@ -431,32 +431,32 @@ export default function AdminUsers() {
           </tbody>
         </table>
         {!filtered.length && (
-          <p className="p-6 text-center text-sm text-[#6e5555]">Никого не найдено</p>
+          <p className="p-6 text-center text-sm text-[var(--a-faint)]">Никого не найдено</p>
         )}
       </div>
 
       {modal && liveUser && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => busy !== liveUser.uid && setModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[#2a1c1c] bg-[#140f0f] p-5 shadow-2xl"
+            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold text-[#f5ecec]">
+            <h3 className="text-base font-semibold text-[var(--a-text)]">
               {hasSub ? 'Управление подпиской' : 'Выдать подписку'}
             </h3>
-            <p className="mt-1 text-sm text-[#9a8585]">
+            <p className="mt-1 text-sm text-[var(--a-muted)]">
               {liveUser.name || 'Пользователь'} · {liveUser.email}
             </p>
 
             {hasSub && liveUser.planExpiresAt && (
-              <div className="mt-3 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-xs text-[#9a8585]">
-                Сейчас: <span className="text-[#e8d5d5]">{PLANS[livePlan].name}</span>
+              <div className="mt-3 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-xs text-[var(--a-muted)]">
+                Сейчас: <span className="text-[var(--a-strong)]">{PLANS[livePlan].name}</span>
                 {' · '}
                 <PlanCountdown expiresAt={liveUser.planExpiresAt} prefix="осталось " />
-                <p className="mt-0.5 text-[10px] text-[#6e5555]">
+                <p className="mt-0.5 text-[10px] text-[var(--a-faint)]">
                   до {new Date(liveUser.planExpiresAt).toLocaleString('ru-RU')}
                 </p>
               </div>
@@ -464,7 +464,7 @@ export default function AdminUsers() {
 
             <div className="mt-4 space-y-4">
               <div>
-                <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#6e5555]">
+                <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
                   Тариф
                 </p>
                 <div className="flex gap-2">
@@ -475,8 +475,8 @@ export default function AdminUsers() {
                       onClick={() => setModal({ ...modal, plan: id })}
                       className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                         modal.plan === id
-                          ? 'border-[#c62828] bg-[#c62828]/15 text-[#ff8a80]'
-                          : 'border-[#2a1c1c] text-[#9a8585] hover:bg-white/5'
+                          ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
+                          : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
                       }`}
                     >
                       {PLANS[id].name}
@@ -486,7 +486,7 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#6e5555]">
+                <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
                   Срок
                 </p>
                 <div className="mb-2 flex gap-1">
@@ -503,8 +503,8 @@ export default function AdminUsers() {
                       onClick={() => setModal({ ...modal, mode: id })}
                       className={`rounded-md px-2.5 py-1 text-[11px] ${
                         modal.mode === id
-                          ? 'bg-[#c62828]/20 text-[#ff8a80]'
-                          : 'text-[#6e5555] hover:text-[#9a8585]'
+                          ? 'bg-[var(--admin-accent)]/20 text-[var(--a-accent-fg)]'
+                          : 'text-[var(--a-faint)] hover:text-[var(--a-muted)]'
                       }`}
                     >
                       {label}
@@ -530,11 +530,11 @@ export default function AdminUsers() {
                         className={`rounded-lg border px-2 py-2 text-xs ${
                           modal.presetDays === d.days
                             ? d.days < 0
-                              ? 'border-[#e57373]/60 bg-[#2a1212] text-[#e57373]'
-                              : 'border-[#c62828] bg-[#c62828]/10 text-[#ff8a80]'
+                              ? 'border-[color-mix(in_srgb,var(--a-danger)_60%,transparent)] bg-[var(--a-danger-soft)] text-[var(--a-danger)]'
+                              : 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 text-[var(--a-accent-fg)]'
                             : d.days < 0
-                              ? 'border-[#2a1c1c] text-[#e57373]/80 hover:bg-[#2a1212]/40'
-                              : 'border-[#2a1c1c] text-[#9a8585] hover:bg-white/5'
+                              ? 'border-[var(--a-border)] text-[var(--a-danger)]/80 hover:bg-[var(--a-danger-soft)]/40'
+                              : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
                         }`}
                       >
                         {d.label}
@@ -561,11 +561,11 @@ export default function AdminUsers() {
                               n < 0 || hasSub ? 'extend' : modal.applyMode,
                           });
                         }}
-                        className="w-28 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none focus:border-[#c62828]/50"
+                        className="w-28 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
                       />
-                      <span className="text-sm text-[#9a8585]">дней</span>
+                      <span className="text-sm text-[var(--a-muted)]">дней</span>
                     </div>
-                    <p className="text-[10px] text-[#6e5555]">
+                    <p className="text-[10px] text-[var(--a-faint)]">
                       Минус (−7) укорачивает текущий срок
                     </p>
                   </div>
@@ -578,7 +578,7 @@ export default function AdminUsers() {
                     onChange={(e) =>
                       setModal({ ...modal, expiresLocal: e.target.value })
                     }
-                    className="w-full rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none focus:border-[#c62828]/50"
+                    className="w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
                   />
                 )}
               </div>
@@ -587,10 +587,10 @@ export default function AdminUsers() {
                 !(modal.mode === 'preset' && modal.presetDays < 0) &&
                 !(modal.mode === 'custom' && Number(modal.customDays) < 0) && (
                 <div>
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#6e5555]">
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
                     Как применить
                     {hasSub && (
-                      <span className="ml-1 normal-case tracking-normal text-[#6e5555]/80">
+                      <span className="ml-1 normal-case tracking-normal text-[var(--a-faint)]/80">
                         (по умолчанию — продлить)
                       </span>
                     )}
@@ -601,8 +601,8 @@ export default function AdminUsers() {
                       onClick={() => setModal({ ...modal, applyMode: 'replace' })}
                       className={`flex-1 rounded-lg border px-2 py-2 text-[11px] ${
                         modal.applyMode === 'replace'
-                          ? 'border-[#c62828] bg-[#c62828]/10 text-[#ff8a80]'
-                          : 'border-[#2a1c1c] text-[#9a8585]'
+                          ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 text-[var(--a-accent-fg)]'
+                          : 'border-[var(--a-border)] text-[var(--a-muted)]'
                       }`}
                     >
                       От сейчас
@@ -615,8 +615,8 @@ export default function AdminUsers() {
                       onClick={() => setModal({ ...modal, applyMode: 'extend' })}
                       className={`flex-1 rounded-lg border px-2 py-2 text-[11px] ${
                         modal.applyMode === 'extend'
-                          ? 'border-[#c62828] bg-[#c62828]/10 text-[#ff8a80]'
-                          : 'border-[#2a1c1c] text-[#9a8585]'
+                          ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 text-[var(--a-accent-fg)]'
+                          : 'border-[var(--a-border)] text-[var(--a-muted)]'
                       }`}
                     >
                       Продлить
@@ -630,7 +630,7 @@ export default function AdminUsers() {
 
               {((modal.mode === 'preset' && modal.presetDays < 0) ||
                 (modal.mode === 'custom' && Number(modal.customDays) < 0)) && (
-                <p className="rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-[11px] text-[#9a8585]">
+                <p className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-[11px] text-[var(--a-muted)]">
                   Минусовой срок вычитается из текущей даты окончания подписки.
                   Если остаток станет нулевым — подписка снимется.
                 </p>
@@ -642,7 +642,7 @@ export default function AdminUsers() {
                 type="button"
                 disabled={busy === liveUser.uid}
                 onClick={() => void saveSubscription()}
-                className="rounded-lg bg-[#c62828] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#b71c1c] disabled:opacity-50"
+                className="rounded-lg bg-[var(--admin-accent)] px-4 py-2.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
               >
                 {busy === liveUser.uid
                   ? 'Сохранение…'
@@ -655,7 +655,7 @@ export default function AdminUsers() {
                   type="button"
                   disabled={busy === liveUser.uid}
                   onClick={() => void removeSubscription()}
-                  className="rounded-lg border border-[#5c2a2a] px-4 py-2 text-sm text-[#e57373] hover:bg-[#2a1212] disabled:opacity-50"
+                  className="rounded-lg border border-[var(--a-danger-border)] px-4 py-2 text-sm text-[var(--a-danger)] hover:bg-[var(--a-danger-soft)] disabled:opacity-50"
                 >
                   Снять подписку
                 </button>
@@ -664,7 +664,7 @@ export default function AdminUsers() {
                 type="button"
                 disabled={busy === liveUser.uid}
                 onClick={() => setModal(null)}
-                className="rounded-lg px-4 py-2 text-sm text-[#6e5555] hover:text-[#9a8585]"
+                className="rounded-lg px-4 py-2 text-sm text-[var(--a-faint)] hover:text-[var(--a-muted)]"
               >
                 Отмена
               </button>
@@ -675,31 +675,31 @@ export default function AdminUsers() {
 
       {banModal && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => busy !== banModal.user.uid && setBanModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[#2a1c1c] bg-[#140f0f] p-5 shadow-2xl"
+            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold text-[#f5ecec]">Заблокировать аккаунт</h3>
-            <p className="mt-1 text-sm text-[#9a8585]">
+            <h3 className="text-base font-semibold text-[var(--a-text)]">Заблокировать аккаунт</h3>
+            <p className="mt-1 text-sm text-[var(--a-muted)]">
               {banModal.user.name || 'Пользователь'} · {banModal.user.email}
             </p>
 
-            <label className="mt-4 block text-[11px] uppercase tracking-wider text-[#6e5555]">
+            <label className="mt-4 block text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
               Причина (увидит пользователь)
               <textarea
                 value={banModal.reason}
                 onChange={(e) => setBanModal({ ...banModal, reason: e.target.value })}
                 rows={3}
                 placeholder="Например: спам / оскорбления / злоупотребление API…"
-                className="mt-1.5 w-full resize-y rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm text-[#f5ecec] outline-none focus:border-[#c62828]/50"
+                className="mt-1.5 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm text-[var(--a-text)] outline-none focus:border-[var(--admin-accent)]/50"
               />
             </label>
 
             <div className="mt-4">
-              <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#6e5555]">Срок</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">Срок</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {(
                   [
@@ -717,8 +717,8 @@ export default function AdminUsers() {
                     onClick={() => setBanModal({ ...banModal, duration: id })}
                     className={`rounded-lg border px-2 py-2 text-[11px] ${
                       banModal.duration === id
-                        ? 'border-[#c62828] bg-[#c62828]/10 text-[#ff8a80]'
-                        : 'border-[#2a1c1c] text-[#9a8585] hover:bg-white/5'
+                        ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 text-[var(--a-accent-fg)]'
+                        : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
                     }`}
                   >
                     {label}
@@ -734,9 +734,9 @@ export default function AdminUsers() {
                     onChange={(e) =>
                       setBanModal({ ...banModal, customDays: e.target.value })
                     }
-                    className="w-20 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-2 py-1.5 text-sm outline-none"
+                    className="w-20 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2 py-1.5 text-sm outline-none"
                   />
-                  <span className="text-xs text-[#9a8585]">дн.</span>
+                  <span className="text-xs text-[var(--a-muted)]">дн.</span>
                   <input
                     type="number"
                     min={0}
@@ -744,9 +744,9 @@ export default function AdminUsers() {
                     onChange={(e) =>
                       setBanModal({ ...banModal, customHours: e.target.value })
                     }
-                    className="w-20 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-2 py-1.5 text-sm outline-none"
+                    className="w-20 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2 py-1.5 text-sm outline-none"
                   />
-                  <span className="text-xs text-[#9a8585]">ч.</span>
+                  <span className="text-xs text-[var(--a-muted)]">ч.</span>
                 </div>
               )}
             </div>
@@ -756,7 +756,7 @@ export default function AdminUsers() {
                 type="button"
                 disabled={busy === banModal.user.uid}
                 onClick={() => void applyBan()}
-                className="rounded-lg bg-[#c62828] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#b71c1c] disabled:opacity-50"
+                className="rounded-lg bg-[var(--admin-accent)] px-4 py-2.5 text-sm font-medium text-white hover:brightness-95 disabled:opacity-50"
               >
                 {busy === banModal.user.uid ? 'Блокировка…' : 'Забанить'}
               </button>
@@ -764,7 +764,7 @@ export default function AdminUsers() {
                 type="button"
                 disabled={busy === banModal.user.uid}
                 onClick={() => setBanModal(null)}
-                className="rounded-lg px-4 py-2 text-sm text-[#6e5555] hover:text-[#9a8585]"
+                className="rounded-lg px-4 py-2 text-sm text-[var(--a-faint)] hover:text-[var(--a-muted)]"
               >
                 Отмена
               </button>

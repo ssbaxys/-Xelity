@@ -261,6 +261,17 @@ export function IconLogout({ className = 'h-3.5 w-3.5' }: IconProps) {
   );
 }
 
+export function IconLimits({ className = 'h-3.5 w-3.5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 6.75h15M4.5 12h15M4.5 17.25h15" />
+      <circle cx="8.25" cy="6.75" r="1.35" fill="currentColor" stroke="none" />
+      <circle cx="14.25" cy="12" r="1.35" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="17.25" r="1.35" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconPricing({ className = 'h-3.5 w-3.5' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -292,6 +303,30 @@ export function IconAdmin({ className = 'h-3.5 w-3.5' }: IconProps) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+      />
+    </svg>
+  );
+}
+
+export function IconSun({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <circle cx="12" cy="12" r="3.5" />
+      <path
+        strokeLinecap="round"
+        d="M12 3.5v1.5M12 19v1.5M3.5 12H5M19 12h1.5M6.2 6.2l1.1 1.1M16.7 16.7l1.1 1.1M6.2 17.8l1.1-1.1M16.7 7.3l1.1-1.1"
+      />
+    </svg>
+  );
+}
+
+export function IconMoon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.5 14.2A8.2 8.2 0 0110 3.7a8.3 8.3 0 1010.5 10.5z"
       />
     </svg>
   );

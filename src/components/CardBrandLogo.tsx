@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { CardBrand } from '../lib/cardBrand';
 
 type Props = {
@@ -7,6 +8,8 @@ type Props = {
 
 /** Компактный логотип платёжной системы для поля номера карты */
 export default function CardBrandLogo({ brand, className = 'h-5 w-8' }: Props) {
+  const uid = useId().replace(/:/g, '');
+
   if (brand === 'unknown') {
     return (
       <svg className={className} viewBox="0 0 32 20" aria-hidden>
@@ -49,12 +52,32 @@ export default function CardBrandLogo({ brand, className = 'h-5 w-8' }: Props) {
   }
 
   if (brand === 'mir') {
+    const gradId = `mir-grad-${uid}`;
     return (
-      <svg className={className} viewBox="0 0 48 32" aria-label="Мир">
-        <rect width="48" height="32" rx="4" fill="#0F5C2E" />
-        <path d="M8 20V12h3.2l2.4 5.2L16 12h3.2v8H17v-5.1L14.8 20h-1.6L11 14.9V20H8zm14.5 0V12h7.2v2h-4.4v1.2h3.8v2h-3.8V18h4.6v2h-7.4z" fill="#fff" />
-        <path d="M34 12h4c2.4 0 4 1.4 4 3.6S40.4 19.2 38 19.2H36.2V20H34V12zm2.2 2v3.2H38c1.2 0 1.8-.6 1.8-1.6S39.2 14 38 14h-1.8z" fill="#00A3E0" />
-      </svg>
+      <span
+        className={`inline-flex items-center justify-center rounded-md bg-white px-1.5 py-0.5 shadow-sm ring-1 ring-black/8 ${className}`}
+        aria-label="Мир"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 400 120"
+          className="h-full w-full"
+          aria-hidden
+        >
+          <linearGradient id={gradId} x1="370" x2="290" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#1F5CD7" />
+            <stop stopColor="#02AEFF" offset="1" />
+          </linearGradient>
+          <path
+            d="m31 13h33c3 0 12-1 16 13 3 9 7 23 13 44h2c6-22 11-37 13-44 4-14 14-13 18-13h31v96h-32v-57h-2l-17 57h-24l-17-57h-3v57h-31m139-96h32v57h3l21-47c4-9 13-10 13-10h30v96h-32v-57h-2l-21 47c-4 9-14 10-14 10h-30m142-29v29h-30v-50h98c-4 12-18 21-34 21"
+            fill="#0f754e"
+          />
+          <path
+            d="m382 53c4-18-8-40-34-40h-68c2 21 20 40 39 40"
+            fill={`url(#${gradId})`}
+          />
+        </svg>
+      </span>
     );
   }
 

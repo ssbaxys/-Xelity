@@ -210,7 +210,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Обзор</h2>
-        <p className="text-sm text-[#9a8585]">
+        <p className="text-sm text-[var(--a-muted)]">
           Сводка по пользователям, сообщениям, оплатам и тикетам
           {loading ? ' · загрузка…' : ''}
         </p>
@@ -235,15 +235,15 @@ export default function AdminDashboard() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="admin-panel p-4">
-          <p className="mb-3 text-[12px] font-medium text-[#9a8585]">Сообщения (7 дней)</p>
+          <p className="mb-3 text-[12px] font-medium text-[var(--a-muted)]">Сообщения (7 дней)</p>
           <BarChart data={msgChart} />
         </div>
         <div className="admin-panel p-4">
-          <p className="mb-3 text-[12px] font-medium text-[#9a8585]">Тарифы</p>
+          <p className="mb-3 text-[12px] font-medium text-[var(--a-muted)]">Тарифы</p>
           <BarChart data={planDist} color="#e57373" />
         </div>
         <div className="admin-panel p-4">
-          <p className="mb-3 text-[12px] font-medium text-[#9a8585]">Тикеты</p>
+          <p className="mb-3 text-[12px] font-medium text-[var(--a-muted)]">Тикеты</p>
           <BarChart data={ticketDist} color="#ef9a9a" />
         </div>
       </div>

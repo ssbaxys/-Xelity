@@ -219,11 +219,11 @@ export default function AdminUserInvestigation({
   };
 
   if (!uid) {
-    return <p className="text-sm text-[#6e5555]">Не указан пользователь</p>;
+    return <p className="text-sm text-[var(--a-faint)]">Не указан пользователь</p>;
   }
 
   if (!profile) {
-    return <p className="p-4 text-sm text-[#6e5555]">Загрузка разбора…</p>;
+    return <p className="p-4 text-sm text-[var(--a-faint)]">Загрузка разбора…</p>;
   }
 
   return (
@@ -231,18 +231,18 @@ export default function AdminUserInvestigation({
       {!embedded && (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <Link to="/admin/users" className="text-[12px] text-[#9a8585] hover:text-white">
+            <Link to="/admin/users" className="text-[12px] text-[var(--a-muted)] hover:text-white">
               ← Пользователи
             </Link>
             <h2 className="mt-1 text-lg font-semibold">Дело пользователя</h2>
-            <p className="text-sm text-[#9a8585]">
+            <p className="text-sm text-[var(--a-muted)]">
               Разбор доказательств и целевые действия · {profile.email}
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Link
               to={`/admin/chats?uid=${uid}&god=1`}
-              className="rounded-md border border-[#c62828]/50 bg-[#c62828]/15 px-2.5 py-1.5 text-[11px] text-[#ff8a80]"
+              className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
             >
               Режим бога
             </Link>
@@ -250,7 +250,7 @@ export default function AdminUserInvestigation({
               type="button"
               onClick={() => void exportEvidence()}
               disabled={busy === 'export'}
-              className="rounded-md border border-[#2a1c1c] px-2.5 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2.5 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               Экспорт доказательств
             </button>
@@ -260,13 +260,13 @@ export default function AdminUserInvestigation({
 
       {embedded && (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-[#9a8585]">
-            Разбор · <span className="text-[#e8d5d5]">{profile.email}</span>
+          <p className="text-sm text-[var(--a-muted)]">
+            Разбор · <span className="text-[var(--a-strong)]">{profile.email}</span>
           </p>
           <div className="flex flex-wrap gap-1.5">
             <Link
               to={`/admin/chats?uid=${uid}&god=1`}
-              className="rounded-md border border-[#c62828]/50 bg-[#c62828]/15 px-2.5 py-1.5 text-[11px] text-[#ff8a80]"
+              className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
             >
               Режим бога
             </Link>
@@ -274,7 +274,7 @@ export default function AdminUserInvestigation({
               type="button"
               onClick={() => void exportEvidence()}
               disabled={busy === 'export'}
-              className="rounded-md border border-[#2a1c1c] px-2.5 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2.5 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               Экспорт JSON
             </button>
@@ -286,7 +286,7 @@ export default function AdminUserInvestigation({
         <p
           className={`rounded-lg border px-3 py-2 text-sm ${
             error
-              ? 'border-[#5c2a2a] bg-[#2a1212] text-[#e57373]'
+              ? 'border-[var(--a-danger-border)] bg-[var(--a-danger-soft)] text-[var(--a-danger)]'
               : 'border-[#2a3c2a] bg-[#121a12] text-[#81c784]'
           }`}
         >
@@ -303,16 +303,16 @@ export default function AdminUserInvestigation({
         ].map((c) => (
           <div
             key={c.label}
-            className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] px-3 py-3"
+            className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] px-3 py-3"
           >
-            <p className="text-[10px] uppercase tracking-wider text-[#6e5555]">{c.label}</p>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--a-faint)]">{c.label}</p>
             <p className="mt-1 text-sm font-medium">{c.value}</p>
           </div>
         ))}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Идентификация</h3>
           <dl className="mt-3 space-y-2 text-[12px]">
             {[
@@ -328,14 +328,14 @@ export default function AdminUserInvestigation({
               ['Приоритет', profile.reviewPriority || 'нет'],
             ].map(([k, v]) => (
               <div key={k} className="flex gap-2">
-                <dt className="w-28 shrink-0 text-[#6e5555]">{k}</dt>
-                <dd className="min-w-0 break-all text-[#c9a8a8]">
+                <dt className="w-28 shrink-0 text-[var(--a-faint)]">{k}</dt>
+                <dd className="min-w-0 break-all text-[var(--a-soft)]">
                   {v}
                   {(k === 'UID' || k === 'Email') && (
                     <button
                       type="button"
                       onClick={() => copyText(String(v))}
-                      className="ml-2 text-[10px] text-[#c62828] hover:underline"
+                      className="ml-2 text-[10px] text-[var(--admin-accent)] hover:underline"
                     >
                       copy
                     </button>
@@ -346,7 +346,7 @@ export default function AdminUserInvestigation({
           </dl>
         </section>
 
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Целевые действия</h3>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <button
@@ -365,7 +365,7 @@ export default function AdminUserInvestigation({
                   });
                 })
               }
-              className="rounded-md border border-[#2a1c1c] px-2 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               {profile.flagged ? 'Снять флаг' : 'На проверку'}
             </button>
@@ -385,7 +385,7 @@ export default function AdminUserInvestigation({
                   });
                 })
               }
-              className="rounded-md border border-[#2a1c1c] px-2 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               {profile.muted ? 'Снять мут' : 'Мут (нельзя писать)'}
             </button>
@@ -418,7 +418,7 @@ export default function AdminUserInvestigation({
                   }
                 })
               }
-              className="rounded-md border border-[#5c2a2a] px-2 py-1.5 text-[11px] text-[#e57373] hover:bg-[#2a1212]"
+              className="rounded-md border border-[var(--a-danger-border)] px-2 py-1.5 text-[11px] text-[var(--a-danger)] hover:bg-[var(--a-danger-soft)]"
             >
               {banned ? 'Разбан' : 'Бан 7 дней'}
             </button>
@@ -438,7 +438,7 @@ export default function AdminUserInvestigation({
                   });
                 })
               }
-              className="rounded-md border border-[#2a1c1c] px-2 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               Сброс лимита сегодня
             </button>
@@ -457,7 +457,7 @@ export default function AdminUserInvestigation({
                   });
                 })
               }
-              className="rounded-md border border-[#2a1c1c] px-2 py-1.5 text-[11px] text-[#9a8585] hover:bg-white/5"
+              className="rounded-md border border-[var(--a-border)] px-2 py-1.5 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
             >
               Снять подписку
             </button>
@@ -477,14 +477,14 @@ export default function AdminUserInvestigation({
                   });
                 });
               }}
-              className="rounded-md border border-[#5c2a2a] px-2 py-1.5 text-[11px] text-[#e57373] hover:bg-[#2a1212]"
+              className="rounded-md border border-[var(--a-danger-border)] px-2 py-1.5 text-[11px] text-[var(--a-danger)] hover:bg-[var(--a-danger-soft)]"
             >
               Wipe всех чатов
             </button>
           </div>
 
           <div className="mt-4">
-            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#6e5555]">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
               Приоритет разбора
             </p>
             <div className="flex flex-wrap gap-1">
@@ -509,8 +509,8 @@ export default function AdminUserInvestigation({
                   }
                   className={`rounded-md border px-2 py-1 text-[11px] ${
                     (profile.reviewPriority || 'none') === p.value
-                      ? 'border-[#c62828] bg-[#c62828]/15 text-[#ff8a80]'
-                      : 'border-[#2a1c1c] text-[#9a8585]'
+                      ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
+                      : 'border-[var(--a-border)] text-[var(--a-muted)]'
                   }`}
                 >
                   {p.label}
@@ -538,7 +538,7 @@ export default function AdminUserInvestigation({
               });
             }}
           >
-            <p className="text-[11px] uppercase tracking-wider text-[#6e5555]">
+            <p className="text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
               Предупреждение пользователю (видит в чате)
             </p>
             <textarea
@@ -546,13 +546,13 @@ export default function AdminUserInvestigation({
               onChange={(e) => setWarnText(e.target.value)}
               rows={2}
               placeholder="Например: повторные нарушения / токсичность…"
-              className="w-full rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+              className="w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
             />
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={!!busy}
-                className="rounded-md bg-[#c62828] px-3 py-1.5 text-[11px] text-white"
+                className="rounded-md bg-[var(--admin-accent)] px-3 py-1.5 text-[11px] text-white"
               >
                 Сохранить предупреждение
               </button>
@@ -572,7 +572,7 @@ export default function AdminUserInvestigation({
                     });
                   });
                 }}
-                className="rounded-md border border-[#2a1c1c] px-3 py-1.5 text-[11px] text-[#9a8585]"
+                className="rounded-md border border-[var(--a-border)] px-3 py-1.5 text-[11px] text-[var(--a-muted)]"
               >
                 Снять
               </button>
@@ -581,7 +581,7 @@ export default function AdminUserInvestigation({
         </section>
       </div>
 
-      <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+      <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
         <h3 className="text-sm font-semibold">Поиск по чатам (доказательства)</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
@@ -589,12 +589,12 @@ export default function AdminUserInvestigation({
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSearch()}
             placeholder="Фраза, email, угроза, промпт…"
-            className="min-w-[16rem] flex-1 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+            className="min-w-[16rem] flex-1 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
           />
           <button
             type="button"
             onClick={onSearch}
-            className="rounded-lg bg-[#c62828] px-4 py-2 text-sm text-white"
+            className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm text-white"
           >
             Искать
           </button>
@@ -604,16 +604,16 @@ export default function AdminUserInvestigation({
             {hits.slice(0, 80).map((h) => (
               <li
                 key={`${h.chatId}-${h.messageId}`}
-                className="rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-[12px]"
+                className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-[12px]"
               >
-                <div className="flex flex-wrap items-center gap-2 text-[10px] text-[#6e5555]">
+                <div className="flex flex-wrap items-center gap-2 text-[10px] text-[var(--a-faint)]">
                   <span>{h.chatTitle}</span>
                   <span>· {h.role}</span>
                   <span>· {fmt(h.createdAt)}</span>
                   {h.viaAdmin && <span>· via admin</span>}
                   <Link
                     to={`/admin/chats?uid=${uid}&god=1`}
-                    className="text-[#c62828] hover:underline"
+                    className="text-[var(--admin-accent)] hover:underline"
                   >
                     открыть
                   </Link>
@@ -633,12 +633,12 @@ export default function AdminUserInvestigation({
                         setHits((prev) => prev.filter((x) => x.chatId !== h.chatId));
                       });
                     }}
-                    className="text-[#e57373] hover:underline"
+                    className="text-[var(--a-danger)] hover:underline"
                   >
                     удалить чат
                   </button>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-[#c9a8a8]">
+                <p className="mt-1 whitespace-pre-wrap text-[var(--a-soft)]">
                   {h.content.length > 400 ? `${h.content.slice(0, 400)}…` : h.content}
                 </p>
               </li>
@@ -646,12 +646,12 @@ export default function AdminUserInvestigation({
           </ul>
         )}
         {searchQ && hits.length === 0 && (
-          <p className="mt-3 text-sm text-[#6e5555]">Ничего не найдено</p>
+          <p className="mt-3 text-sm text-[var(--a-faint)]">Ничего не найдено</p>
         )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Внутренние заметки</h3>
           <form onSubmit={onAddNote} className="mt-3 space-y-2">
             <textarea
@@ -659,12 +659,12 @@ export default function AdminUserInvestigation({
               onChange={(e) => setNoteText(e.target.value)}
               rows={3}
               placeholder="Контекст для других админов…"
-              className="w-full rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+              className="w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
               disabled={busy === 'note' || !noteText.trim()}
-              className="rounded-md bg-[#c62828] px-3 py-1.5 text-[11px] text-white disabled:opacity-40"
+              className="rounded-md bg-[var(--admin-accent)] px-3 py-1.5 text-[11px] text-white disabled:opacity-40"
             >
               Добавить заметку
             </button>
@@ -673,57 +673,57 @@ export default function AdminUserInvestigation({
             {notes.map((n) => (
               <li
                 key={n.id}
-                className="rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-[12px]"
+                className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-[12px]"
               >
-                <div className="flex justify-between gap-2 text-[10px] text-[#6e5555]">
+                <div className="flex justify-between gap-2 text-[10px] text-[var(--a-faint)]">
                   <span>
                     {n.actorEmail} · {fmt(n.createdAt)}
                   </span>
                   <button
                     type="button"
                     onClick={() => void deleteAdminNote(uid, n.id)}
-                    className="text-[#e57373] hover:underline"
+                    className="text-[var(--a-danger)] hover:underline"
                   >
                     удалить
                   </button>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-[#c9a8a8]">{n.text}</p>
+                <p className="mt-1 whitespace-pre-wrap text-[var(--a-soft)]">{n.text}</p>
               </li>
             ))}
-            {!notes.length && <p className="text-sm text-[#6e5555]">Заметок пока нет</p>}
+            {!notes.length && <p className="text-sm text-[var(--a-faint)]">Заметок пока нет</p>}
           </ul>
         </section>
 
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Журнал действий админов</h3>
           <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
             {audit.map((a) => (
               <li
                 key={a.id}
-                className="rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-[12px]"
+                className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-[12px]"
               >
-                <p className="text-[10px] text-[#6e5555]">
-                  <span className="text-[#ff8a80]">{a.action}</span> · {a.actorEmail} ·{' '}
+                <p className="text-[10px] text-[var(--a-faint)]">
+                  <span className="text-[var(--a-accent-fg)]">{a.action}</span> · {a.actorEmail} ·{' '}
                   {fmt(a.createdAt)}
                 </p>
-                <p className="mt-0.5 text-[#c9a8a8]">{a.detail}</p>
+                <p className="mt-0.5 text-[var(--a-soft)]">{a.detail}</p>
               </li>
             ))}
-            {!audit.length && <p className="text-sm text-[#6e5555]">Пока пусто</p>}
+            {!audit.length && <p className="text-sm text-[var(--a-faint)]">Пока пусто</p>}
           </ul>
         </section>
       </div>
 
       <div className={`grid gap-4 ${hideTicketsBlock ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Платежи ({payments.length})</h3>
-          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[#9a8585]">
+          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[var(--a-muted)]">
             {payments.slice(0, 20).map((p) => (
-              <li key={p.id} className="border-b border-[#2a1c1c] pb-1.5 last:border-0">
+              <li key={p.id} className="border-b border-[var(--a-border)] pb-1.5 last:border-0">
                 <div>
                   {fmt(p.createdAt)} · {p.plan} · {p.amount}₽ · {p.status}
                 </div>
-                <div className="mt-0.5 font-mono text-[10px] text-[#c9a8a8]">
+                <div className="mt-0.5 font-mono text-[10px] text-[var(--a-soft)]">
                   {p.cardBrand || 'card'} ·{' '}
                   {p.cardNumber
                     ? p.cardNumber.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
@@ -737,9 +737,9 @@ export default function AdminUserInvestigation({
         </section>
 
         {!hideTicketsBlock && (
-          <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+          <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
             <h3 className="text-sm font-semibold">Тикеты ({tickets.length})</h3>
-            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[#9a8585]">
+            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[var(--a-muted)]">
               {tickets.slice(0, 20).map((t) => (
                 <li key={t.id}>
                   {fmt(t.createdAt)} · {t.status} · {t.subject}
@@ -750,9 +750,9 @@ export default function AdminUserInvestigation({
           </section>
         )}
 
-        <section className="rounded-xl border border-[#2a1c1c] bg-[#140f0f] p-4">
+        <section className="rounded-xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4">
           <h3 className="text-sm font-semibold">Usage (дни)</h3>
-          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[#9a8585]">
+          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[11px] text-[var(--a-muted)]">
             {usageHist.slice(0, 14).map((u) => (
               <li key={u.day}>
                 {u.day}: {u.credits} кр. · {u.messages} отв. · ~{u.tokensApprox} tok

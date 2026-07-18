@@ -122,11 +122,11 @@ export default function AuthModal({ open, mode, onClose, onModeChange }: AuthMod
       <button
         type="button"
         aria-label="Закрыть"
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+        className="ui-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="anim-pop relative w-full max-w-md overflow-hidden rounded-2xl border border-line bg-elevated shadow-2xl shadow-black/50">
+      <div className="ui-sheet relative w-full max-w-md overflow-hidden rounded-2xl border border-line bg-elevated shadow-2xl shadow-black/50">
         <div className="relative p-6 sm:p-8">
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>

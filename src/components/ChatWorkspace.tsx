@@ -15,8 +15,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../context/AuthContext';
 import { usePrefs, type AppLanguage, type AppTheme, type UiScale } from '../context/PrefsContext';
-import { formatLimit, getPlan } from '../lib/plans';
-import PlanCountdown from './PlanCountdown';
+import { getPlan } from '../lib/plans';
+import LimitsModal from './LimitsModal';
 import {
   loadLocalChatStore,
   saveLocalChatStore,
@@ -61,6 +61,7 @@ import {
   IconFolder,
   IconFolderOut,
   IconGrip,
+  IconLimits,
   IconLogout,
   IconMenu,
   IconMore,
@@ -330,6 +331,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [foldAnim, setFoldAnim] = useState<{ from: string; into: string } | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [limitsOpen, setLimitsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
@@ -1272,19 +1274,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                     {user ? userDisplayName(user) : t('chat.guest')}
                   </span>
                   <span className="block truncate text-[10px] text-[var(--c-faint)]">
-                    {user
-                      ? planExpiresAt
-                        ? (
-                            <>
-                              {plan.name} · <PlanCountdown expiresAt={planExpiresAt} prefix="" />
-                            </>
-                          )
-                        : `${plan.name} · ${
-                            plan.creditsPerDay == null
-                              ? `${usageToday} кр.`
-                              : `${usageToday}/${plan.creditsPerDay} кр.`
-                          }`
-                      : t('chat.login.hint')}
+                    {user ? plan.name : t('chat.login.hint')}
                   </span>
                 </span>
                 <IconChevronDown
@@ -1328,6 +1318,17 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                       >
                         <IconSettings className="h-3.5 w-3.5" />
                         {t('chat.settings')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setLimitsOpen(true);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--c-muted)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
+                      >
+                        <IconLimits className="h-3.5 w-3.5" />
+                        Лимиты
                       </button>
                       <Link
                         to="/pricing"
@@ -1386,6 +1387,17 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         <IconSettings className="h-3.5 w-3.5" />
                         {t('chat.settings')}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setLimitsOpen(true);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--c-muted)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
+                      >
+                        <IconLimits className="h-3.5 w-3.5" />
+                        Лимиты
+                      </button>
                       <Link
                         to="/pricing"
                         onClick={() => setProfileOpen(false)}
@@ -1431,14 +1443,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           <button
             type="button"
             aria-label="Закрыть"
-            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            className="ui-backdrop absolute inset-0 bg-black/60 backdrop-blur-[2px]"
             onClick={() => setSettingsOpen(false)}
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="chat-settings-title"
-            className="anim-pop relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] shadow-2xl"
+            className="ui-sheet relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
@@ -1711,21 +1723,6 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                 </div>
               )}
               <form onSubmit={onSubmit} className="mx-auto max-w-[720px]">
-                <p className="mb-1.5 text-[11px] text-[var(--c-faint)]">
-                  {plan.name}: {formatLimit(plan)}
-                  {plan.creditsPerDay != null
-                    ? ` · сегодня ${usageToday}/${plan.creditsPerDay} кр.`
-                    : ` · сегодня ${usageToday} кр.`}
-                  {active
-                    ? ` · ответ −${creditCostForRequest(active.modelId, active.reasoning)} кр.`
-                    : ''}
-                  {planExpiresAt ? (
-                    <>
-                      {' · '}
-                      <PlanCountdown expiresAt={planExpiresAt} className="text-[var(--c-muted)]" />
-                    </>
-                  ) : null}
-                </p>
                 <div className="chat-composer rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-elev)]">
                   <textarea
                     ref={textareaRef}
@@ -1821,6 +1818,21 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           </>
         )}
       </section>
+
+      <LimitsModal
+        open={limitsOpen}
+        onClose={() => setLimitsOpen(false)}
+        plan={plan}
+        usedToday={usageToday}
+        answerCost={
+          active
+            ? creditCostForRequest(active.modelId, active.reasoning)
+            : creditCostForRequest(DEFAULT_MODEL_ID, false)
+        }
+        planExpiresAt={planExpiresAt}
+        modelId={active?.modelId ?? DEFAULT_MODEL_ID}
+        reasoning={Boolean(active?.reasoning)}
+      />
     </div>
   );
 }

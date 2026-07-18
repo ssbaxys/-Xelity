@@ -545,6 +545,93 @@ body {
   animation: msg-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes ui-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ui-backdrop {
+  animation: ui-backdrop-in 0.22s ease both;
+}
+
+.ui-sheet {
+  animation: pop-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-enter {
+  animation: fade-in 0.4s ease both;
+}
+
+/* Плавные нажатия / появление — везде */
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  [role='button'],
+  summary,
+  .ui-press {
+    transition:
+      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.18s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.22s ease,
+      filter 0.2s ease;
+  }
+
+  a:active:not([aria-disabled='true']),
+  button:active:not(:disabled),
+  [role='button']:active:not([aria-disabled='true']),
+  .ui-press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+.limits-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.35rem;
+  margin-top: -0.15rem;
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.limits-range::-webkit-slider-runnable-track {
+  height: 0.35rem;
+  background: transparent;
+}
+
+.limits-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: -0.25rem;
+  border-radius: 999px;
+  background: #c62828;
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.2);
+}
+
+.limits-range::-moz-range-track {
+  height: 0.35rem;
+  background: transparent;
+  border: none;
+}
+
+.limits-range::-moz-range-thumb {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: #c62828;
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.2);
+}
+
 /* ——— Mobile nav ——— */
 .nav-burger {
   position: relative;
@@ -873,48 +960,19 @@ body {
   animation-delay: 0.3s;
 }
 
-.chat-token-in {
-  animation: chat-token-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+/* Ответ / мысли: сильное размытие → читаемый текст */
+.answer-blur {
+  filter: blur(14px);
+  opacity: 0.35;
+  transition:
+    filter 0.95s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: filter, opacity;
 }
 
-@keyframes chat-token-in {
-  from {
-    opacity: 0;
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-.chat-caret {
-  display: inline-block;
-  width: 0.45em;
-  height: 1em;
-  margin-left: 1px;
-  vertical-align: -0.12em;
-  background: color-mix(in srgb, var(--c-muted) 55%, transparent);
-  animation: chat-caret-blink 0.9s step-end infinite;
-}
-
-@keyframes chat-caret-blink {
-  50% {
-    opacity: 0;
-  }
-}
-
-.answer-settle {
-  animation: answer-settle-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes answer-settle-in {
-  from {
-    opacity: 0.35;
-  }
-  to {
-    opacity: 1;
-  }
+.answer-blur.is-clear {
+  filter: blur(0);
+  opacity: 1;
 }
 
 .assistant-answer-wrap {
@@ -1113,13 +1171,77 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-shell {
   --admin-accent: #c62828;
   --admin-accent-soft: rgba(198, 40, 40, 0.2);
+  --a-bg: #0d0a0a;
+  --a-text: #f3ecec;
+  --a-muted: #9a8585;
+  --a-faint: #6e5555;
+  --a-soft: #c9a8a8;
+  --a-strong: #e8d5d5;
+  --a-border: #2a1c1c;
+  --a-border-strong: #3a2424;
+  --a-surface: #140f0f;
+  --a-elev: #161010;
+  --a-input: rgba(13, 10, 10, 0.92);
+  --a-chip: #221616;
+  --a-hover: rgba(255, 255, 255, 0.05);
+  --a-header: rgba(20, 15, 15, 0.82);
+  --a-accent-fg: #ff8a80;
+  --a-danger: #e57373;
+  --a-danger-soft: #2a1212;
+  --a-danger-border: #5c2a2a;
+  --a-panel: linear-gradient(180deg, rgba(22, 16, 16, 0.98), rgba(18, 12, 12, 0.96));
+  --a-stat: linear-gradient(160deg, rgba(26, 18, 18, 0.95), rgba(16, 12, 12, 0.98));
+  --a-menu: linear-gradient(180deg, #1a1212, #140f0f);
+  --a-modal: #140f0f;
+  --a-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.65);
+  --a-row-hover: color-mix(in srgb, var(--admin-accent) 8%, transparent);
+  --a-focus-ring: color-mix(in srgb, var(--admin-accent) 18%, transparent);
+  --a-grid: rgba(255, 255, 255, 0.015);
+  --a-check-mark: #fff;
+  color-scheme: dark;
   position: relative;
   isolation: isolate;
   background:
     radial-gradient(900px 420px at 8% -10%, color-mix(in srgb, var(--admin-accent) 22%, transparent), transparent 55%),
     radial-gradient(700px 380px at 100% 0%, color-mix(in srgb, var(--admin-accent) 12%, transparent), transparent 50%),
-    #0d0a0a;
-  color: #f3ecec;
+    var(--a-bg);
+  color: var(--a-text);
+}
+
+.admin-shell.is-light {
+  --a-bg: #f6f4f2;
+  --a-text: #1a1414;
+  --a-muted: #6b5a5a;
+  --a-faint: #8a7878;
+  --a-soft: #5c4a4a;
+  --a-strong: #2a2020;
+  --a-border: #e4d8d8;
+  --a-border-strong: #d4c4c4;
+  --a-surface: #ffffff;
+  --a-elev: #ffffff;
+  --a-input: #ffffff;
+  --a-chip: #f0eaea;
+  --a-hover: rgba(26, 20, 20, 0.05);
+  --a-header: rgba(255, 255, 255, 0.88);
+  --a-accent-fg: color-mix(in srgb, var(--admin-accent) 88%, #000);
+  --a-danger: #c62828;
+  --a-danger-soft: #fdecea;
+  --a-danger-border: #f5c6c2;
+  --a-panel: linear-gradient(180deg, #ffffff, #fbf9f8);
+  --a-stat: linear-gradient(160deg, #ffffff, #f7f3f2);
+  --a-menu: linear-gradient(180deg, #ffffff, #faf7f6);
+  --a-modal: #ffffff;
+  --a-shadow: 0 12px 36px -22px rgba(40, 20, 20, 0.22);
+  --a-row-hover: color-mix(in srgb, var(--admin-accent) 7%, transparent);
+  --a-focus-ring: color-mix(in srgb, var(--admin-accent) 16%, transparent);
+  --a-grid: rgba(26, 20, 20, 0.04);
+  --a-check-mark: #fff;
+  --admin-accent-soft: color-mix(in srgb, var(--admin-accent) 14%, transparent);
+  color-scheme: light;
+  background:
+    radial-gradient(900px 420px at 8% -10%, color-mix(in srgb, var(--admin-accent) 12%, transparent), transparent 55%),
+    radial-gradient(700px 380px at 100% 0%, color-mix(in srgb, var(--admin-accent) 8%, transparent), transparent 50%),
+    var(--a-bg);
 }
 
 .admin-theme-helper {
@@ -1140,10 +1262,19 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-theme-owner {
   --admin-accent: #d4a017;
   --admin-accent-soft: rgba(212, 160, 23, 0.2);
-  background:
-    radial-gradient(900px 420px at 8% -10%, rgba(212, 160, 23, 0.16), transparent 55%),
-    radial-gradient(700px 380px at 100% 0%, rgba(198, 40, 40, 0.1), transparent 50%),
-    #0d0a0a;
+}
+
+.admin-shell.is-light.admin-theme-helper {
+  --admin-accent-soft: rgba(42, 157, 143, 0.14);
+}
+.admin-shell.is-light.admin-theme-moderator {
+  --admin-accent-soft: rgba(224, 159, 62, 0.14);
+}
+.admin-shell.is-light.admin-theme-admin {
+  --admin-accent-soft: rgba(198, 40, 40, 0.12);
+}
+.admin-shell.is-light.admin-theme-owner {
+  --admin-accent-soft: rgba(212, 160, 23, 0.14);
 }
 
 .admin-brand-code {
@@ -1158,10 +1289,14 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   z-index: 0;
   opacity: 0.35;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    linear-gradient(var(--a-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--a-grid) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 75%);
+}
+
+.admin-shell.is-light::before {
+  opacity: 0.55;
 }
 
 .admin-shell > * {
@@ -1171,8 +1306,8 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 
 .admin-header {
   backdrop-filter: blur(14px);
-  background: rgba(20, 15, 15, 0.82);
-  border-bottom: 1px solid rgba(42, 28, 28, 0.9);
+  background: var(--a-header);
+  border-bottom: 1px solid var(--a-border);
   transition: background 0.25s ease, border-color 0.25s ease;
 }
 
@@ -1181,7 +1316,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   border-radius: 0.55rem;
   padding: 0.4rem 0.7rem;
   font-size: 12px;
-  color: #9a8585;
+  color: var(--a-muted);
   transition:
     color 0.22s ease,
     background 0.22s ease,
@@ -1189,15 +1324,37 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-nav-link:hover {
-  color: #f3ecec;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--a-text);
+  background: var(--a-hover);
   transform: translateY(-1px);
 }
 
 .admin-nav-link.is-active {
-  color: #fff;
+  color: var(--a-text);
   background: var(--admin-accent-soft);
   animation: admin-nav-glow 2.8s ease-in-out infinite;
+}
+
+.admin-shell.is-light .admin-nav-link.is-active {
+  color: var(--admin-accent);
+}
+
+.admin-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--a-border);
+  background: var(--a-input);
+  color: var(--a-muted);
+}
+
+.admin-theme-toggle:hover {
+  color: var(--a-text);
+  border-color: var(--a-border-strong);
+  background: var(--a-hover);
 }
 
 .admin-page {
@@ -1209,12 +1366,13 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-shell input[type='number'],
 .admin-shell input[type='search'],
 .admin-shell input[type='datetime-local'],
+.admin-shell input[type='password'],
 .admin-shell input:not([type]),
 .admin-shell textarea {
   border-radius: 0.7rem;
-  border: 1px solid #2a1c1c;
-  background: rgba(13, 10, 10, 0.92);
-  color: #f3ecec;
+  border: 1px solid var(--a-border);
+  background: var(--a-input);
+  color: var(--a-text);
   outline: none;
   transition:
     border-color 0.22s ease,
@@ -1228,9 +1386,10 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-shell input[type='number']:hover,
 .admin-shell input[type='search']:hover,
 .admin-shell input[type='datetime-local']:hover,
+.admin-shell input[type='password']:hover,
 .admin-shell input:not([type]):hover,
 .admin-shell textarea:hover {
-  border-color: #3a2424;
+  border-color: var(--a-border-strong);
 }
 
 .admin-shell input[type='text']:focus,
@@ -1238,10 +1397,41 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-shell input[type='number']:focus,
 .admin-shell input[type='search']:focus,
 .admin-shell input[type='datetime-local']:focus,
+.admin-shell input[type='password']:focus,
 .admin-shell input:not([type]):focus,
 .admin-shell textarea:focus {
-  border-color: rgba(198, 40, 40, 0.55);
-  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.14);
+  border-color: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
+}
+
+.admin-shell input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  filter: invert(0.75);
+}
+
+.admin-shell.is-light input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.5;
+}
+
+.admin-shell select {
+  appearance: none;
+  border-radius: 0.7rem;
+  border: 1px solid var(--a-border);
+  background: var(--a-input);
+  color: var(--a-text);
+  outline: none;
+  padding: 0.4rem 2rem 0.4rem 0.7rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--a-faint) 50%),
+    linear-gradient(135deg, var(--a-faint) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% - 2px),
+    calc(100% - 9px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 }
 
 .admin-shell button {
@@ -1264,9 +1454,9 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 
 .admin-panel {
   border-radius: 1rem;
-  border: 1px solid #2a1c1c;
-  background: linear-gradient(180deg, rgba(22, 16, 16, 0.98), rgba(18, 12, 12, 0.96));
-  box-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--a-border);
+  background: var(--a-panel);
+  box-shadow: var(--a-shadow);
   transition:
     border-color 0.25s ease,
     box-shadow 0.25s ease,
@@ -1274,8 +1464,8 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-panel:hover {
-  border-color: rgba(58, 36, 36, 0.95);
-  box-shadow: 0 16px 48px -22px rgba(198, 40, 40, 0.18);
+  border-color: var(--a-border-strong);
+  box-shadow: 0 16px 48px -22px color-mix(in srgb, var(--admin-accent) 22%, transparent);
 }
 
 .admin-shell table {
@@ -1288,11 +1478,13 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-shell tbody tr:hover {
-  background: rgba(198, 40, 40, 0.06);
+  background: var(--a-row-hover);
 }
 
 .admin-shell thead th {
   letter-spacing: 0.06em;
+  background: var(--a-surface);
+  color: var(--a-faint);
 }
 
 .admin-tab {
@@ -1300,7 +1492,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   padding: 0.5rem 0.85rem;
   font-size: 12px;
   font-weight: 500;
-  color: #6e5555;
+  color: var(--a-faint);
   transition:
     color 0.22s ease,
     background 0.22s ease,
@@ -1308,44 +1500,97 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-tab:hover {
-  color: #9a8585;
+  color: var(--a-muted);
 }
 
 .admin-tab.is-active {
-  color: #ff8a80;
-  background: rgba(198, 40, 40, 0.15);
+  color: var(--a-accent-fg);
+  background: var(--admin-accent-soft);
 }
 
 .admin-modal-backdrop {
   animation: admin-soft-in 0.2s ease;
   backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.admin-shell.is-light .admin-modal-backdrop {
+  background: rgba(30, 20, 20, 0.35);
 }
 
 .admin-modal-card {
   animation: admin-fade-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--a-modal);
+  border: 1px solid var(--a-border);
+  color: var(--a-text);
+}
+
+.admin-select-trigger {
+  display: inline-flex;
+  min-width: 7.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--a-border);
+  background: var(--a-input);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-size: 12px;
+  color: var(--a-text);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--a-text) 4%, transparent);
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
+}
+
+.admin-select-trigger:hover:not(:disabled) {
+  border-color: var(--a-border-strong);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
+}
+
+.admin-select-trigger.is-open {
+  border-color: color-mix(in srgb, var(--admin-accent) 50%, transparent);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
+}
+
+.admin-select-trigger:disabled {
+  opacity: 0.4;
 }
 
 .admin-select-menu {
   animation: admin-soft-in 0.16s ease;
   transform-origin: top center;
-  border: 1px solid #3a2424;
-  background: linear-gradient(180deg, #1a1212, #140f0f);
-  box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--a-border-strong);
+  background: var(--a-menu);
+  box-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.35);
+  color: var(--a-text);
+}
+
+.admin-shell.is-light .admin-select-menu {
+  box-shadow: 0 18px 40px -16px rgba(40, 20, 20, 0.18);
 }
 
 .admin-select-option {
   transition: background 0.18s ease, color 0.18s ease, padding-left 0.18s ease;
+  color: var(--a-muted);
 }
 
 .admin-select-option:hover {
-  background: rgba(198, 40, 40, 0.14);
+  background: var(--admin-accent-soft);
   padding-left: 0.85rem;
+}
+
+.admin-select-option.is-active {
+  background: var(--admin-accent-soft);
+  color: var(--a-text);
 }
 
 .admin-stat {
   border-radius: 1rem;
-  border: 1px solid #2a1c1c;
-  background: linear-gradient(160deg, rgba(26, 18, 18, 0.95), rgba(16, 12, 12, 0.98));
+  border: 1px solid var(--a-border);
+  background: var(--a-stat);
   padding: 1rem;
   transition:
     transform 0.25s ease,
@@ -1355,15 +1600,20 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 
 .admin-stat:hover {
   transform: translateY(-2px);
-  border-color: rgba(198, 40, 40, 0.35);
-  box-shadow: 0 14px 36px -20px rgba(198, 40, 40, 0.45);
+  border-color: color-mix(in srgb, var(--admin-accent) 35%, transparent);
+  box-shadow: 0 14px 36px -20px color-mix(in srgb, var(--admin-accent) 40%, transparent);
 }
 
 .admin-bar {
   transform-origin: bottom;
   animation: admin-bar-grow 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, #ef5350, #c62828 70%, #8e1b1b);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--admin-accent) 70%, #fff),
+    var(--admin-accent) 70%,
+    color-mix(in srgb, var(--admin-accent) 70%, #000)
+  );
   transition: filter 0.2s ease;
 }
 
@@ -1371,7 +1621,6 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   filter: brightness(1.12);
 }
 
-/* Fancy animated checkbox */
 .admin-check {
   position: relative;
   display: inline-flex;
@@ -1379,13 +1628,13 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   gap: 0.55rem;
   cursor: pointer;
   user-select: none;
-  color: #9a8585;
+  color: var(--a-muted);
   font-size: 11px;
   transition: color 0.2s ease;
 }
 
 .admin-check:hover {
-  color: #c9a8a8;
+  color: var(--a-soft);
 }
 
 .admin-check input {
@@ -1400,8 +1649,8 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   width: 1.05rem;
   height: 1.05rem;
   border-radius: 0.35rem;
-  border: 1.5px solid #3a2424;
-  background: #0d0a0a;
+  border: 1.5px solid var(--a-border-strong);
+  background: var(--a-input);
   transition:
     border-color 0.22s ease,
     background 0.22s ease,
@@ -1417,7 +1666,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--a-check-mark);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) scale(0);
   opacity: 0;
@@ -1425,9 +1674,13 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-check input:checked + .admin-check-box {
-  border-color: #c62828;
-  background: linear-gradient(145deg, #ef5350, #c62828);
-  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.18);
+  border-color: var(--admin-accent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--admin-accent) 55%, #fff),
+    var(--admin-accent)
+  );
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
 }
 
 .admin-check input:checked + .admin-check-box::after {
@@ -1437,7 +1690,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-check input:focus-visible + .admin-check-box {
-  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.28);
+  box-shadow: 0 0 0 3px var(--a-focus-ring);
 }
 
 .admin-check:active .admin-check-box {
@@ -1447,13 +1700,17 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-loading {
   background: linear-gradient(
     90deg,
-    rgba(42, 28, 28, 0.3) 25%,
-    rgba(198, 40, 40, 0.18) 50%,
-    rgba(42, 28, 28, 0.3) 75%
+    color-mix(in srgb, var(--a-border) 50%, transparent) 25%,
+    var(--admin-accent-soft) 50%,
+    color-mix(in srgb, var(--a-border) 50%, transparent) 75%
   );
   background-size: 200% 100%;
   animation: admin-shimmer 1.4s linear infinite;
   border-radius: 0.75rem;
+}
+
+.admin-scroll.is-light *::-webkit-scrollbar-track {
+  background: rgba(26, 20, 20, 0.04);
 }
 
 

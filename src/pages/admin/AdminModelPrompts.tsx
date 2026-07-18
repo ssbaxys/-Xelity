@@ -53,14 +53,14 @@ export default function AdminModelPrompts() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Промпты моделей</h2>
-        <p className="text-sm text-[#9a8585]">
+        <p className="text-sm text-[var(--a-muted)]">
           Дополнительный системный промпт для конкретной модели. Применяется во всех чатах, где
           выбрана эта модель (поверх базового канона Xlaude).
         </p>
       </div>
 
       <form onSubmit={onSubmit} className="admin-panel space-y-4 p-4">
-        <label className="block text-xs text-[#9a8585]">
+        <label className="block text-xs text-[var(--a-muted)]">
           Модель
           <div className="mt-1">
             <AdminSelect
@@ -75,32 +75,32 @@ export default function AdminModelPrompts() {
         </label>
 
         {selected && (
-          <p className="text-[11px] text-[#6e5555]">
-            {selected.desc} · id <span className="text-[#9a8585]">{selected.id}</span>
+          <p className="text-[11px] text-[var(--a-faint)]">
+            {selected.desc} · id <span className="text-[var(--a-muted)]">{selected.id}</span>
           </p>
         )}
 
-        <label className="block text-xs text-[#9a8585]">
+        <label className="block text-xs text-[var(--a-muted)]">
           Системный промпт модели
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, 8000))}
             rows={12}
             placeholder="Например: всегда отвечай структурировано, используй таблицы для сравнений…"
-            className="mt-1 w-full resize-y rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 font-mono text-sm outline-none focus:border-[#c62828]/50"
+            className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 font-mono text-sm outline-none focus:border-[var(--admin-accent)]/50"
           />
-          <span className="mt-1 block text-[10px] text-[#6e5555]">
+          <span className="mt-1 block text-[10px] text-[var(--a-faint)]">
             {text.length}/8000 · пустое поле = без доп. промпта
           </span>
         </label>
 
         {meta?.updatedAt ? (
-          <p className="text-[11px] text-[#6e5555]">
+          <p className="text-[11px] text-[var(--a-faint)]">
             Обновлено {new Date(meta.updatedAt).toLocaleString()}
             {meta.updatedByEmail ? ` · ${meta.updatedByEmail}` : ''}
           </p>
         ) : (
-          <p className="text-[11px] text-[#6e5555]">Для этой модели доп. промпт ещё не задан</p>
+          <p className="text-[11px] text-[var(--a-faint)]">Для этой модели доп. промпт ещё не задан</p>
         )}
 
         {error && <p className="text-xs text-red-400">{error}</p>}
@@ -109,7 +109,7 @@ export default function AdminModelPrompts() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-[#c62828] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           {busy ? 'Сохранение…' : 'Сохранить'}
         </button>

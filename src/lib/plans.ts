@@ -43,10 +43,10 @@ export const PLANS: Record<PlanId, PlanDef> = {
     name: 'Max',
     priceRub: 2490,
     priceLabel: 'от 2 490 ₽/мес',
-    creditsPerDay: null,
+    creditsPerDay: 1200,
     maxTokens: 8192,
-    blurb: 'Без дневного потолка кредитов для команд и агентов.',
-    features: ['Без лимита кредитов', 'Ответы до ~8k токенов', 'Максимальный бюджет ответа'],
+    blurb: 'Большой дневной бюджет для команд и агентов.',
+    features: ['1200 кредитов в сутки', 'Ответы до ~8k токенов', 'Максимальный бюджет ответа'],
   },
 };
 
@@ -192,4 +192,11 @@ export function todayKey(d = new Date()) {
 export function formatLimit(plan: PlanDef): string {
   if (plan.creditsPerDay == null) return 'Без лимита кредитов';
   return `${plan.creditsPerDay} кр./сутки`;
+}
+
+/** Следующий сброс дневных кредитов — локальная полночь */
+export function nextCreditsResetAt(now = Date.now()): number {
+  const d = new Date(now);
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
 }

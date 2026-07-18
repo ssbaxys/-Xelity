@@ -15,13 +15,13 @@ import {
 import { modelLabel, normalizeModelId } from '../../lib/models';
 import { watchAllUsers, type UserProfile } from '../../lib/rtdb';
 import { requestXlaudeReply } from '../../lib/xlaude';
-import { IconBrain } from '../../components/icons';
+import { IconBrain, IconChevronDown } from '../../components/icons';
 import AdminSelect from './AdminSelect';
 import AdminCheckbox from './AdminCheckbox';
 
 function MarkdownBody({ content }: { content: string }) {
   return (
-    <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[13px] leading-[1.6] text-[#e8d5d5]">
+    <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[13px] leading-[1.6] text-[var(--a-strong)]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
@@ -205,12 +205,12 @@ export default function AdminChats() {
       key={c.id}
       type="button"
       onClick={() => setThreadId(c.id)}
-      className={`mb-0.5 w-full rounded-lg px-2 py-2 text-left text-xs hover:bg-white/5 ${
+      className={`mb-0.5 w-full rounded-lg px-2 py-2 text-left text-xs hover:bg-[var(--a-hover)] ${
         nested ? 'pl-4' : ''
-      } ${threadId === c.id ? 'bg-[#c62828]/15' : ''}`}
+      } ${threadId === c.id ? 'bg-[var(--admin-accent)]/15' : ''}`}
     >
       <span className="block truncate font-medium">{c.title || 'Без названия'}</span>
-      <span className="text-[10px] text-[#6e5555]">
+      <span className="text-[10px] text-[var(--a-faint)]">
         {c.messages.length} сообщ. · {modelLabel(c.modelId)}
       </span>
     </button>
@@ -223,7 +223,7 @@ export default function AdminChats() {
           <h2 className="text-lg font-semibold">
             {godMode ? 'Режим бога' : 'Чаты пользователей'}
           </h2>
-          <p className="text-sm text-[#9a8585]">
+          <p className="text-sm text-[var(--a-muted)]">
             {godMode
               ? 'Папки, markdown и ответ от лица модели пользователя'
               : 'Просмотр облачных чатов и отправка от лица пользователя'}
@@ -255,9 +255,9 @@ export default function AdminChats() {
       </div>
 
       {!selectedUid ? (
-        <p className="text-sm text-[#6e5555]">Выберите пользователя</p>
+        <p className="text-sm text-[var(--a-faint)]">Выберите пользователя</p>
       ) : !store || !store.chats.length ? (
-        <p className="admin-panel p-6 text-center text-sm text-[#6e5555]">
+        <p className="admin-panel p-6 text-center text-sm text-[var(--a-faint)]">
           У пользователя ещё нет чатов в базе
         </p>
       ) : (
@@ -277,24 +277,28 @@ export default function AdminChats() {
                           [folder.id]: !open,
                         }))
                       }
-                      className="mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-[#c9a8a8] hover:bg-white/5"
+                      className="mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-[var(--a-soft)] hover:bg-[var(--a-hover)]"
                     >
-                      <span className="text-[#6e5555]">{open ? '▾' : '▸'}</span>
+                      <IconChevronDown
+                        className={`h-3 w-3 shrink-0 text-[var(--a-faint)] transition-transform ${
+                          open ? 'rotate-0' : '-rotate-90'
+                        }`}
+                      />
                       <span className="truncate">{folder.title}</span>
-                      <span className="ml-auto text-[10px] text-[#6e5555]">{inner.length}</span>
+                      <span className="ml-auto text-[10px] text-[var(--a-faint)]">{inner.length}</span>
                     </button>
                     {open &&
                       (inner.length
                         ? inner.map((c) => renderChatButton(c, true))
                         : (
-                          <p className="px-4 py-1 text-[10px] text-[#6e5555]">Пусто</p>
+                          <p className="px-4 py-1 text-[10px] text-[var(--a-faint)]">Пусто</p>
                         ))}
                   </div>
                 );
               })}
 
             {godMode && folders.length > 0 && rootChats.length > 0 && (
-              <p className="mb-1 mt-2 px-2 text-[10px] uppercase tracking-wider text-[#6e5555]">
+              <p className="mb-1 mt-2 px-2 text-[10px] uppercase tracking-wider text-[var(--a-faint)]">
                 Без папки
               </p>
             )}
@@ -302,20 +306,20 @@ export default function AdminChats() {
             {(godMode ? rootChats : store.chats).map((c) => renderChatButton(c))}
 
             {godMode && !folders.length && !rootChats.length && (
-              <p className="p-3 text-center text-xs text-[#6e5555]">Нет чатов</p>
+              <p className="p-3 text-center text-xs text-[var(--a-faint)]">Нет чатов</p>
             )}
           </div>
 
           <div className="admin-panel flex min-h-[480px] flex-col">
-            <div className="border-b border-[#2a1c1c] px-4 py-3">
+            <div className="border-b border-[var(--a-border)] px-4 py-3">
               <p className="font-medium">{thread?.title ?? '—'}</p>
-              <p className="text-[11px] text-[#9a8585]">
+              <p className="text-[11px] text-[var(--a-muted)]">
                 {selectedUser?.email || selectedUid}
                 {thread && (
                   <>
                     {' · '}
                     модель пользователя:{' '}
-                    <span className="text-[#ff8a80]">{modelName}</span>
+                    <span className="text-[var(--a-accent-fg)]">{modelName}</span>
                   </>
                 )}
                 {godMode && ' · god mode'}
@@ -333,17 +337,17 @@ export default function AdminChats() {
                   <div
                     key={m.id}
                     className={`max-w-[92%] rounded-xl px-3 py-2 text-sm ${
-                      m.role === 'user' ? 'ml-auto bg-[#221616]' : 'bg-[#c62828]/10'
+                      m.role === 'user' ? 'ml-auto bg-[var(--a-chip)]' : 'bg-[var(--admin-accent)]/10'
                     }`}
                   >
-                    <p className="flex items-center gap-1.5 text-[10px] text-[#6e5555]">
+                    <p className="flex items-center gap-1.5 text-[10px] text-[var(--a-faint)]">
                       <span>
                         {m.role === 'user' ? 'user' : `assistant · ${modelName}`}
                         {m.viaAdmin ? ' · via admin' : ''}
                       </span>
                       {usedReasoning && (
                         <span
-                          className="inline-flex items-center gap-0.5 rounded bg-[#c62828]/20 px-1 py-0.5 text-[#ff8a80]"
+                          className="inline-flex items-center gap-0.5 rounded bg-[var(--admin-accent)]/20 px-1 py-0.5 text-[var(--a-accent-fg)]"
                           title="Пользователь включил «Рассуждения»"
                         >
                           <IconBrain className="h-3 w-3" />
@@ -357,11 +361,11 @@ export default function AdminChats() {
                       <MarkdownBody content={m.content} />
                     </div>
                     {m.role === 'assistant' && m.reasoning?.trim() && (
-                      <details className="mt-2 rounded-lg border border-[#2a1c1c] bg-[#0d0a0a]/60 px-2 py-1.5">
-                        <summary className="cursor-pointer text-[10px] text-[#9a8585]">
+                      <details className="mt-2 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)]/60 px-2 py-1.5">
+                        <summary className="cursor-pointer text-[10px] text-[var(--a-muted)]">
                           Мысли модели
                         </summary>
-                        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-[#6e5555]">
+                        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--a-faint)]">
                           {m.reasoning}
                         </p>
                       </details>
@@ -370,19 +374,19 @@ export default function AdminChats() {
                 );
               })}
               {!thread?.messages.length && (
-                <p className="text-center text-sm text-[#6e5555]">Пустой чат</p>
+                <p className="text-center text-sm text-[var(--a-faint)]">Пустой чат</p>
               )}
             </div>
 
-            <form onSubmit={onSend} className="space-y-2 border-t border-[#2a1c1c] p-3">
+            <form onSubmit={onSend} className="space-y-2 border-t border-[var(--a-border)] p-3">
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setSendAs('user')}
                   className={`rounded-md border px-2.5 py-1 text-[11px] ${
                     sendAs === 'user'
-                      ? 'border-[#c62828] bg-[#c62828]/15 text-[#ff8a80]'
-                      : 'border-[#2a1c1c] text-[#9a8585]'
+                      ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
+                      : 'border-[var(--a-border)] text-[var(--a-muted)]'
                   }`}
                 >
                   От лица пользователя
@@ -392,8 +396,8 @@ export default function AdminChats() {
                   onClick={() => setSendAs('model')}
                   className={`rounded-md border px-2.5 py-1 text-[11px] ${
                     sendAs === 'model'
-                      ? 'border-[#c62828] bg-[#c62828]/15 text-[#ff8a80]'
-                      : 'border-[#2a1c1c] text-[#9a8585]'
+                      ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
+                      : 'border-[var(--a-border)] text-[var(--a-muted)]'
                   }`}
                 >
                   От лица модели ({modelName})
@@ -401,7 +405,7 @@ export default function AdminChats() {
               </div>
 
               {genHint && (
-                <p className="text-[11px] text-[#ff8a80]">{genHint}</p>
+                <p className="text-[11px] text-[var(--a-accent-fg)]">{genHint}</p>
               )}
               {error && <p className="text-xs text-red-400">{error}</p>}
               <div className="flex gap-2">
@@ -417,7 +421,7 @@ export default function AdminChats() {
                       ? `Текст ответа модели (${modelName})…`
                       : 'Сообщение от лица пользователя…'
                   }
-                  className="min-w-0 flex-1 resize-y rounded-lg border border-[#2a1c1c] bg-[#0d0a0a] px-3 py-2 text-sm outline-none"
+                  className="min-w-0 flex-1 resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
                 />
                 <button
                   type="button"
@@ -425,14 +429,14 @@ export default function AdminChats() {
                   onClick={() => void onWandGenerate()}
                   title="Сгенерировать ответ в поле"
                   aria-label="Сгенерировать ответ"
-                  className="self-end inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#c62828]/45 bg-[#c62828]/15 text-[#ff8a80] hover:bg-[#c62828]/25 disabled:opacity-40"
+                  className="self-end inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--admin-accent)]/45 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)] hover:bg-[var(--admin-accent)]/25 disabled:opacity-40"
                 >
                   <IconWand className="h-4 w-4" />
                 </button>
                 <button
                   type="submit"
                   disabled={busy || !draft.trim() || !thread}
-                  className="self-end rounded-lg bg-[#c62828] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  className="self-end rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
                   {busy ? '…' : 'Отправить'}
                 </button>

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import BlurMarkdown from './BlurMarkdown';
 import ReasoningPanel from './ReasoningPanel';
 import TypingDots from './TypingDots';
-import WordReveal from './WordReveal';
 import { modelLabel, normalizeModelId, type ChatModelId } from '../lib/models';
 
 type ThinkingPhase = 'thinking' | 'answering' | null | undefined;
@@ -15,21 +13,10 @@ type Props = {
   reasoningMs?: number | null;
   thinkingPhase?: ThinkingPhase;
   createdAt: number;
-  /** идёт генерация этого сообщения */
   live?: boolean;
 };
 
-function MarkdownBody({ content }: { content: string }) {
-  return (
-    <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[15px] leading-[1.65] text-[var(--c-text)]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
-  );
-}
-
-/**
- * Ответ ассистента: точки → мысли → ответ по словам.
- */
+/** Ответ: точки → мысли → markdown сразу + blur → sharp */
 export default function AssistantReply({
   content,
   modelId,
@@ -45,17 +32,14 @@ export default function AssistantReply({
 
   const [dotsExit, setDotsExit] = useState(false);
   const [showDots, setShowDots] = useState(!hasContent);
-  const [thoughtsReady, setThoughtsReady] = useState(false);
-  const [answerReady, setAnswerReady] = useState(hasContent && !live);
-  const [revealAnswer, setRevealAnswer] = useState(false);
-  const [answerDone, setAnswerDone] = useState(hasContent && !live);
-  const revealedFor = useRef<string | null>(hasContent && !live ? content : null);
+  const [showAnswer, setShowAnswer] = useState(hasContent && !live);
+  const [animateAnswer, setAnimateAnswer] = useState(false);
+  const seenRef = useRef<string | null>(hasContent && !live ? content : null);
 
-  // Точки, пока ждём мысли/ответ; потом плавно гасим
   useEffect(() => {
     if (hasContent || hasReasoning) {
       setDotsExit(true);
-      const t = window.setTimeout(() => setShowDots(false), 360);
+      const t = window.setTimeout(() => setShowDots(false), 280);
       return () => window.clearTimeout(t);
     }
     if (live || thinking) {
@@ -64,34 +48,23 @@ export default function AssistantReply({
     }
   }, [hasContent, hasReasoning, live, thinking]);
 
-  // Когда появились мысли — плавный reveal
-  useEffect(() => {
-    if (hasReasoning) {
-      setThoughtsReady(true);
-    }
-  }, [hasReasoning]);
-
-  // После контента — сначала дождаться исчезновения точек, потом word reveal
   useEffect(() => {
     if (!hasContent) {
-      setRevealAnswer(false);
-      setAnswerDone(false);
-      setAnswerReady(false);
-      revealedFor.current = null;
+      setShowAnswer(false);
+      setAnimateAnswer(false);
+      seenRef.current = null;
       return;
     }
-    // уже показывали этот текст — без повторной анимации (переключение чатов)
-    if (revealedFor.current === content) {
-      setAnswerDone(true);
-      setRevealAnswer(false);
-      setAnswerReady(true);
+    // уже показали этот текст — не трогаем animate, чтобы не оборвать blur
+    if (seenRef.current === content) {
+      setShowAnswer(true);
       return;
     }
-    setAnswerReady(true);
-    const delay = showDots || dotsExit ? 340 : 80;
+    const delay = showDots || dotsExit ? 200 : 40;
     const t = window.setTimeout(() => {
-      setRevealAnswer(true);
-      revealedFor.current = content;
+      setShowAnswer(true);
+      setAnimateAnswer(true);
+      seenRef.current = content;
     }, delay);
     return () => window.clearTimeout(t);
   }, [hasContent, content, showDots, dotsExit]);
@@ -110,7 +83,7 @@ export default function AssistantReply({
           reasoningMs={reasoningMs}
           thinkingPhase={thinkingPhase}
           startedAt={createdAt}
-          animateThoughts={thoughtsReady}
+          animateThoughts
         />
       )}
 
@@ -120,30 +93,9 @@ export default function AssistantReply({
         </div>
       )}
 
-      {answerReady && hasContent && (
+      {showAnswer && hasContent && (
         <div className="assistant-answer-wrap">
-          {answerDone || !revealAnswer ? (
-            answerDone ? (
-              <div className="answer-settle">
-                <MarkdownBody content={content} />
-              </div>
-            ) : (
-              <TypingDots />
-            )
-          ) : (
-            <WordReveal
-              text={content}
-              mode="words"
-              stepMs={30}
-              className="whitespace-pre-wrap text-[15px] leading-[1.65] text-[var(--c-text)]"
-              onDone={() => setAnswerDone(true)}
-              doneSlot={
-                <div className="answer-settle">
-                  <MarkdownBody content={content} />
-                </div>
-              }
-            />
-          )}
+          <BlurMarkdown content={content} animate={animateAnswer} />
         </div>
       )}
     </div>

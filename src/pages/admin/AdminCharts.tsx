@@ -14,7 +14,7 @@ function BarChart({
         const h = Math.max(d.value > 0 ? 6 : 2, Math.round((d.value / max) * barMaxPx));
         return (
           <div key={d.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
-            <span className="text-[10px] tabular-nums text-[#9a8585] transition-opacity duration-300">
+            <span className="text-[10px] tabular-nums text-[var(--a-muted)] transition-opacity duration-300">
               {d.value}
             </span>
             <div
@@ -29,7 +29,7 @@ function BarChart({
               }}
               title={`${d.label}: ${d.value}`}
             />
-            <span className="w-full truncate text-center text-[9px] text-[#6e5555]">{d.label}</span>
+            <span className="w-full truncate text-center text-[9px] text-[var(--a-faint)]">{d.label}</span>
           </div>
         );
       })}
@@ -40,9 +40,9 @@ function BarChart({
 export function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="admin-stat">
-      <p className="text-[11px] uppercase tracking-wider text-[#6e5555]">{label}</p>
+      <p className="text-[11px] uppercase tracking-wider text-[var(--a-faint)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-[#9a8585]">{hint}</p>}
+      {hint && <p className="mt-1 text-[11px] text-[var(--a-muted)]">{hint}</p>}
     </div>
   );
 }

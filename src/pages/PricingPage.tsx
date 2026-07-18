@@ -169,12 +169,17 @@ export default function PricingPage() {
     }
   };
 
+  const history = useMemo(
+    () => payments.filter((p) => p.status !== 'pending').slice(0, 12),
+    [payments],
+  );
+
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="page-enter min-h-screen bg-paper text-ink">
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <Link to="/" className="text-sm text-slate hover:text-ink">
+            <Link to="/" className="ui-press text-sm text-slate transition hover:text-ink">
               ← На главную
             </Link>
             <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
@@ -184,7 +189,10 @@ export default function PricingPage() {
               Free, Pro и Max — дневные кредиты и лимит токенов. Оплата на 1 / 3 / 12 месяцев.
             </p>
           </div>
-          <Link to="/chat" className="rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-white">
+          <Link
+            to="/chat"
+            className="ui-press rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+          >
             В чат
           </Link>
         </div>
@@ -236,13 +244,14 @@ export default function PricingPage() {
             return (
               <div
                 key={id}
-                className={`flex flex-col rounded-2xl border p-5 ${
+                className={`anim-msg flex flex-col rounded-2xl border p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10 ${
                   active
                     ? 'border-signal/50 bg-elevated'
                     : blocked
                       ? 'border-line bg-elevated/40 opacity-70'
                       : 'border-line bg-elevated/60'
                 }`}
+                style={{ animationDelay: `${PLAN_ORDER.indexOf(id) * 60}ms` }}
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="font-display text-xl font-bold">{p.name}</h2>
@@ -287,7 +296,7 @@ export default function PricingPage() {
                   type="button"
                   disabled={id === 'free' || blocked}
                   onClick={() => startCheckout(id)}
-                  className="mt-5 rounded-lg bg-signal px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="ui-press mt-5 rounded-lg bg-signal px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {btnLabel}
                 </button>
@@ -297,34 +306,92 @@ export default function PricingPage() {
         </div>
 
         {pending.length > 0 && (
-          <div className="mt-10 rounded-2xl border border-line bg-elevated p-5">
-            <h3 className="font-semibold">Ожидают решения админа</h3>
-            <ul className="mt-3 space-y-2 text-sm text-slate">
-              {pending.map((p) => (
-                <li key={p.id}>
-                  {PLANS[p.plan].name} · {p.months || 1} мес. · {p.amount} ₽ · карта ••••{' '}
-                  {p.cardLast4} · {paymentStatusLabel(p.status)}
+          <section className="anim-pop mt-10">
+            <h3 className="mb-3 text-sm font-semibold tracking-wide text-ink">
+              Ожидают решения
+              <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
+                {pending.length}
+              </span>
+            </h3>
+            <ul className="space-y-2.5">
+              {pending.map((p, i) => (
+                <li
+                  key={p.id}
+                  className="anim-msg flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-4 py-3.5 transition hover:border-amber-500/40"
+                  style={{ animationDelay: `${i * 45}ms` }}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink">
+                      {PLANS[p.plan].name}
+                      <span className="ml-1.5 text-sm font-normal text-slate">
+                        · {p.months || 1} мес. · {formatPriceRub(p.amount)}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 font-mono text-[12px] text-slate">
+                      •••• {p.cardLast4}
+                      <span className="mx-1.5 text-line">·</span>
+                      {new Date(p.createdAt).toLocaleString('ru-RU')}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+                    В обработке
+                  </span>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
 
-        {payments.some((p) => p.status !== 'pending') && (
-          <div className="mt-6 rounded-2xl border border-line bg-elevated p-5">
-            <h3 className="font-semibold">История</h3>
-            <ul className="mt-3 space-y-2 text-sm text-slate">
-              {payments
-                .filter((p) => p.status !== 'pending')
-                .slice(0, 8)
-                .map((p) => (
-                  <li key={p.id}>
-                    {PLANS[p.plan].name} · {p.months || 1} мес. · {paymentStatusLabel(p.status)} ·
-                    •••• {p.cardLast4}
+        {history.length > 0 && (
+          <section className="anim-pop mt-8">
+            <h3 className="mb-3 text-sm font-semibold tracking-wide text-ink">История покупок</h3>
+            <ul className="space-y-2">
+              {history.map((p, i) => {
+                const ok = p.status === 'succeeded';
+                return (
+                  <li
+                    key={p.id}
+                    className="anim-msg group flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-elevated px-4 py-3.5 transition duration-300 hover:-translate-y-0.5 hover:border-signal/30 hover:shadow-md hover:shadow-black/5"
+                    style={{ animationDelay: `${i * 40}ms` }}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${
+                          ok
+                            ? 'bg-emerald-500/15 text-emerald-600'
+                            : 'bg-red-500/10 text-red-400'
+                        }`}
+                      >
+                        {PLANS[p.plan].name.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-ink">
+                          {PLANS[p.plan].name}
+                          <span className="ml-1.5 text-sm font-normal text-slate">
+                            · {p.months || 1} мес. · {formatPriceRub(p.amount)}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 font-mono text-[12px] text-slate">
+                          •••• {p.cardLast4}
+                          <span className="mx-1.5 opacity-40">·</span>
+                          {new Date(p.createdAt).toLocaleString('ru-RU')}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        ok
+                          ? 'bg-emerald-500/15 text-emerald-700'
+                          : 'bg-red-500/10 text-red-500'
+                      }`}
+                    >
+                      {paymentStatusLabel(p.status)}
+                    </span>
                   </li>
-                ))}
+                );
+              })}
             </ul>
-          </div>
+          </section>
         )}
       </div>
 
@@ -332,13 +399,13 @@ export default function PricingPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <button
             type="button"
-            className="absolute inset-0 bg-black/60"
+            className="ui-backdrop absolute inset-0 bg-black/60"
             aria-label="Закрыть"
             onClick={() => setCheckoutPlan(null)}
           />
           <form
             onSubmit={onSubmit}
-            className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-elevated p-5 shadow-2xl"
+            className="ui-sheet relative z-10 w-full max-w-md rounded-2xl border border-line bg-elevated p-5 shadow-2xl"
           >
             {(() => {
               const checkoutAction = purchaseActionFor(planId, checkoutPlan);
