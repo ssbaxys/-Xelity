@@ -5,11 +5,99 @@ set -euo pipefail
 APP_DIR="${XELITY_DIR:-/opt/xelity}"
 ENV_FILE="${APP_DIR}/.env"
 SERVICE="xelity"
+BRANCH="${XELITY_BRANCH:-main}"
 
 c_title() { printf '\n\033[1;36m══ Xelity ai-tool ══\033[0m\n'; }
 c_ok() { printf '\033[32m%s\033[0m\n' "$*"; }
 c_warn() { printf '\033[33m%s\033[0m\n' "$*"; }
 c_err() { printf '\033[31m%s\033[0m\n' "$*"; }
+
+# Оранжевая плашка на всю ширину терминала (или ~72)
+c_banner_orange() {
+  local msg="$*"
+  local cols=72
+  if command -v tput >/dev/null 2>&1; then
+    cols=$(tput cols 2>/dev/null || echo 72)
+  fi
+  [[ "${cols}" -lt 40 ]] && cols=40
+  [[ "${cols}" -gt 100 ]] && cols=100
+  local pad=$((cols - 2))
+  local line
+  line=$(printf "%-${pad}s" " ${msg}")
+  line=${line:0:${pad}}
+  printf '\033[48;5;208m\033[1;30m%s\033[0m\n' "${line}"
+}
+
+git_safe() {
+  git -c safe.directory="${APP_DIR}" -C "${APP_DIR}" "$@"
+}
+
+pkg_version() {
+  if [[ -f "${APP_DIR}/package.json" ]]; then
+    grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' "${APP_DIR}/package.json" | head -1 | cut -d'"' -f4 || echo "?"
+  else
+    echo "?"
+  fi
+}
+
+# Тихий fetch (не валит меню при ошибке сети)
+refresh_remote() {
+  if [[ ! -d "${APP_DIR}/.git" ]]; then
+    return 1
+  fi
+  git config --global --add safe.directory "${APP_DIR}" 2>/dev/null || true
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 12 git_safe fetch origin "${BRANCH}" --quiet 2>/dev/null || return 1
+  else
+    git_safe fetch origin "${BRANCH}" --quiet 2>/dev/null || return 1
+  fi
+  return 0
+}
+
+# Печатает оранжевую строку, если на GitHub есть коммиты впереди
+show_update_banner() {
+  if [[ ! -d "${APP_DIR}/.git" ]]; then
+    return 0
+  fi
+
+  local local_sha remote_sha local_short remote_short ver ahead behind
+  local_sha=$(git_safe rev-parse HEAD 2>/dev/null || echo "")
+  remote_sha=$(git_safe rev-parse "origin/${BRANCH}" 2>/dev/null || echo "")
+
+  if [[ -z "${local_sha}" ]]; then
+    return 0
+  fi
+
+  ver=$(pkg_version)
+  local_short="${local_sha:0:7}"
+
+  if [[ -z "${remote_sha}" ]]; then
+    echo
+    c_banner_orange "Версия v${ver} · ${local_short} · нет данных origin/${BRANCH} (проверь сеть)"
+    return 0
+  fi
+
+  remote_short="${remote_sha:0:7}"
+
+  if [[ "${local_sha}" == "${remote_sha}" ]]; then
+    echo
+    printf '  Версия:  \033[32mv%s\033[0m · %s · актуально\n' "${ver}" "${local_short}"
+    return 0
+  fi
+
+  ahead=$(git_safe rev-list --count "origin/${BRANCH}..HEAD" 2>/dev/null || echo 0)
+  behind=$(git_safe rev-list --count "HEAD..origin/${BRANCH}" 2>/dev/null || echo 0)
+
+  echo
+  if [[ "${behind}" -gt 0 ]]; then
+    c_banner_orange "ДОСТУПНА НОВАЯ ВЕРСИЯ — обнови: пункт 7"
+    c_banner_orange "Сейчас: v${ver} · ${local_short}   →   GitHub: ${remote_short}  (+${behind} комм.)"
+  elif [[ "${ahead}" -gt 0 ]]; then
+    c_banner_orange "Локально впереди GitHub на ${ahead} комм. · ${local_short} (origin ${remote_short})"
+  else
+    c_banner_orange "Расхождение с origin/${BRANCH}: ${local_short} ≠ ${remote_short}"
+  fi
+}
 
 ask() {
   local prompt="$1"
@@ -217,6 +305,9 @@ menu() {
   while true; do
     c_title
     show_status
+    # проверка обновлений при каждом заходе в меню
+    refresh_remote || true
+    show_update_banner
     echo
     echo "  1) Задать / сменить API ключ"
     echo "  2) CORS (домены фронта)"
@@ -254,18 +345,26 @@ menu() {
   done
 }
 
-# non-interactive shortcuts: ai-tool status|restart|stop|start|update
+# non-interactive shortcuts: ai-tool status|restart|stop|start|update|check
 cmd="${1:-}"
 case "${cmd}" in
   "") menu ;;
-  status) show_status ;;
+  status)
+    show_status
+    refresh_remote || true
+    show_update_banner
+    ;;
+  check)
+    refresh_remote || true
+    show_update_banner
+    ;;
   start) need_root; systemctl start "${SERVICE}"; show_status ;;
   stop) need_root; systemctl stop "${SERVICE}"; show_status ;;
   restart) need_root; systemctl restart "${SERVICE}"; show_status ;;
   update) do_update ;;
   menu) menu ;;
   *)
-    echo "Usage: ai-tool [status|start|stop|restart|update|menu]"
+    echo "Usage: ai-tool [status|check|start|stop|restart|update|menu]"
     exit 1
     ;;
 esac
