@@ -566,6 +566,203 @@ body {
   animation: fade-in 0.4s ease both;
 }
 
+/* ——— Pricing / подписки ——— */
+@keyframes pricing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pricing-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pricing-feature-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pricing-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(198, 40, 40, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(198, 40, 40, 0);
+  }
+}
+
+@keyframes pricing-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pricing-period-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pricing-total-tick {
+  from {
+    opacity: 0.4;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pricing-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pricing-hero {
+  animation: pricing-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pricing-status {
+  animation: pricing-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.pricing-card {
+  animation: pricing-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    box-shadow 0.3s ease,
+    opacity 0.25s ease;
+}
+
+.pricing-card:hover:not(.is-blocked) {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.35);
+}
+
+.pricing-card.is-active {
+  animation:
+    pricing-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both,
+    pricing-pulse-ring 2.4s ease-in-out 0.6s infinite;
+}
+
+.pricing-card.is-blocked:hover {
+  transform: none;
+}
+
+.pricing-badge {
+  animation: pricing-badge-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+}
+
+.pricing-feature {
+  animation: pricing-feature-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pricing-section {
+  animation: pricing-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pricing-row {
+  animation: pricing-row-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.pricing-row:hover {
+  transform: translateY(-2px);
+}
+
+.pricing-period {
+  animation: pricing-period-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pricing-period:hover {
+  transform: translateY(-2px);
+}
+
+.pricing-period.is-selected {
+  transform: scale(1.03);
+}
+
+.pricing-period.is-selected:hover {
+  transform: scale(1.03) translateY(-1px);
+}
+
+.pricing-total {
+  animation: pricing-total-tick 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pricing-field {
+  animation: pricing-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pricing-alert {
+  animation: pricing-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-hero,
+  .pricing-status,
+  .pricing-card,
+  .pricing-badge,
+  .pricing-feature,
+  .pricing-section,
+  .pricing-row,
+  .pricing-period,
+  .pricing-total,
+  .pricing-field,
+  .pricing-alert {
+    animation: none !important;
+  }
+
+  .pricing-card.is-active {
+    animation: none !important;
+  }
+}
+
 /* Плавные нажатия / появление — везде */
 @media (prefers-reduced-motion: no-preference) {
   a,

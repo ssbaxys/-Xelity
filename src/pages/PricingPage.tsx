@@ -61,6 +61,7 @@ export default function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [totalKey, setTotalKey] = useState(0);
 
   const cardBrand = useMemo(() => detectCardBrand(cardNumber), [cardNumber]);
   const cardLen = cardNumberLength(cardBrand);
@@ -98,6 +99,7 @@ export default function PricingPage() {
       return;
     }
     setMonths(1);
+    setTotalKey((k) => k + 1);
     setCheckoutPlan(plan);
     setCardholder(user.displayName || '');
   };
@@ -177,7 +179,7 @@ export default function PricingPage() {
   return (
     <div className="page-enter min-h-screen bg-paper text-ink">
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="pricing-hero mb-8 flex flex-wrap items-center justify-between gap-3">
           <div>
             <Link to="/" className="ui-press text-sm text-slate transition hover:text-ink">
               ← На главную
@@ -198,7 +200,7 @@ export default function PricingPage() {
         </div>
 
         {!loading && (
-          <p className="mb-6 text-sm text-slate">
+          <p className="pricing-status mb-6 text-sm text-slate">
             Текущий план: <span className="font-semibold text-ink">{current.name}</span> ·{' '}
             {formatLimit(current)}
             {planExpiresAt ? (
@@ -215,18 +217,18 @@ export default function PricingPage() {
         )}
 
         {okMsg && (
-          <div className="mb-6 rounded-xl border border-signal/30 bg-signal/10 px-4 py-3 text-sm">
+          <div className="pricing-alert mb-6 rounded-xl border border-signal/30 bg-signal/10 px-4 py-3 text-sm">
             {okMsg}
           </div>
         )}
         {error && !checkoutPlan && (
-          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="pricing-alert mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
         <div className="grid gap-4 md:grid-cols-3">
-          {PLAN_ORDER.map((id) => {
+          {PLAN_ORDER.map((id, cardIndex) => {
             const p = PLANS[id];
             const active = id === planId;
             const action = purchaseActionFor(planId, id);
@@ -244,19 +246,19 @@ export default function PricingPage() {
             return (
               <div
                 key={id}
-                className={`anim-msg flex flex-col rounded-2xl border p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10 ${
+                className={`pricing-card flex flex-col rounded-2xl border p-5 ${
                   active
-                    ? 'border-signal/50 bg-elevated'
+                    ? 'is-active border-signal/50 bg-elevated'
                     : blocked
-                      ? 'border-line bg-elevated/40 opacity-70'
+                      ? 'is-blocked border-line bg-elevated/40 opacity-70'
                       : 'border-line bg-elevated/60'
                 }`}
-                style={{ animationDelay: `${PLAN_ORDER.indexOf(id) * 60}ms` }}
+                style={{ animationDelay: `${120 + cardIndex * 90}ms` }}
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="font-display text-xl font-bold">{p.name}</h2>
                   {active && (
-                    <span className="rounded-md bg-signal/15 px-2 py-0.5 text-[11px] font-medium text-signal">
+                    <span className="pricing-badge rounded-md bg-signal/15 px-2 py-0.5 text-[11px] font-medium text-signal">
                       Активен
                     </span>
                   )}
@@ -264,8 +266,12 @@ export default function PricingPage() {
                 <p className="mt-1 text-2xl font-semibold tracking-tight">{p.priceLabel}</p>
                 {id !== 'free' && (
                   <div className="mt-2 space-y-1 text-[12px] text-slate">
-                    {BILLING_PERIODS.map((bp) => (
-                      <p key={bp.months}>
+                    {BILLING_PERIODS.map((bp, i) => (
+                      <p
+                        key={bp.months}
+                        className="pricing-feature"
+                        style={{ animationDelay: `${220 + cardIndex * 90 + i * 50}ms` }}
+                      >
                         {bp.short}:{' '}
                         <span className="font-medium text-ink">
                           {formatPriceRub(priceForPeriod(id, bp.months))}
@@ -277,16 +283,28 @@ export default function PricingPage() {
                     ))}
                   </div>
                 )}
-                <p className="mt-2 text-sm text-slate">{p.blurb}</p>
+                <p
+                  className="pricing-feature mt-2 text-sm text-slate"
+                  style={{ animationDelay: `${280 + cardIndex * 90}ms` }}
+                >
+                  {p.blurb}
+                </p>
                 {blocked && id !== 'free' && (
-                  <p className="mt-2 text-[12px] text-slate">
+                  <p
+                    className="pricing-feature mt-2 text-[12px] text-slate"
+                    style={{ animationDelay: `${320 + cardIndex * 90}ms` }}
+                  >
                     У вас уже {current.name} — доступно только продление текущего тарифа
                     {planId !== 'max' ? ' или переход выше' : ''}.
                   </p>
                 )}
                 <ul className="mt-4 flex-1 space-y-2 text-sm text-slate">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex gap-2">
+                  {p.features.map((f, fi) => (
+                    <li
+                      key={f}
+                      className="pricing-feature flex gap-2"
+                      style={{ animationDelay: `${340 + cardIndex * 90 + fi * 55}ms` }}
+                    >
                       <span className="text-signal">✓</span>
                       <span>{f}</span>
                     </li>
@@ -306,10 +324,10 @@ export default function PricingPage() {
         </div>
 
         {pending.length > 0 && (
-          <section className="anim-pop mt-10">
+          <section className="pricing-section mt-10" style={{ animationDelay: '0.45s' }}>
             <h3 className="mb-3 text-sm font-semibold tracking-wide text-ink">
               Ожидают решения
-              <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
+              <span className="pricing-badge ml-2 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">
                 {pending.length}
               </span>
             </h3>
@@ -317,8 +335,8 @@ export default function PricingPage() {
               {pending.map((p, i) => (
                 <li
                   key={p.id}
-                  className="anim-msg flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-4 py-3.5 transition hover:border-amber-500/40"
-                  style={{ animationDelay: `${i * 45}ms` }}
+                  className="pricing-row flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-4 py-3.5 hover:border-amber-500/40"
+                  style={{ animationDelay: `${480 + i * 55}ms` }}
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-ink">
@@ -343,7 +361,7 @@ export default function PricingPage() {
         )}
 
         {history.length > 0 && (
-          <section className="anim-pop mt-8">
+          <section className="pricing-section mt-8" style={{ animationDelay: '0.55s' }}>
             <h3 className="mb-3 text-sm font-semibold tracking-wide text-ink">История покупок</h3>
             <ul className="space-y-2">
               {history.map((p, i) => {
@@ -351,12 +369,12 @@ export default function PricingPage() {
                 return (
                   <li
                     key={p.id}
-                    className="anim-msg group flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-elevated px-4 py-3.5 transition duration-300 hover:-translate-y-0.5 hover:border-signal/30 hover:shadow-md hover:shadow-black/5"
-                    style={{ animationDelay: `${i * 40}ms` }}
+                    className="pricing-row group flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-elevated px-4 py-3.5 hover:border-signal/30 hover:shadow-md hover:shadow-black/5"
+                    style={{ animationDelay: `${560 + i * 50}ms` }}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold ${
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold transition group-hover:scale-105 ${
                           ok
                             ? 'bg-emerald-500/15 text-emerald-600'
                             : 'bg-red-500/10 text-red-400'
@@ -410,7 +428,7 @@ export default function PricingPage() {
             {(() => {
               const checkoutAction = purchaseActionFor(planId, checkoutPlan);
               return (
-                <>
+                <div className="pricing-field" style={{ animationDelay: '40ms' }}>
                   <h3 className="font-display text-lg font-bold">
                     {checkoutAction === 'renew'
                       ? 'Продление'
@@ -424,24 +442,28 @@ export default function PricingPage() {
                       ? 'Срок добавится к текущей подписке. Выберите период и карту.'
                       : 'Выберите срок и заполните данные карты.'}
                   </p>
-                </>
+                </div>
               );
             })()}
 
             <div className="mt-4 grid grid-cols-3 gap-2">
-              {BILLING_PERIODS.map((bp) => {
+              {BILLING_PERIODS.map((bp, i) => {
                 const price = priceForPeriod(checkoutPlan, bp.months);
                 const selected = months === bp.months;
                 return (
                   <button
                     key={bp.months}
                     type="button"
-                    onClick={() => setMonths(bp.months)}
-                    className={`rounded-xl border px-2 py-2.5 text-center transition ${
+                    onClick={() => {
+                      setMonths(bp.months);
+                      setTotalKey((k) => k + 1);
+                    }}
+                    className={`pricing-period ui-press rounded-xl border px-2 py-2.5 text-center ${
                       selected
-                        ? 'border-signal bg-signal/10 ring-1 ring-signal/40'
+                        ? 'is-selected border-signal bg-signal/10 ring-1 ring-signal/40'
                         : 'border-line hover:border-signal/40'
                     }`}
+                    style={{ animationDelay: `${80 + i * 60}ms` }}
                   >
                     <span className="block text-[12px] font-semibold">{bp.short}</span>
                     <span className="mt-0.5 block text-[11px] text-slate">
@@ -455,23 +477,29 @@ export default function PricingPage() {
               })}
             </div>
 
-            <p className="mt-3 text-sm font-semibold">
+            <p key={totalKey} className="pricing-total mt-3 text-sm font-semibold">
               Итого: {formatPriceRub(checkoutTotal)} · {months} мес.
             </p>
 
             <div className="mt-4 space-y-3">
-              <label className="block text-xs text-slate">
+              <label
+                className="pricing-field block text-xs text-slate"
+                style={{ animationDelay: '160ms' }}
+              >
                 Имя на карте
                 <input
                   value={cardholder}
                   onChange={(e) => setCardholder(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-signal"
+                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none transition focus:border-signal"
                 />
               </label>
-              <label className="block text-xs text-slate">
+              <label
+                className="pricing-field block text-xs text-slate"
+                style={{ animationDelay: '210ms' }}
+              >
                 Номер карты
                 <div className="relative mt-1">
-                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate transition-transform duration-300">
                     <CardBrandLogo brand={cardBrand} className="h-5 w-8" />
                   </span>
                   <input
@@ -480,14 +508,19 @@ export default function PricingPage() {
                     inputMode="numeric"
                     autoComplete="cc-number"
                     placeholder="2200 0000 0000 0000"
-                    className="w-full rounded-lg border border-line bg-paper py-2 pl-12 pr-3 font-mono text-sm text-ink outline-none focus:border-signal"
+                    className="w-full rounded-lg border border-line bg-paper py-2 pl-12 pr-3 font-mono text-sm text-ink outline-none transition focus:border-signal"
                   />
                 </div>
                 {cardBrand !== 'unknown' && (
-                  <span className="mt-1 block text-[11px] text-slate">{cardBrandLabel(cardBrand)}</span>
+                  <span className="pricing-badge mt-1 block text-[11px] text-slate">
+                    {cardBrandLabel(cardBrand)}
+                  </span>
                 )}
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div
+                className="pricing-field grid grid-cols-2 gap-3"
+                style={{ animationDelay: '260ms' }}
+              >
                 <label className="block text-xs text-slate">
                   Срок
                   <input
@@ -499,7 +532,7 @@ export default function PricingPage() {
                     aria-invalid={
                       !expiryCheck.incomplete && !expiryCheck.ok ? true : undefined
                     }
-                    className={`mt-1 w-full rounded-lg border bg-paper px-3 py-2 font-mono text-sm text-ink outline-none ${
+                    className={`mt-1 w-full rounded-lg border bg-paper px-3 py-2 font-mono text-sm text-ink outline-none transition ${
                       !expiryCheck.incomplete && !expiryCheck.ok
                         ? 'border-red-500/60 focus:border-red-400'
                         : expiryCheck.ok
@@ -508,12 +541,12 @@ export default function PricingPage() {
                     }`}
                   />
                   {!expiryCheck.incomplete && expiryCheck.message && (
-                    <span className="mt-1 block text-[11px] text-red-400">
+                    <span className="pricing-alert mt-1 block text-[11px] text-red-400">
                       {expiryCheck.message}
                     </span>
                   )}
                   {expiryCheck.ok && (
-                    <span className="mt-1 block text-[11px] text-emerald-400/90">
+                    <span className="pricing-alert mt-1 block text-[11px] text-emerald-400/90">
                       Срок действителен
                     </span>
                   )}
@@ -527,17 +560,22 @@ export default function PricingPage() {
                     }
                     inputMode="numeric"
                     autoComplete="cc-csc"
-                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-ink outline-none focus:border-signal"
+                    className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-ink outline-none transition focus:border-signal"
                   />
                 </label>
               </div>
             </div>
-            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-            <div className="mt-5 flex gap-2">
+            {error && (
+              <p className="pricing-alert mt-3 text-sm text-red-400">{error}</p>
+            )}
+            <div
+              className="pricing-field mt-5 flex gap-2"
+              style={{ animationDelay: '320ms' }}
+            >
               <button
                 type="button"
                 onClick={() => setCheckoutPlan(null)}
-                className="flex-1 rounded-lg border border-line px-3 py-2 text-sm"
+                className="ui-press flex-1 rounded-lg border border-line px-3 py-2 text-sm"
               >
                 Отмена
               </button>
@@ -547,7 +585,7 @@ export default function PricingPage() {
                   submitting ||
                   (!expiryCheck.incomplete && !expiryCheck.ok)
                 }
-                className="flex-1 rounded-lg bg-signal px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="ui-press flex-1 rounded-lg bg-signal px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
               >
                 {submitting ? 'Отправка…' : 'Отправить заявку'}
               </button>
