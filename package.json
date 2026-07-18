@@ -1,0 +1,48 @@
+{
+  "name": "xelity",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Xelity — frontend (React) + backend chat API for VPS",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:client": "vite build",
+    "preview": "vite preview",
+    "start": "tsx server.ts",
+    "start:backend": "tsx server.ts",
+    "start:prod": "NODE_ENV=production tsx server.ts"
+  },
+  "xelity": {
+    "client": "1.0.0",
+    "backend": "1.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "express": "^5.1.0",
+    "firebase": "^12.16.0",
+    "motion": "^12.42.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.1",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "3.4.0",
+    "tsx": "^4.20.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.17",
+    "@types/express": "^5.0.3",
+    "@types/node": "22.19.17",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3",
+    "vite": "7.3.2",
+    "vite-plugin-singlefile": "2.3.0"
+  }
+}

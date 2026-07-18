@@ -1,0 +1,20 @@
+[Unit]
+Description=Xelity chat API (backend for Render client)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/xelity
+EnvironmentFile=/opt/xelity/.env
+ExecStart=/opt/xelity/node_modules/.bin/tsx /opt/xelity/server.ts
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+# Soft limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

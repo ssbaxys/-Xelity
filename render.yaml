@@ -1,0 +1,31 @@
+# Render деплоит ТОЛЬКО клиент (статика). Бэкенд — на VPS.
+services:
+  - type: web
+    name: xelity
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    buildFilter:
+      paths:
+        - src/**
+        - public/**
+        - index.html
+        - package.json
+        - package-lock.json
+        - vite.config.ts
+        - vite.aitunnel-plugin.ts
+        - tsconfig.json
+        - .env.example
+      ignoredPaths:
+        - server.ts
+        - server/**
+        - deploy/**
+        - VERSION
+        - database.rules.json
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

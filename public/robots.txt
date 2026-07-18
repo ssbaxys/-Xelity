@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /chat
+Disallow: /banned
+Disallow: /404
+
+Sitemap: https://xelity.ru/sitemap.xml
