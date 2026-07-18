@@ -40,16 +40,46 @@ pkg_version() {
   fi
 }
 
-# Тихий fetch (не валит меню при ошибке сети)
+# Актуальный tip с GitHub (не доверяем устаревшему origin/main)
+# Пишет SHA в REMOTE_TIP; 0 = ок, 1 = ошибка сети/git
+REMOTE_TIP=""
+REMOTE_CHECK_ERR=""
+
 refresh_remote() {
+  REMOTE_TIP=""
+  REMOTE_CHECK_ERR=""
   if [[ ! -d "${APP_DIR}/.git" ]]; then
+    REMOTE_CHECK_ERR="нет .git"
     return 1
   fi
   git config --global --add safe.directory "${APP_DIR}" 2>/dev/null || true
+
+  # ownership: после chown www-data fetch от root иногда ломается
+  chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
+
+  local out=""
   if command -v timeout >/dev/null 2>&1; then
-    timeout 12 git_safe fetch origin "${BRANCH}" --quiet 2>/dev/null || return 1
+    out=$(timeout 15 git_safe ls-remote origin "refs/heads/${BRANCH}" 2>/dev/null || true)
   else
-    git_safe fetch origin "${BRANCH}" --quiet 2>/dev/null || return 1
+    out=$(git_safe ls-remote origin "refs/heads/${BRANCH}" 2>/dev/null || true)
+  fi
+  REMOTE_TIP=$(printf '%s' "${out}" | awk 'NR==1 {print $1; exit}')
+  if [[ -z "${REMOTE_TIP}" || ! "${REMOTE_TIP}" =~ ^[0-9a-f]{7,40}$ ]]; then
+    REMOTE_CHECK_ERR="ls-remote не ответил (сеть / доступ к GitHub)"
+    # fallback: старый origin/main + fetch
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 15 git_safe fetch origin "${BRANCH}" --prune --quiet 2>/dev/null || true
+    else
+      git_safe fetch origin "${BRANCH}" --prune --quiet 2>/dev/null || true
+    fi
+    REMOTE_TIP=$(git_safe rev-parse "origin/${BRANCH}" 2>/dev/null || echo "")
+    if [[ -z "${REMOTE_TIP}" ]]; then
+      return 1
+    fi
+    REMOTE_CHECK_ERR=""
+  else
+    # подтянуть ref, чтобы пункт 7 / rev-list работали
+    git_safe fetch origin "${BRANCH}" --prune --quiet 2>/dev/null || true
   fi
   return 0
 }
@@ -60,9 +90,12 @@ show_update_banner() {
     return 0
   fi
 
-  local local_sha remote_sha local_short remote_short ver ahead behind
+  local local_sha remote_sha local_short remote_short ver behind
   local_sha=$(git_safe rev-parse HEAD 2>/dev/null || echo "")
-  remote_sha=$(git_safe rev-parse "origin/${BRANCH}" 2>/dev/null || echo "")
+  remote_sha="${REMOTE_TIP:-}"
+  if [[ -z "${remote_sha}" ]]; then
+    remote_sha=$(git_safe rev-parse "origin/${BRANCH}" 2>/dev/null || echo "")
+  fi
 
   if [[ -z "${local_sha}" ]]; then
     return 0
@@ -71,9 +104,16 @@ show_update_banner() {
   ver=$(pkg_version)
   local_short="${local_sha:0:7}"
 
+  if [[ -n "${REMOTE_CHECK_ERR}" && -z "${remote_sha}" ]]; then
+    echo
+    c_banner_orange "Версия v${ver} · ${local_short} · не удалось проверить GitHub"
+    c_banner_orange "${REMOTE_CHECK_ERR} — всё равно можно: пункт 7"
+    return 0
+  fi
+
   if [[ -z "${remote_sha}" ]]; then
     echo
-    c_banner_orange "Версия v${ver} · ${local_short} · нет данных origin/${BRANCH} (проверь сеть)"
+    c_banner_orange "Версия v${ver} · ${local_short} · нет данных origin/${BRANCH}"
     return 0
   fi
 
@@ -81,21 +121,19 @@ show_update_banner() {
 
   if [[ "${local_sha}" == "${remote_sha}" ]]; then
     echo
-    printf '  Версия:  \033[32mv%s\033[0m · %s · актуально\n' "${ver}" "${local_short}"
+    printf '  Версия:  \033[32mv%s\033[0m · %s · актуально (GitHub %s)\n' "${ver}" "${local_short}" "${remote_short}"
     return 0
   fi
 
-  ahead=$(git_safe rev-list --count "origin/${BRANCH}..HEAD" 2>/dev/null || echo 0)
-  behind=$(git_safe rev-list --count "HEAD..origin/${BRANCH}" 2>/dev/null || echo 0)
+  # behind: сколько коммитов на remote, которых нет локально
+  behind=$(git_safe rev-list --count "${local_sha}..${remote_sha}" 2>/dev/null || echo "?")
 
   echo
-  if [[ "${behind}" -gt 0 ]]; then
-    c_banner_orange "ДОСТУПНА НОВАЯ ВЕРСИЯ — обнови: пункт 7"
+  c_banner_orange "ДОСТУПНА НОВАЯ ВЕРСИЯ — обнови: пункт 7"
+  if [[ "${behind}" != "?" && "${behind}" -gt 0 ]]; then
     c_banner_orange "Сейчас: v${ver} · ${local_short}   →   GitHub: ${remote_short}  (+${behind} комм.)"
-  elif [[ "${ahead}" -gt 0 ]]; then
-    c_banner_orange "Локально впереди GitHub на ${ahead} комм. · ${local_short} (origin ${remote_short})"
   else
-    c_banner_orange "Расхождение с origin/${BRANCH}: ${local_short} ≠ ${remote_short}"
+    c_banner_orange "Сейчас: v${ver} · ${local_short}   →   GitHub: ${remote_short}"
   fi
 }
 
