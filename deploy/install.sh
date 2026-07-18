@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Xelity VPS install — Ubuntu 24.04
-# Спросит только API-ключ, остальное сделает сам.
+# Спросит только API-ключ (или передай его в переменной).
 #
-#   curl -fsSL https://raw.githubusercontent.com/ssbaxys/-Xelity/main/deploy/install.sh | sudo bash
+# Надёжный способ (рекомендуется):
+#   curl -fsSL https://raw.githubusercontent.com/ssbaxys/-Xelity/main/deploy/install.sh -o /tmp/xelity-install.sh
+#   sudo bash /tmp/xelity-install.sh
+#
+# Без вопросов (ключ сразу):
+#   sudo AITUNNEL_API_KEY='sk-aitunnel-xxx' bash /tmp/xelity-install.sh
 #
 set -euo pipefail
 
@@ -14,9 +19,13 @@ DEFAULT_PORT="${XELITY_PORT:-8088}"
 DEFAULT_CORS="${XELITY_CORS:-https://xelity.ru,https://www.xelity.ru}"
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Запусти от root: curl … | sudo bash"
+  echo "Запусти от root: sudo bash /tmp/xelity-install.sh"
   exit 1
 fi
+
+# Не даём SSH/pipe оборвать длинный apt/npm
+trap '' HUP
+export DEBIAN_FRONTEND=noninteractive
 
 echo
 echo "══════════════════════════════════════"
@@ -24,14 +33,16 @@ echo "  Xelity — установка бэкенда на VPS"
 echo "══════════════════════════════════════"
 echo
 
-# stdin может быть pipe (curl|bash) — читаем с tty
 ask() {
   local prompt="$1"
-  local __out
+  local __out=""
+  # 1) настоящий терминал  2) stdin если не pipe-скрипт
   if [[ -r /dev/tty ]]; then
-    read -r -p "${prompt}" __out < /dev/tty
+    read -r -p "${prompt}" __out </dev/tty || true
+  elif [[ -t 0 ]]; then
+    read -r -p "${prompt}" __out || true
   else
-    read -r -p "${prompt}" __out
+    echo "(нет tty — задай ключ так: sudo AITUNNEL_API_KEY='sk-…' bash \$0)" >&2
   fi
   printf '%s' "${__out}"
 }
@@ -42,6 +53,7 @@ if [[ -z "${API_KEY}" ]]; then
   if [[ -f "${APP_DIR}/.env" ]] && grep -qE '^AITUNNEL_API_KEY=sk-' "${APP_DIR}/.env" 2>/dev/null; then
     echo "Найден существующий ключ в ${APP_DIR}/.env"
     keep=$(ask "Оставить его? [Y/n] ")
+    keep=${keep:-Y}
     if [[ ! "${keep}" =~ ^[Nn]$ ]]; then
       API_KEY=$(grep -E '^AITUNNEL_API_KEY=' "${APP_DIR}/.env" | head -1 | cut -d= -f2-)
     fi
@@ -50,12 +62,17 @@ fi
 
 if [[ -z "${API_KEY}" ]]; then
   echo "Вставь ключ AITUNNEL (из https://aitunnel.ru → Ключи)"
+  echo "Можно вставить и нажать Enter. Если SSH рвётся — см. команду без вопросов ниже."
   API_KEY=$(ask "API key: ")
   API_KEY=$(echo "${API_KEY}" | tr -d '[:space:]')
 fi
 
 if [[ -z "${API_KEY}" ]]; then
-  echo "Ошибка: ключ обязателен"
+  echo
+  echo "Ошибка: ключ не получен (часто из-за curl|bash и обрыва SSH)."
+  echo "Сделай так:"
+  echo "  curl -fsSL https://raw.githubusercontent.com/ssbaxys/-Xelity/main/deploy/install.sh -o /tmp/xelity-install.sh"
+  echo "  sudo AITUNNEL_API_KEY='sk-aitunnel-ТВОЙ_КЛЮЧ' bash /tmp/xelity-install.sh"
   exit 1
 fi
 
@@ -67,7 +84,6 @@ fi
 
 echo
 echo ">> Ставлю зависимости…"
-export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y ca-certificates curl git build-essential
 
