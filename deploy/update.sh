@@ -64,7 +64,7 @@ if path_match '^(src/|public/|index\.html|vite\.config\.ts|vite\.aitunnel-plugin
   need_build=1
 fi
 
-if path_match '^(server\.ts|server/|src/lib/models\.ts|package\.json|package-lock\.json)'; then
+if path_match '^(server\.ts|server/|src/lib/models\.ts|src/lib/plans\.ts|package\.json|package-lock\.json)'; then
   need_restart=1
 fi
 
