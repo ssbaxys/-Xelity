@@ -12,9 +12,16 @@ const __dirname = path.dirname(__filename);
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiKey = env.AITUNNEL_API_KEY || '';
+  // На Vercel — обычный multi-file dist (CDN). singlefile оставляем для VPS/локали.
+  const useSingleFile = process.env.VERCEL !== '1';
 
   return {
-    plugins: [react(), tailwindcss(), viteSingleFile(), aitunnelChatPlugin(apiKey)],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(useSingleFile ? [viteSingleFile()] : []),
+      aitunnelChatPlugin(apiKey),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
