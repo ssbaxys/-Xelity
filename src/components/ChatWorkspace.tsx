@@ -267,19 +267,22 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const { chats, folders, activeId } = store;
 
   const persist = useCallback(
-    (next: Store) => {
-      const stamped = { ...next, updatedAt: Date.now() };
-      setStore(stamped);
-      try {
-        saveLocalChatStore(stamped);
-      } catch {
-        /* quota / private mode */
-      }
-      if (user) {
-        void saveUserChatStore(user.uid, stamped).catch(() => {
-          /* offline / rules — локальная копия уже сохранена */
-        });
-      }
+    (next: Store | ((prev: Store) => Store)) => {
+      setStore((prev) => {
+        const resolved = typeof next === 'function' ? next(prev) : next;
+        const stamped = { ...resolved, updatedAt: Date.now() };
+        try {
+          saveLocalChatStore(stamped);
+        } catch {
+          /* quota / private mode */
+        }
+        if (user) {
+          void saveUserChatStore(user.uid, stamped).catch((err) => {
+            console.warn('[xelity] saveUserChatStore', err);
+          });
+        }
+        return stamped;
+      });
     },
     [user],
   );
@@ -561,12 +564,15 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     if (!renamingId) return;
     const title = renameValue.trim() || 'Новый чат';
     const isFolder = folders.some((f) => f.id === renamingId);
-    persist(
+    persist((prev) =>
       isFolder
-        ? { ...store, folders: folders.map((f) => (f.id === renamingId ? { ...f, title } : f)) }
+        ? {
+            ...prev,
+            folders: prev.folders.map((f) => (f.id === renamingId ? { ...f, title } : f)),
+          }
         : {
-            ...store,
-            chats: chats.map((c) =>
+            ...prev,
+            chats: prev.chats.map((c) =>
               c.id === renamingId
                 ? { ...c, title, manualTitle: true, updatedAt: Date.now() }
                 : c,
@@ -588,27 +594,27 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     setLastReasoning(toolFlags.reasoning);
     setLastCodingTools(toolFlags.codingTools);
     setLastWebTools(toolFlags.webTools);
-    const chat = makeChat(
-      chats,
-      active?.modelId ?? DEFAULT_MODEL_ID,
-      folderId,
-      toolFlags,
-    );
-    let baseChats = chats;
-    if (prevId) {
-      const prevChat = chats.find((c) => c.id === prevId);
-      const leaving = prevChat ? { ...prevChat, draft: savedDraft } : null;
-      if (leaving && isPrunableEmptyChat(leaving)) {
-        clearSandbox(prevId);
-        baseChats = chats.filter((c) => c.id !== prevId);
-      } else {
-        baseChats = chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c));
+    const modelId = active?.modelId ?? DEFAULT_MODEL_ID;
+    persist((prev) => {
+      const chat = makeChat(prev.chats, modelId, folderId, toolFlags);
+      let baseChats = prev.chats;
+      if (prevId) {
+        const prevChat = prev.chats.find((c) => c.id === prevId);
+        const leaving = prevChat ? { ...prevChat, draft: savedDraft } : null;
+        if (leaving && isPrunableEmptyChat(leaving)) {
+          clearSandbox(prevId);
+          baseChats = prev.chats.filter((c) => c.id !== prevId);
+        } else {
+          baseChats = prev.chats.map((c) =>
+            c.id === prevId ? { ...c, draft: savedDraft } : c,
+          );
+        }
       }
-    }
-    persist({
-      ...store,
-      chats: [chat, ...baseChats],
-      activeId: chat.id,
+      return {
+        ...prev,
+        chats: [chat, ...baseChats],
+        activeId: chat.id,
+      };
     });
     setDraft('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -619,29 +625,31 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const deleteChat = (id: string) => {
     clearSandbox(id);
-    const nextChats = chats.filter((c) => c.id !== id);
-    persist({
-      ...store,
-      chats: nextChats,
-      activeId: activeId === id ? nextChats[0]?.id ?? null : activeId,
+    persist((prev) => {
+      const nextChats = prev.chats.filter((c) => c.id !== id);
+      return {
+        ...prev,
+        chats: nextChats,
+        activeId: prev.activeId === id ? nextChats[0]?.id ?? null : prev.activeId,
+      };
     });
   };
 
   const deleteFolder = (id: string) => {
-    persist({
-      ...store,
-      folders: folders.filter((f) => f.id !== id),
-      chats: chats.map((c) => (c.folderId === id ? { ...c, folderId: null } : c)),
-    });
+    persist((prev) => ({
+      ...prev,
+      folders: prev.folders.filter((f) => f.id !== id),
+      chats: prev.chats.map((c) => (c.folderId === id ? { ...c, folderId: null } : c)),
+    }));
   };
 
   const togglePin = (id: string) => {
-    persist({
-      ...store,
-      chats: chats.map((c) =>
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
         c.id === id ? { ...c, pinned: !c.pinned, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
   };
 
   const duplicateChat = (id: string) => {
@@ -656,7 +664,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       pinned: false,
       manualTitle: src.manualTitle,
     };
-    persist({ ...store, chats: [copy, ...chats], activeId: copy.id });
+    persist((prev) => ({ ...prev, chats: [copy, ...prev.chats], activeId: copy.id }));
   };
 
   const exportChat = (id: string) => {
@@ -676,51 +684,52 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const setModel = (modelId: ModelId) => {
     if (!active) return;
-    persist({
-      ...store,
-      chats: chats.map((c) =>
-        c.id === active.id ? { ...c, modelId, updatedAt: Date.now() } : c,
+    const id = active.id;
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
+        c.id === id ? { ...c, modelId, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
     setModelOpen(false);
   };
 
   const setReasoning = (on: boolean) => {
     if (!active) return;
+    const id = active.id;
     setLastReasoning(on);
-    persist({
-      ...store,
-      updatedAt: Date.now(),
-      chats: chats.map((c) =>
-        c.id === active.id ? { ...c, reasoning: on, updatedAt: Date.now() } : c,
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
+        c.id === id ? { ...c, reasoning: on, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
   };
 
   const setCodingTools = (on: boolean) => {
     if (!active) return;
+    const id = active.id;
     setLastCodingTools(on);
-    if (on) ensureReactSiteTemplate(active.id);
-    persist({
-      ...store,
-      updatedAt: Date.now(),
-      chats: chats.map((c) =>
-        c.id === active.id ? { ...c, codingTools: on, updatedAt: Date.now() } : c,
+    if (on) ensureReactSiteTemplate(id);
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
+        c.id === id ? { ...c, codingTools: on, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
     if (!on) setCodingMobileOpen(false);
   };
 
   const setWebTools = (on: boolean) => {
     if (!active) return;
+    const id = active.id;
     setLastWebTools(on);
-    persist({
-      ...store,
-      updatedAt: Date.now(),
-      chats: chats.map((c) =>
-        c.id === active.id ? { ...c, webTools: on, updatedAt: Date.now() } : c,
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
+        c.id === id ? { ...c, webTools: on, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
   };
 
   const onDragStart = (e: DragEvent, id: string) => {
@@ -804,19 +813,21 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     setDragId(null);
     setDropTarget(null);
     if (!sourceId) return;
-    persist({
-      ...store,
-      chats: chats.map((c) =>
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
         c.id === sourceId ? { ...c, folderId, updatedAt: Date.now() } : c,
       ),
-    });
+    }));
   };
 
   const removeFromFolder = (id: string) => {
-    persist({
-      ...store,
-      chats: chats.map((c) => (c.id === id ? { ...c, folderId: null, updatedAt: Date.now() } : c)),
-    });
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
+        c.id === id ? { ...c, folderId: null, updatedAt: Date.now() } : c,
+      ),
+    }));
   };
 
   useEffect(() => {
@@ -910,9 +921,9 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     const webToolsOn = autoWeb || active.webTools !== false;
     if (autoWeb) setLastWebTools(true);
 
-    persist({
-      ...store,
-      chats: chats.map((c) =>
+    persist((prev) => ({
+      ...prev,
+      chats: prev.chats.map((c) =>
         c.id === chatId
           ? {
               ...c,
@@ -924,7 +935,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
             }
           : c,
       ),
-    });
+    }));
     setDraft('');
     setSending(true);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -1258,12 +1269,12 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                   <button
                     type="button"
                     onClick={() =>
-                      persist({
-                        ...store,
-                        folders: folders.map((f) =>
+                      persist((prev) => ({
+                        ...prev,
+                        folders: prev.folders.map((f) =>
                           f.id === folder.id ? { ...f, expanded: !f.expanded } : f,
                         ),
-                      })
+                      }))
                     }
                     onDoubleClick={() => startRename(folder.id, folder.title)}
                     className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1.5 text-left text-[12px] text-[var(--c-muted)] hover:text-[var(--c-text)]"

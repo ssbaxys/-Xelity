@@ -142,7 +142,9 @@ function uid(prefix: string) {
 function persistStore(store: ChatStore, firebaseUid?: string | null) {
   saveLocalChatStore(store);
   if (firebaseUid) {
-    void saveUserChatStore(firebaseUid, store).catch(() => {});
+    void saveUserChatStore(firebaseUid, store).catch((err) => {
+      console.warn('[xelity] saveUserChatStore', err);
+    });
   }
   notify();
 }
@@ -662,7 +664,6 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           thinkingPhase: 'answering',
         });
         const answerContent = coded.content;
-        const toolActivity = coded.toolActivity.length ? coded.toolActivity : undefined;
 
         persistStore(
           upsertAssistantInStore(
@@ -676,7 +677,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
               thinkingPhase: null,
               reasoning: thoughts,
               reasoningMs,
-              toolActivity,
+              ...(coded.toolActivity.length ? { toolActivity: coded.toolActivity } : {}),
               serverLoad: null,
             },
             { titleIfNotManual: params.titleIfNotManual },
@@ -723,7 +724,6 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         thinkingPhase: null,
       });
       const replyContent = coded.content;
-      const toolActivity = coded.toolActivity.length ? coded.toolActivity : undefined;
 
       persistStore(
         upsertAssistantInStore(
@@ -737,7 +737,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             thinkingPhase: null,
             reasoning: null,
             reasoningMs: null,
-            toolActivity,
+            ...(coded.toolActivity.length ? { toolActivity: coded.toolActivity } : {}),
             serverLoad: null,
           },
           { titleIfNotManual: params.titleIfNotManual },

@@ -127,126 +127,190 @@ export function emptyChatStore(): ChatStore {
   return { chats: [], folders: [], activeId: null };
 }
 
+/** Firebase RTDB: массивы часто приходят как `{0:…,1:…}` */
+function asArray<T = unknown>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    return Object.keys(o)
+      .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
+      .map((k) => o[k] as T);
+  }
+  return [];
+}
+
+/** Firebase set() падает на undefined — вычищаем рекурсивно */
+export function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== undefined)
+      .map((item) => stripUndefinedDeep(item)) as T;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === undefined) continue;
+    out[k] = stripUndefinedDeep(v);
+  }
+  return out as T;
+}
+
+function compactToolActivity(raw: unknown): ToolActivity[] | undefined {
+  const list = asArray<Record<string, unknown>>(raw)
+    .filter((t) => t && typeof t === 'object')
+    .map((t) => {
+      const kindList = [
+        'list',
+        'read',
+        'create',
+        'edit',
+        'delete',
+        'build',
+        'search',
+        'fetch',
+        'weather',
+      ] as const;
+      const kind = kindList.includes(t.kind as ToolActivityKind)
+        ? (t.kind as ToolActivityKind)
+        : ('edit' as ToolActivityKind);
+      const item: ToolActivity = {
+        id: String(t.id || ''),
+        name: String(t.name || ''),
+        kind,
+        ok: Boolean(t.ok),
+      };
+      if (typeof t.path === 'string') item.path = t.path;
+      if (typeof t.error === 'string') item.error = t.error;
+      if (typeof t.startLine === 'number') item.startLine = t.startLine;
+      if (typeof t.endLine === 'number') item.endLine = t.endLine;
+      if (typeof t.before === 'string') item.before = t.before.slice(0, 80_000);
+      if (typeof t.after === 'string') item.after = t.after.slice(0, 80_000);
+      if (t.pending) item.pending = true;
+      if (Array.isArray(t.links) || (t.links && typeof t.links === 'object')) {
+        const links = asArray<Record<string, unknown>>(t.links)
+          .filter((l) => l && typeof l === 'object' && typeof l.url === 'string')
+          .slice(0, 12)
+          .map((l) => {
+            const link: ToolActivityLink = {
+              title: String(l.title || l.url).slice(0, 200),
+              url: String(l.url).slice(0, 500),
+            };
+            if (typeof l.snippet === 'string') link.snippet = l.snippet.slice(0, 400);
+            if (typeof l.image === 'string' && /^https?:\/\//i.test(l.image)) {
+              link.image = l.image.slice(0, 2000);
+            }
+            return link;
+          });
+        if (links.length) item.links = links;
+      }
+      if (
+        t.weather &&
+        typeof t.weather === 'object' &&
+        (t.weather as WeatherPayload).current &&
+        typeof (t.weather as WeatherPayload).place === 'string'
+      ) {
+        item.weather = t.weather as WeatherPayload;
+      }
+      return item;
+    })
+    .filter((t) => t.id && t.name);
+  return list.length ? list : undefined;
+}
+
 export function normalizeChatStore(raw: unknown): ChatStore {
   if (!raw || typeof raw !== 'object') return emptyChatStore();
-  const parsed = raw as Partial<ChatStore>;
+  const parsed = raw as Partial<ChatStore> & Record<string, unknown>;
+  const chatsRaw = asArray<Partial<ChatThread>>(parsed.chats);
+  const foldersRaw = asArray<ChatFolder>(parsed.folders);
+
   return {
-    chats: Array.isArray(parsed.chats)
-      ? parsed.chats.map((c) => ({
-          ...c,
-          messages: Array.isArray(c.messages)
-            ? c.messages.map((m) => ({
-                ...m,
-                modelId: m.modelId ? normalizeModelId(m.modelId) : m.modelId ?? null,
-                reasoning: typeof m.reasoning === 'string' ? m.reasoning : m.reasoning ?? null,
-                reasoningMs:
-                  typeof m.reasoningMs === 'number' ? m.reasoningMs : m.reasoningMs ?? null,
-                thinkingPhase:
-                  m.thinkingPhase === 'thinking' || m.thinkingPhase === 'answering'
-                    ? m.thinkingPhase
-                    : null,
-                usedReasoning: Boolean(m.usedReasoning),
-                toolActivity: Array.isArray(m.toolActivity)
-                  ? m.toolActivity
-                      .filter((t) => t && typeof t === 'object')
-                      .map((t) => ({
-                        id: String(t.id || ''),
-                        name: String(t.name || ''),
-                        kind: (
-                          [
-                            'list',
-                            'read',
-                            'create',
-                            'edit',
-                            'delete',
-                            'build',
-                            'search',
-                            'fetch',
-                            'weather',
-                          ] as const
-                        ).includes(t.kind as ToolActivityKind)
-                          ? (t.kind as ToolActivityKind)
-                          : 'edit',
-                        path: typeof t.path === 'string' ? t.path : undefined,
-                        ok: Boolean(t.ok),
-                        error: typeof t.error === 'string' ? t.error : undefined,
-                        startLine: typeof t.startLine === 'number' ? t.startLine : undefined,
-                        endLine: typeof t.endLine === 'number' ? t.endLine : undefined,
-                        before: typeof t.before === 'string' ? t.before.slice(0, 80_000) : undefined,
-                        after: typeof t.after === 'string' ? t.after.slice(0, 80_000) : undefined,
-                        pending: Boolean(t.pending),
-                        links: Array.isArray(t.links)
-                          ? t.links
-                              .filter((l) => l && typeof l === 'object' && typeof l.url === 'string')
-                              .slice(0, 12)
-                              .map((l) => ({
-                                title: String(l.title || l.url).slice(0, 200),
-                                url: String(l.url).slice(0, 500),
-                                snippet:
-                                  typeof l.snippet === 'string'
-                                    ? l.snippet.slice(0, 400)
-                                    : undefined,
-                                image:
-                                  typeof l.image === 'string' &&
-                                  /^https?:\/\//i.test(l.image)
-                                    ? l.image.slice(0, 2000)
-                                    : undefined,
-                              }))
-                          : undefined,
-                        weather:
-                          t.weather &&
-                          typeof t.weather === 'object' &&
-                          t.weather.current &&
-                          typeof t.weather.place === 'string'
-                            ? (t.weather as WeatherPayload)
-                            : undefined,
-                      }))
-                      .filter((t) => t.id && t.name)
-                  : undefined,
-                errorDetail:
-                  typeof m.errorDetail === 'string' ? m.errorDetail.slice(0, 4000) : m.errorDetail ?? null,
-                serverLoad:
-                  m.serverLoad === 'intercept' || m.serverLoad === 'queue' ? m.serverLoad : null,
-                asAdmin: Boolean(m.asAdmin),
-                viaAdmin: Boolean(m.viaAdmin) || undefined,
-              }))
-            : [],
+    chats: chatsRaw
+      .filter((c) => c && typeof c === 'object' && c.id)
+      .map((c) => {
+        const messages = asArray<Partial<ChatMessage>>(c.messages).map((m) => {
+          const msg: ChatMessage = {
+            id: String(m.id || ''),
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: typeof m.content === 'string' ? m.content : '',
+            createdAt: typeof m.createdAt === 'number' ? m.createdAt : Date.now(),
+          };
+          if (m.modelId) msg.modelId = normalizeModelId(m.modelId);
+          if (typeof m.reasoning === 'string') msg.reasoning = m.reasoning;
+          if (typeof m.reasoningMs === 'number') msg.reasoningMs = m.reasoningMs;
+          if (m.thinkingPhase === 'thinking' || m.thinkingPhase === 'answering') {
+            msg.thinkingPhase = m.thinkingPhase;
+          }
+          if (m.usedReasoning) msg.usedReasoning = true;
+          const tools = compactToolActivity(m.toolActivity);
+          if (tools) msg.toolActivity = tools;
+          if (typeof m.errorDetail === 'string') msg.errorDetail = m.errorDetail.slice(0, 4000);
+          if (m.serverLoad === 'intercept' || m.serverLoad === 'queue') {
+            msg.serverLoad = m.serverLoad;
+          }
+          if (m.asAdmin) msg.asAdmin = true;
+          if (m.viaAdmin) msg.viaAdmin = true;
+          return msg;
+        });
+
+        return {
+          id: String(c.id),
+          title: typeof c.title === 'string' ? c.title : 'Новый чат',
+          messages,
+          createdAt: typeof c.createdAt === 'number' ? c.createdAt : Date.now(),
+          updatedAt: typeof c.updatedAt === 'number' ? c.updatedAt : Date.now(),
           manualTitle: Boolean(c.manualTitle),
           pinned: Boolean(c.pinned),
           folderId: c.folderId ?? null,
           modelId: normalizeModelId(c.modelId),
           adminSystemPrompt:
-            typeof c.adminSystemPrompt === 'string' ? c.adminSystemPrompt : c.adminSystemPrompt ?? null,
+            typeof c.adminSystemPrompt === 'string' ? c.adminSystemPrompt : null,
           reasoning: Boolean(c.reasoning),
           codingTools: Boolean(c.codingTools),
           webTools: c.webTools !== false,
           draft: typeof c.draft === 'string' ? c.draft.slice(0, 2000) : '',
-        }))
-      : [],
-    folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-    activeId: parsed.activeId ?? null,
-    updatedAt: parsed.updatedAt,
+        } satisfies ChatThread;
+      }),
+    folders: foldersRaw.filter((f) => f && typeof f === 'object' && f.id),
+    activeId: typeof parsed.activeId === 'string' ? parsed.activeId : null,
+    updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : undefined,
   };
 }
 
-/** Слияние двух сторов: не теряем codingTools/reasoning при синке с облаком */
+/** Слияние двух сторов: чаты по id не теряем; папки — у более нового стора */
 export function mergeChatStores(a: ChatStore, b: ChatStore): ChatStore {
+  const aTs = a.updatedAt || 0;
+  const bTs = b.updatedAt || 0;
+  const newerStore = aTs >= bTs ? a : b;
+  const olderStore = newerStore === a ? b : a;
+  const skewMs = 15_000;
+
   const byId = new Map<string, ChatThread>();
-  for (const c of a.chats) byId.set(c.id, c);
-  for (const c of b.chats) {
+  for (const c of newerStore.chats) {
+    if (c?.id) byId.set(c.id, c);
+  }
+  for (const c of olderStore.chats) {
+    if (!c?.id) continue;
     const prev = byId.get(c.id);
     if (!prev) {
-      byId.set(c.id, c);
+      // чат только в старом: оставляем при близких updatedAt (параллельное создание)
+      // или если новый стор не новее надолго (иначе это удаление)
+      if (Math.abs(aTs - bTs) <= skewMs) byId.set(c.id, c);
       continue;
     }
     const cTs = c.updatedAt || 0;
     const pTs = prev.updatedAt || 0;
     const newer = cTs >= pTs ? c : prev;
     const older = newer === c ? prev : c;
-    // при равном updatedAt не затираем включённые инструменты «пустой» копией
     const sameTs = cTs === pTs;
+    // сообщения: берём более длинную/новую ленту
+    const messages =
+      (newer.messages?.length || 0) >= (older.messages?.length || 0)
+        ? newer.messages
+        : older.messages;
     byId.set(c.id, {
       ...newer,
+      messages,
       reasoning: sameTs ? Boolean(c.reasoning || prev.reasoning) : Boolean(newer.reasoning),
       codingTools: sameTs ? Boolean(c.codingTools || prev.codingTools) : Boolean(newer.codingTools),
       webTools: sameTs
@@ -256,15 +320,12 @@ export function mergeChatStores(a: ChatStore, b: ChatStore): ChatStore {
       adminSystemPrompt: newer.adminSystemPrompt ?? older.adminSystemPrompt ?? null,
     });
   }
-  const aTs = a.updatedAt || 0;
-  const bTs = b.updatedAt || 0;
-  const preferActive = aTs >= bTs ? a : b;
-  // Папки берём у более нового стора целиком (включая []), иначе удалённые «воскресают»
-  const folders = Array.isArray(preferActive.folders) ? preferActive.folders : [];
+
+  const folders = Array.isArray(newerStore.folders) ? newerStore.folders : [];
   return {
     chats: [...byId.values()].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)),
     folders,
-    activeId: preferActive.activeId ?? a.activeId ?? b.activeId ?? null,
+    activeId: newerStore.activeId ?? olderStore.activeId ?? null,
     updatedAt: Math.max(aTs, bTs, Date.now()),
   };
 }
@@ -291,10 +352,11 @@ export async function fetchUserChatStore(uid: string): Promise<ChatStore | null>
 }
 
 export async function saveUserChatStore(uid: string, store: ChatStore): Promise<void> {
-  const payload: ChatStore = {
+  // Firebase RTDB запрещает undefined в любом свойстве (часто toolActivity)
+  const payload = stripUndefinedDeep({
     ...store,
     updatedAt: Date.now(),
-  };
+  });
   await set(ref(database, `userChats/${uid}`), payload);
 }
 
