@@ -94,7 +94,7 @@ export default function AdminPayments() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+        <div className="admin-error">
           {error}
         </div>
       )}
@@ -119,7 +119,7 @@ export default function AdminPayments() {
                   </p>
                   <CardSimBlock p={p} />
                 </div>
-                <div className="min-w-[12rem]">
+                <div className="min-w-0 w-full sm:min-w-[12rem] sm:w-auto">
                   <AdminSelect
                     value={
                       (busy === p.id ? 'choose' : 'choose') as
@@ -150,8 +150,8 @@ export default function AdminPayments() {
 
       <section className="space-y-3">
         <h3 className="text-sm font-medium text-[var(--a-muted)]">История</h3>
-        <div className="admin-panel overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+        <div className="admin-panel admin-table-scroll">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[var(--a-surface)] text-[11px] uppercase text-[var(--a-faint)]">
               <tr>
                 <th className="px-3 py-2">План</th>

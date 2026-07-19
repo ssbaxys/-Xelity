@@ -1570,6 +1570,9 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   --a-danger: #e57373;
   --a-danger-soft: #2a1212;
   --a-danger-border: #5c2a2a;
+  --a-ok: #81c784;
+  --a-ok-soft: #121a12;
+  --a-ok-border: #2a3c2a;
   --a-panel: linear-gradient(180deg, rgba(22, 16, 16, 0.98), rgba(18, 12, 12, 0.96));
   --a-stat: linear-gradient(160deg, rgba(26, 18, 18, 0.95), rgba(16, 12, 12, 0.98));
   --a-menu: linear-gradient(180deg, #1a1212, #140f0f);
@@ -1608,6 +1611,9 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   --a-danger: #c62828;
   --a-danger-soft: #fdecea;
   --a-danger-border: #f5c6c2;
+  --a-ok: #2e7d32;
+  --a-ok-soft: #e8f5e9;
+  --a-ok-border: #c8e6c9;
   --a-panel: linear-gradient(180deg, #ffffff, #fbf9f8);
   --a-stat: linear-gradient(160deg, #ffffff, #f7f3f2);
   --a-menu: linear-gradient(180deg, #ffffff, #faf7f6);
@@ -1667,7 +1673,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   pointer-events: none;
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   opacity: 0.35;
   background-image:
     linear-gradient(var(--a-grid) 1px, transparent 1px),
@@ -1678,11 +1684,6 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 
 .admin-shell.is-light::before {
   opacity: 0.55;
-}
-
-.admin-shell > * {
-  position: relative;
-  z-index: 1;
 }
 
 .admin-header {
@@ -1893,6 +1894,16 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   animation: admin-soft-in 0.2s ease;
   backdrop-filter: blur(6px);
   background: rgba(0, 0, 0, 0.7);
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .admin-modal-backdrop {
+    align-items: center;
+  }
 }
 
 .admin-shell.is-light .admin-modal-backdrop {
@@ -1904,11 +1915,17 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   background: var(--a-modal);
   border: 1px solid var(--a-border);
   color: var(--a-text);
+  max-height: min(90dvh, 720px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: auto 0;
 }
 
 .admin-select-trigger {
   display: inline-flex;
-  min-width: 7.5rem;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
@@ -1954,18 +1971,143 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-select-option {
-  transition: background 0.18s ease, color 0.18s ease, padding-left 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease;
   color: var(--a-muted);
 }
 
 .admin-select-option:hover {
   background: var(--admin-accent-soft);
-  padding-left: 0.85rem;
+  color: var(--a-text);
 }
 
 .admin-select-option.is-active {
   background: var(--admin-accent-soft);
   color: var(--a-text);
+}
+
+/* Чипы фильтров — читаемо и в light */
+.admin-chip {
+  border-radius: 0.4rem;
+  border: 1px solid var(--a-border);
+  padding: 0.25rem 0.65rem;
+  font-size: 11px;
+  color: var(--a-muted);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-chip:hover {
+  background: var(--a-hover);
+  color: var(--a-text);
+}
+
+.admin-chip.is-active {
+  border-color: color-mix(in srgb, var(--admin-accent) 45%, var(--a-border));
+  background: var(--admin-accent-soft);
+  color: var(--a-accent-fg);
+  font-weight: 600;
+}
+
+.admin-error {
+  border-radius: 0.65rem;
+  border: 1px solid var(--a-danger-border);
+  background: var(--a-danger-soft);
+  color: var(--a-danger);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+}
+
+.admin-error-inline {
+  color: var(--a-danger);
+  font-size: 0.75rem;
+}
+
+.admin-ok {
+  border-radius: 0.65rem;
+  border: 1px solid var(--a-ok-border);
+  background: var(--a-ok-soft);
+  color: var(--a-ok);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+}
+
+/* Master–detail панели */
+.admin-split {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-split-list,
+.admin-split-detail {
+  min-width: 0;
+}
+
+.admin-split-pane {
+  display: flex;
+  flex-direction: column;
+  max-height: min(78vh, calc(100dvh - 9.5rem));
+  min-height: 16rem;
+}
+
+@media (max-width: 1023px) {
+  .admin-split-list.is-hidden-mobile,
+  .admin-split-detail.is-hidden-mobile {
+    display: none !important;
+  }
+
+  .admin-split-pane {
+    max-height: min(82vh, calc(100dvh - 8.5rem));
+    min-height: 18rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-split.is-tickets {
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  }
+
+  .admin-split.is-chats {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+
+  .admin-split-list.is-hidden-mobile,
+  .admin-split-detail.is-hidden-mobile {
+    display: flex !important;
+  }
+}
+
+.admin-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.admin-main {
+  min-width: 0;
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  .admin-header .admin-brand-hint {
+    display: none;
+  }
+
+  .admin-nav-drawer {
+    max-height: min(70dvh, 28rem);
+    overflow-y: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-page,
+  .admin-modal-card,
+  .admin-modal-backdrop,
+  .admin-select-menu,
+  .admin-nav-link.is-active,
+  .admin-loading,
+  .admin-bar {
+    animation: none !important;
+  }
 }
 
 .admin-stat {

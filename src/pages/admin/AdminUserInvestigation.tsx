@@ -231,7 +231,7 @@ export default function AdminUserInvestigation({
       {!embedded && (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <Link to="/admin/users" className="text-[12px] text-[var(--a-muted)] hover:text-white">
+            <Link to="/admin/users" className="text-[12px] text-[var(--a-muted)] hover:text-[var(--a-text)]">
               ← Пользователи
             </Link>
             <h2 className="mt-1 text-lg font-semibold">Дело пользователя</h2>
@@ -283,15 +283,7 @@ export default function AdminUserInvestigation({
       )}
 
       {(error || ok) && (
-        <p
-          className={`rounded-lg border px-3 py-2 text-sm ${
-            error
-              ? 'border-[var(--a-danger-border)] bg-[var(--a-danger-soft)] text-[var(--a-danger)]'
-              : 'border-[#2a3c2a] bg-[#121a12] text-[#81c784]'
-          }`}
-        >
-          {error || ok}
-        </p>
+        <p className={error ? 'admin-error' : 'admin-ok'}>{error || ok}</p>
       )}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -589,7 +581,7 @@ export default function AdminUserInvestigation({
             onChange={(e) => setSearchQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSearch()}
             placeholder="Фраза, email, угроза, промпт…"
-            className="min-w-[16rem] flex-1 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
+            className="min-w-0 w-full flex-1 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
           />
           <button
             type="button"

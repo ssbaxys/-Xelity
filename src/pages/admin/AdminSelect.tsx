@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { IconCheck, IconChevronDown } from '../../components/icons';
 
@@ -17,6 +17,31 @@ type Props<T extends string> = {
   placeholder?: string;
 };
 
+type MenuPos = { top: number; left: number; width: number; place: 'below' | 'above' };
+
+function copyShellVars(from: Element | null): CSSProperties {
+  if (!from || !(from instanceof HTMLElement)) return {};
+  const cs = getComputedStyle(from);
+  const keys = [
+    '--admin-accent',
+    '--admin-accent-soft',
+    '--a-text',
+    '--a-muted',
+    '--a-faint',
+    '--a-border',
+    '--a-border-strong',
+    '--a-menu',
+    '--a-accent-fg',
+    '--a-hover',
+  ] as const;
+  const style: Record<string, string> = {};
+  for (const k of keys) {
+    const v = cs.getPropertyValue(k).trim();
+    if (v) style[k] = v;
+  }
+  return style as CSSProperties;
+}
+
 export default function AdminSelect<T extends string>({
   value,
   options,
@@ -26,13 +51,43 @@ export default function AdminSelect<T extends string>({
   placeholder = 'Выбрать',
 }: Props<T>) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const [pos, setPos] = useState<MenuPos | null>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const listId = useId();
 
   const selected = options.find((o) => o.value === value);
+
+  const placeMenu = () => {
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(Math.max(rect.width, 168), window.innerWidth - 16);
+    let left = rect.left;
+    if (left + width > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - width - 8);
+    }
+    if (left < 8) left = 8;
+
+    const menuH = menuRef.current?.offsetHeight || 224;
+    const spaceBelow = window.innerHeight - rect.bottom - 10;
+    const spaceAbove = rect.top - 10;
+    const place: 'below' | 'above' =
+      spaceBelow < menuH && spaceAbove > spaceBelow ? 'above' : 'below';
+
+    setPos({
+      top: place === 'below' ? rect.bottom + 6 : Math.max(8, rect.top - menuH - 6),
+      left,
+      width,
+      place,
+    });
+    setMenuStyle(copyShellVars(btnRef.current?.closest('.admin-shell') ?? null));
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    placeMenu();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,14 +99,18 @@ export default function AdminSelect<T extends string>({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
-    const onScroll = () => setOpen(false);
+    // только скролл окна — не закрывать при скролле списка тикетов
+    const onWinScroll = () => setOpen(false);
+    const onResize = () => placeMenu();
     window.addEventListener('pointerdown', onPointer);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('scroll', onWinScroll);
+    window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('pointerdown', onPointer);
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('scroll', onWinScroll);
+      window.removeEventListener('resize', onResize);
     };
   }, [open]);
 
@@ -61,21 +120,7 @@ export default function AdminSelect<T extends string>({
       setOpen(false);
       return;
     }
-    const rect = btnRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const width = Math.max(rect.width, 168);
-    let left = rect.left;
-    if (left + width > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - width - 8);
-    }
-    setPos({
-      top: rect.bottom + 6,
-      left,
-      width,
-    });
-    setPortalRoot(
-      (btnRef.current?.closest('.admin-shell') as HTMLElement | null) || document.body,
-    );
+    placeMenu();
     setOpen(true);
   };
 
@@ -100,14 +145,19 @@ export default function AdminSelect<T extends string>({
       </button>
       {open &&
         pos &&
-        portalRoot &&
         createPortal(
           <div
             ref={menuRef}
             id={listId}
             role="listbox"
-            className="admin-select-menu fixed z-[200] max-h-56 overflow-y-auto rounded-xl py-1.5"
-            style={{ top: pos.top, left: pos.left, width: pos.width }}
+            className="admin-select-menu fixed z-[300] max-h-56 overflow-y-auto rounded-xl py-1.5"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              transformOrigin: pos.place === 'above' ? 'bottom center' : 'top center',
+              ...menuStyle,
+            }}
           >
             {options.map((opt) => {
               const active = opt.value === value;
@@ -138,7 +188,7 @@ export default function AdminSelect<T extends string>({
               );
             })}
           </div>,
-          portalRoot,
+          document.body,
         )}
     </>
   );

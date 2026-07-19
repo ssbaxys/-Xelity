@@ -71,7 +71,7 @@ export default function AdminBroadcasts() {
             className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
           />
         </label>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="admin-error-inline">{error}</p>}
         <button
           type="submit"
           disabled={busy}

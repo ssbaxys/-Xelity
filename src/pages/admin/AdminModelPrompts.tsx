@@ -103,7 +103,7 @@ export default function AdminModelPrompts() {
           <p className="text-[11px] text-[var(--a-faint)]">Для этой модели доп. промпт ещё не задан</p>
         )}
 
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="admin-error-inline">{error}</p>}
         {ok && <p className="text-xs text-emerald-400/90">{ok}</p>}
 
         <button

@@ -233,18 +233,14 @@ export default function AdminUsers() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Поиск…"
-          className="rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-1.5 text-sm outline-none"
+          className="w-full max-w-xs rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-1.5 text-sm outline-none"
         />
       </div>
 
-      {error && (
-        <p className="rounded-lg border border-[var(--a-danger-border)] bg-[var(--a-danger-soft)] px-3 py-2 text-sm text-[var(--a-danger)]">
-          {error}
-        </p>
-      )}
+      {error && <p className="admin-error">{error}</p>}
 
-      <div className="overflow-x-auto admin-panel">
-        <table className="w-full min-w-[800px] text-left text-sm">
+      <div className="admin-panel admin-table-scroll">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-[var(--a-surface)] text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
             <tr>
               <th className="px-3 py-2 font-medium">Пользователь</th>
@@ -437,11 +433,11 @@ export default function AdminUsers() {
 
       {modal && liveUser && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="admin-modal-backdrop fixed inset-0 z-50 flex"
           onClick={() => busy !== liveUser.uid && setModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-5 shadow-2xl"
+            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-[var(--a-text)]">
@@ -675,11 +671,11 @@ export default function AdminUsers() {
 
       {banModal && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="admin-modal-backdrop fixed inset-0 z-50 flex"
           onClick={() => busy !== banModal.user.uid && setBanModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-5 shadow-2xl"
+            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-[var(--a-text)]">Заблокировать аккаунт</h3>

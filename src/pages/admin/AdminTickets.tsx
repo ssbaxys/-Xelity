@@ -201,81 +201,94 @@ export default function AdminTickets() {
             key={id}
             type="button"
             onClick={() => setFilter(id)}
-            className={`rounded-md border px-2.5 py-1 text-[11px] transition ${
-              filter === id
-                ? 'border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.2))] text-white'
-                : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
-            }`}
+            className={`admin-chip ${filter === id ? 'is-active' : ''}`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="admin-panel max-h-[78vh] overflow-y-auto p-2">
-          {sorted.length === 0 ? (
-            <p className="p-4 text-center text-sm text-[var(--a-faint)]">Нет тикетов</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {sorted.map((t) => {
-                const waiting =
-                  (t.status === 'open' || t.status === 'in_progress') &&
-                  t.lastAuthorRole !== 'staff';
-                return (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveId(t.id)}
-                      className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-[var(--a-hover)] ${
-                        activeId === t.id
-                          ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
-                          : ''
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {waiting && (
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--admin-accent,#c62828)]"
-                            title="Ждёт ответа"
-                          />
-                        )}
-                        <span className="block min-w-0 flex-1 truncate font-medium">
-                          {t.subject}
+      <div className="admin-split is-tickets">
+        <div
+          className={`admin-panel admin-split-list admin-split-pane overflow-hidden p-2 ${
+            activeId ? 'is-hidden-mobile' : ''
+          }`}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {sorted.length === 0 ? (
+              <p className="p-4 text-center text-sm text-[var(--a-faint)]">Нет тикетов</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {sorted.map((t) => {
+                  const waiting =
+                    (t.status === 'open' || t.status === 'in_progress') &&
+                    t.lastAuthorRole !== 'staff';
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveId(t.id)}
+                        className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-[var(--a-hover)] ${
+                          activeId === t.id
+                            ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
+                            : ''
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {waiting && (
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--admin-accent,#c62828)]"
+                              title="Ждёт ответа"
+                            />
+                          )}
+                          <span className="block min-w-0 flex-1 truncate font-medium">
+                            {t.subject}
+                          </span>
+                          {(t.priority === 'high' || t.priority === 'urgent') && (
+                            <span className="shrink-0 text-[9px] uppercase tracking-wide text-[var(--a-accent-fg)]">
+                              {t.priority === 'urgent' ? 'urgent' : 'high'}
+                            </span>
+                          )}
                         </span>
-                        {(t.priority === 'high' || t.priority === 'urgent') && (
-                          <span className="shrink-0 text-[9px] uppercase tracking-wide text-[var(--a-accent-fg)]">
-                            {t.priority === 'urgent' ? 'urgent' : 'high'}
+                        <span className="mt-0.5 block truncate text-[11px] text-[var(--a-muted)]">
+                          {STATUS_LABEL[t.status]} · {t.email}
+                        </span>
+                        {t.assigneeName && (
+                          <span className="mt-0.5 block truncate text-[10px] text-[var(--a-faint)]">
+                            → {t.assigneeName}
                           </span>
                         )}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-[var(--a-muted)]">
-                        {STATUS_LABEL[t.status]} · {t.email}
-                      </span>
-                      {t.assigneeName && (
-                        <span className="mt-0.5 block text-[10px] text-[var(--a-faint)]">
-                          → {t.assigneeName}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
-        <div className="admin-panel min-h-[520px]">
+        <div
+          className={`admin-panel admin-split-detail admin-split-pane overflow-hidden ${
+            !activeId ? 'is-hidden-mobile' : ''
+          }`}
+        >
           {!active ? (
-            <div className="flex h-full min-h-[480px] items-center justify-center text-sm text-[var(--a-faint)]">
+            <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-[var(--a-faint)]">
               Выберите тикет
             </div>
           ) : (
-            <div className="flex h-full min-h-[520px] flex-col">
-              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--a-border)] px-4 py-3">
-                <div className="min-w-0">
-                  <h3 className="font-semibold">{active.subject}</h3>
-                  <p className="text-xs text-[var(--a-muted)]">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--a-border)] px-3 py-3 sm:px-4">
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(null)}
+                    className="mb-1 text-[12px] text-[var(--a-muted)] hover:text-[var(--a-text)] lg:hidden"
+                  >
+                    ← К списку
+                  </button>
+                  <h3 className="truncate font-semibold">{active.subject}</h3>
+                  <p className="break-words text-xs text-[var(--a-muted)]">
                     {active.email} · {CATEGORY_LABEL[active.category] || active.category}
                     {can('users.view') && (
                       <>
@@ -297,7 +310,7 @@ export default function AdminTickets() {
                           type="button"
                           disabled={busy}
                           onClick={() => void unclaimTicket(active.id)}
-                          className="ml-1 underline hover:text-white"
+                          className="ml-1 underline hover:text-[var(--a-text)]"
                         >
                           отпустить
                         </button>
@@ -314,8 +327,9 @@ export default function AdminTickets() {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                   <AdminSelect
+                    className="min-w-[7rem] flex-1 sm:flex-none"
                     value={active.priority || 'normal'}
                     options={(Object.keys(PRIORITY_LABEL) as TicketPriority[]).map((p) => ({
                       value: p,
@@ -324,6 +338,7 @@ export default function AdminTickets() {
                     onChange={(p) => void setTicketPriority(active.id, p)}
                   />
                   <AdminSelect
+                    className="min-w-[7rem] flex-1 sm:flex-none"
                     value={active.status}
                     options={(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => ({
                       value: s,
@@ -383,15 +398,15 @@ export default function AdminTickets() {
                   {active.status !== 'closed' && (
                     <form
                       onSubmit={onReply}
-                      className="flex flex-col gap-2 border-t border-[var(--a-border)] px-4 py-3 sm:flex-row"
+                      className="flex flex-col gap-2 border-t border-[var(--a-border)] px-3 py-3 sm:px-4"
                     >
                       <input
                         value={reply}
                         onChange={(e) => setReply(e.target.value)}
                         placeholder="Ответ поддержки…"
-                        className="min-w-0 flex-1 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
+                        className="min-w-0 w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
                       />
-                      <div className="flex shrink-0 gap-1.5">
+                      <div className="flex flex-col gap-1.5 xs:flex-row sm:flex-row">
                         <button
                           type="button"
                           disabled={busy || !reply.trim()}
@@ -416,14 +431,14 @@ export default function AdminTickets() {
                               }
                             })();
                           }}
-                          className="rounded-lg border border-[var(--a-border)] px-3 py-2 text-sm text-[var(--a-muted)] hover:bg-[var(--a-hover)] disabled:opacity-40"
+                          className="w-full rounded-lg border border-[var(--a-border)] px-3 py-2 text-sm text-[var(--a-muted)] hover:bg-[var(--a-hover)] disabled:opacity-40 sm:w-auto"
                         >
                           Ответить и решить
                         </button>
                         <button
                           type="submit"
                           disabled={busy || !reply.trim()}
-                          className="rounded-lg bg-[var(--admin-accent,#c62828)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                          className="w-full rounded-lg bg-[var(--admin-accent,#c62828)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto"
                         >
                           Ответить
                         </button>
@@ -432,7 +447,7 @@ export default function AdminTickets() {
                   )}
                 </>
               ) : (
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
                   <AdminUserInvestigation
                     uid={active.uid}
                     source="ticket"

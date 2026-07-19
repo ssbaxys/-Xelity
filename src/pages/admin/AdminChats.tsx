@@ -53,6 +53,8 @@ export default function AdminChats() {
   const [sendAs, setSendAs] = useState<SendAs>('user');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  /** на мобиле: список чатов или переписка */
+  const [mobilePane, setMobilePane] = useState<'list' | 'detail'>('list');
 
   useEffect(() => watchAllUsers(setUsers), []);
   useEffect(() => watchAllUserChatIndexes(setIndexes), []);
@@ -62,6 +64,10 @@ export default function AdminChats() {
     if (fromUrl && fromUrl !== selectedUid) setSelectedUid(fromUrl);
     setGodMode(allowGod && searchParams.get('god') === '1');
   }, [searchParams, allowGod]);
+
+  useEffect(() => {
+    setMobilePane('list');
+  }, [selectedUid]);
 
   useEffect(() => {
     if (!selectedUid) {
@@ -199,7 +205,10 @@ export default function AdminChats() {
     <button
       key={c.id}
       type="button"
-      onClick={() => setThreadId(c.id)}
+      onClick={() => {
+        setThreadId(c.id);
+        setMobilePane('detail');
+      }}
       className={`mb-0.5 w-full rounded-lg px-2 py-2 text-left text-xs hover:bg-[var(--a-hover)] ${
         nested ? 'pl-4' : ''
       } ${threadId === c.id ? 'bg-[var(--admin-accent)]/15' : ''}`}
@@ -244,8 +253,9 @@ export default function AdminChats() {
           onChange={(v) => {
             setSelectedUid(v);
             setThreadId('');
+            setMobilePane('list');
           }}
-          className="min-w-[14rem]"
+          className="w-full min-w-0 max-w-md sm:min-w-[14rem]"
         />
       </div>
 
@@ -256,64 +266,81 @@ export default function AdminChats() {
           У пользователя ещё нет чатов в базе
         </p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-          <div className="admin-panel max-h-[70vh] overflow-y-auto p-2">
-            {godMode &&
-              folders.map((folder) => {
-                const inner = chatsInFolder(folder.id);
-                const open = expandedFolders[folder.id] !== false;
-                return (
-                  <div key={folder.id} className="mb-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedFolders((prev) => ({
-                          ...prev,
-                          [folder.id]: !open,
-                        }))
-                      }
-                      className="mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-[var(--a-soft)] hover:bg-[var(--a-hover)]"
-                    >
-                      <IconChevronDown
-                        className={`h-3 w-3 shrink-0 text-[var(--a-faint)] transition-transform ${
-                          open ? 'rotate-0' : '-rotate-90'
-                        }`}
-                      />
-                      <span className="truncate">{folder.title}</span>
-                      <span className="ml-auto text-[10px] text-[var(--a-faint)]">{inner.length}</span>
-                    </button>
-                    {open &&
-                      (inner.length
-                        ? inner.map((c) => renderChatButton(c, true))
-                        : (
+        <div className="admin-split is-chats">
+          <div
+            className={`admin-panel admin-split-list admin-split-pane overflow-hidden p-2 ${
+              mobilePane === 'detail' ? 'is-hidden-mobile' : ''
+            }`}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {godMode &&
+                folders.map((folder) => {
+                  const inner = chatsInFolder(folder.id);
+                  const open = expandedFolders[folder.id] !== false;
+                  return (
+                    <div key={folder.id} className="mb-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedFolders((prev) => ({
+                            ...prev,
+                            [folder.id]: !open,
+                          }))
+                        }
+                        className="mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-[var(--a-soft)] hover:bg-[var(--a-hover)]"
+                      >
+                        <IconChevronDown
+                          className={`h-3 w-3 shrink-0 text-[var(--a-faint)] transition-transform ${
+                            open ? 'rotate-0' : '-rotate-90'
+                          }`}
+                        />
+                        <span className="truncate">{folder.title}</span>
+                        <span className="ml-auto text-[10px] text-[var(--a-faint)]">{inner.length}</span>
+                      </button>
+                      {open &&
+                        (inner.length ? (
+                          inner.map((c) => renderChatButton(c, true))
+                        ) : (
                           <p className="px-4 py-1 text-[10px] text-[var(--a-faint)]">Пусто</p>
                         ))}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
 
-            {godMode && folders.length > 0 && rootChats.length > 0 && (
-              <p className="mb-1 mt-2 px-2 text-[10px] uppercase tracking-wider text-[var(--a-faint)]">
-                Без папки
-              </p>
-            )}
+              {godMode && folders.length > 0 && rootChats.length > 0 && (
+                <p className="mb-1 mt-2 px-2 text-[10px] uppercase tracking-wider text-[var(--a-faint)]">
+                  Без папки
+                </p>
+              )}
 
-            {(godMode ? rootChats : store.chats).map((c) => renderChatButton(c))}
+              {(godMode ? rootChats : store.chats).map((c) => renderChatButton(c))}
 
-            {godMode && !folders.length && !rootChats.length && (
-              <p className="p-3 text-center text-xs text-[var(--a-faint)]">Нет чатов</p>
-            )}
+              {godMode && !folders.length && !rootChats.length && (
+                <p className="p-3 text-center text-xs text-[var(--a-faint)]">Нет чатов</p>
+              )}
+            </div>
           </div>
 
-          <div className="admin-panel flex min-h-[480px] flex-col">
-            <div className="border-b border-[var(--a-border)] px-4 py-3">
-              <p className="font-medium">{thread?.title ?? '—'}</p>
-              <p className="text-[11px] text-[var(--a-muted)]">
+          <div
+            className={`admin-panel admin-split-detail admin-split-pane overflow-hidden ${
+              mobilePane === 'list' ? 'is-hidden-mobile' : ''
+            }`}
+          >
+            <div className="border-b border-[var(--a-border)] px-3 py-3 sm:px-4">
+              <button
+                type="button"
+                onClick={() => setMobilePane('list')}
+                className="mb-1 text-[12px] text-[var(--a-muted)] hover:text-[var(--a-text)] lg:hidden"
+              >
+                ← К списку чатов
+              </button>
+              <p className="truncate font-medium">{thread?.title ?? '—'}</p>
+              <p className="break-words text-[11px] text-[var(--a-muted)]">
                 {selectedUser?.email || selectedUid}
                 {thread && (
                   <>
                     {' · '}
-                    модель пользователя:{' '}
+                    модель:{' '}
                     <span className="text-[var(--a-accent-fg)]">{modelName}</span>
                   </>
                 )}
@@ -321,7 +348,7 @@ export default function AdminChats() {
               </p>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
               {thread?.messages.map((m, i) => {
                 const next = thread.messages[i + 1];
                 const usedReasoning =
@@ -402,39 +429,41 @@ export default function AdminChats() {
               {genHint && (
                 <p className="text-[11px] text-[var(--a-accent-fg)]">{genHint}</p>
               )}
-              {error && <p className="text-xs text-red-400">{error}</p>}
-              <div className="flex gap-2">
+              {error && <p className="admin-error-inline">{error}</p>}
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <textarea
                   value={draft}
                   onChange={(e) => {
                     setDraft(e.target.value);
                     if (genHint?.startsWith('Готово')) setGenHint(null);
                   }}
-                  rows={godMode ? 3 : 1}
+                  rows={godMode ? 3 : 2}
                   placeholder={
                     sendAs === 'model'
                       ? `Текст ответа модели (${modelName})…`
                       : 'Сообщение от лица пользователя…'
                   }
-                  className="min-w-0 flex-1 resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
+                  className="min-w-0 w-full flex-1 resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
                 />
-                <button
-                  type="button"
-                  disabled={busy || !thread}
-                  onClick={() => void onWandGenerate()}
-                  title="Сгенерировать ответ в поле"
-                  aria-label="Сгенерировать ответ"
-                  className="self-end inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--admin-accent)]/45 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)] hover:bg-[var(--admin-accent)]/25 disabled:opacity-40"
-                >
-                  <IconWand className="h-4 w-4" />
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy || !draft.trim() || !thread}
-                  className="self-end rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                >
-                  {busy ? '…' : 'Отправить'}
-                </button>
+                <div className="flex shrink-0 gap-2 sm:flex-col">
+                  <button
+                    type="button"
+                    disabled={busy || !thread}
+                    onClick={() => void onWandGenerate()}
+                    title="Сгенерировать ответ в поле"
+                    aria-label="Сгенерировать ответ"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--admin-accent)]/45 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)] hover:bg-[var(--admin-accent)]/25 disabled:opacity-40"
+                  >
+                    <IconWand className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy || !draft.trim() || !thread}
+                    className="h-10 flex-1 rounded-lg bg-[var(--admin-accent)] px-4 text-sm font-semibold text-white disabled:opacity-40 sm:flex-none"
+                  >
+                    {busy ? '…' : 'Отправить'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
