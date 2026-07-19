@@ -127,27 +127,61 @@ export const WEB_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_weather',
+      description:
+        'Get live weather and multi-day forecast via Open-Meteo (global, accurate). Use whenever the user asks about weather, temperature, rain, wind, or forecast for a place. Returns structured data for the UI weather card — do not invent numbers.',
+      parameters: {
+        type: 'object',
+        properties: {
+          location: {
+            type: 'string',
+            description: 'City or place name, e.g. Москва, London, Tokyo',
+          },
+          latitude: {
+            type: 'number',
+            description: 'Optional latitude if known',
+          },
+          longitude: {
+            type: 'number',
+            description: 'Optional longitude if known',
+          },
+          days: {
+            type: 'integer',
+            description: 'Forecast days 1–7 (default 7)',
+            minimum: 1,
+            maximum: 7,
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный доступ):
-У тебя есть tools: web_search (список результатов) и web_fetch (чтение содержимого выбранных сайтов).
+У тебя есть tools: web_search, web_fetch и get_weather (Open-Meteo).
 
-ЭКОНОМИЯ ТОКЕНОВ (важно):
+ПОГОДА:
+- Если пользователь спрашивает про погоду / температуру / дождь / прогноз — ОБЯЗАТЕЛЬНО вызови get_weather (не угадывай и не бери погоду из web_search).
+- Укажи location (город). UI покажет интерактивную карточку; в тексте дай краткий итог.
+- Источник данных: Open-Meteo.
+
+ЭКОНОМИЯ ТОКЕНОВ (поиск):
 1) web_search даёт ТОЛЬКО список: номер, title, URL, короткий snippet — НЕ полный текст страниц.
 2) После поиска САМА выбери, что читать:
-   - если сниппетов достаточно для ответа — НЕ вызывай web_fetch;
-   - обычно открой 1–3 самых релевантных URL;
-   - «прочитать все» — только если задача явно требует сверки многих источников;
-   - не больше 5 URL за один web_fetch (параметр urls).
-3) Один вызов web_fetch с urls=[...] лучше, чем много отдельных вызовов (меньше раундов API).
-4) НЕ выдумывай содержимое сайтов и НЕ утверждай, что «проверил интернет», если tool не вызывался.
+   - если сниппетов достаточно — НЕ вызывай web_fetch;
+   - обычно 1–3 URL; «все» — только если нужно; urls до 5 за один web_fetch.
+3) НЕ выдумывай содержимое сайтов и НЕ утверждай, что «проверил интернет», если tool не вызывался.
 
 КОГДА ВЫЗЫВАТЬ:
 - Свежие факты / новости / доки / цены → web_search → выборочный web_fetch.
-- Пользователь дал ссылку → сразу web_fetch по этой ссылке.
-- Спорные факты → укажи URL источника в ответе.
+- Ссылка от пользователя → web_fetch.
+- Погода → get_weather.
 
-ЗАПРЕЩЕНО: localhost, внутренние IP, не-http(s). При ошибке поиска/загрузки — скажи честно.`;
+ЗАПРЕЩЕНО: localhost, внутренние IP, не-http(s). При ошибке — скажи честно.`;
 
 export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (песочница проекта в этом чате):
 У тебя ОБЯЗАТЕЛЬНО есть tools: list_files, read_file, write_file, delete_file.

@@ -9,15 +9,29 @@ import {
   IconSearch,
   IconTrash,
 } from './icons';
+import WeatherCard from './WeatherCard';
+import WeatherIcon from './WeatherIcons';
+import { weatherIconKind } from '../lib/weather';
 
 function KindIcon({
   kind,
   pending,
+  weatherCode,
 }: {
   kind: ToolActivity['kind'];
   pending?: boolean;
+  weatherCode?: number;
 }) {
   const spin = pending ? 'tool-icon-spin' : '';
+  if (kind === 'weather') {
+    return (
+      <WeatherIcon
+        kind={weatherIconKind(weatherCode ?? 2)}
+        className={`h-4 w-4 ${spin}`}
+        isDay
+      />
+    );
+  }
   if (kind === 'search') return <IconSearch className={`h-3.5 w-3.5 ${spin}`} />;
   if (kind === 'fetch') return <IconEye className={`h-3.5 w-3.5 ${spin}`} />;
   if (kind === 'read' || kind === 'list') {
@@ -29,6 +43,7 @@ function KindIcon({
 }
 
 function labelFor(a: ToolActivity): string {
+  if (a.kind === 'weather') return `Погода: ${a.path || '…'}`;
   if (a.kind === 'search') return `Поиск: ${a.path || '…'}`;
   if (a.kind === 'fetch') {
     if (a.links && a.links.length > 1) {
@@ -121,6 +136,36 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
   return (
     <div className="tool-cards mb-3 space-y-1.5">
       {items.map((a, index) => {
+        if (a.kind === 'weather' && a.weather && a.ok) {
+          return (
+            <div
+              key={a.id}
+              className="tool-card weather-tool-wrap"
+              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+            >
+              <WeatherCard weather={a.weather} pending={a.pending} />
+            </div>
+          );
+        }
+
+        if (a.kind === 'weather' && a.pending) {
+          return (
+            <div
+              key={a.id}
+              className="tool-card overflow-hidden rounded-xl border border-[var(--c-border-strong)] bg-[var(--c-soft)]"
+              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+            >
+              <div className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[var(--c-text)]">
+                <KindIcon kind="weather" pending />
+                <span className="tool-label-shimmer min-w-0 flex-1 truncate font-medium">
+                  {labelFor(a)}…
+                </span>
+                <span className="text-[10px] text-[var(--c-faint)]">работаю</span>
+              </div>
+            </div>
+          );
+        }
+
         const expanded = openId === a.id;
         const expandable =
           Boolean(a.links?.length) ||
@@ -154,7 +199,11 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
                       : 'text-[#e57373]'
                 }`}
               >
-                <KindIcon kind={a.kind} pending={a.pending} />
+                <KindIcon
+                  kind={a.kind}
+                  pending={a.pending}
+                  weatherCode={a.weather?.current.code}
+                />
               </span>
               <span
                 className={`min-w-0 flex-1 truncate font-medium ${
@@ -174,7 +223,7 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
                   aria-label="готово"
                 >
                   <IconCheck className="tool-check-in h-3.5 w-3.5 shrink-0" />
-                  {a.kind === 'search' ? null : 'ок'}
+                  {a.kind === 'search' || a.kind === 'weather' ? null : 'ок'}
                 </span>
               ) : (
                 <span className="tool-status-fail text-[10px] text-[#e57373]">ошибка</span>

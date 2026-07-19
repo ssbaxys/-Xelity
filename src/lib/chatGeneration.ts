@@ -22,6 +22,7 @@ const MAX_TOOL_ROUNDS = 10;
 function pendingKindFor(name: string): ToolActivityKind {
   if (name === 'web_search') return 'search';
   if (name === 'web_fetch') return 'fetch';
+  if (name === 'get_weather') return 'weather';
   if (name === 'read_file') return 'read';
   if (name === 'list_files') return 'list';
   if (name === 'delete_file') return 'delete';
@@ -312,8 +313,10 @@ async function runWithAgentTools(params: {
           query?: string;
           url?: string;
           urls?: string[];
+          location?: string;
         };
         if (args.path) pending.path = String(args.path);
+        else if (args.location) pending.path = String(args.location);
         else if (args.query) pending.path = String(args.query);
         else if (Array.isArray(args.urls) && args.urls.length > 1) {
           pending.path = `${args.urls.length} стр.`;

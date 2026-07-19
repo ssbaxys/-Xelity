@@ -103,6 +103,7 @@ export async function handleToolExecute(req: IncomingMessage, res: ServerRespons
       url: result.url,
       query: result.query,
       links: result.links,
+      weather: result.weather,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Ошибка tool';

@@ -1,6 +1,7 @@
 import { get, onValue, ref, set, type Unsubscribe } from 'firebase/database';
 import { database } from './firebase';
 import { normalizeModelId, type ChatModelId } from './models';
+import type { WeatherPayload } from './weather';
 
 export type { ChatModelId } from './models';
 export type ChatRole = 'user' | 'assistant';
@@ -12,7 +13,8 @@ export type ToolActivityKind =
   | 'edit'
   | 'delete'
   | 'search'
-  | 'fetch';
+  | 'fetch'
+  | 'weather';
 
 export type ToolActivityLink = {
   title: string;
@@ -20,7 +22,7 @@ export type ToolActivityLink = {
   snippet?: string;
 };
 
-/** Карточка tool-шага в ответе (кодинг / web) */
+/** Карточка tool-шага в ответе (кодинг / web / погода) */
 export type ToolActivity = {
   id: string;
   name: string;
@@ -38,6 +40,8 @@ export type ToolActivity = {
   pending?: boolean;
   /** результаты web_search — для просмотра ресурсов */
   links?: ToolActivityLink[];
+  /** структурированная погода (Open-Meteo) для WeatherCard */
+  weather?: WeatherPayload;
 };
 
 export type ChatMessage = {
@@ -146,6 +150,7 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                             'delete',
                             'search',
                             'fetch',
+                            'weather',
                           ] as const
                         ).includes(t.kind as ToolActivityKind)
                           ? (t.kind as ToolActivityKind)
@@ -171,6 +176,13 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                                     : undefined,
                               }))
                           : undefined,
+                        weather:
+                          t.weather &&
+                          typeof t.weather === 'object' &&
+                          t.weather.current &&
+                          typeof t.weather.place === 'string'
+                            ? (t.weather as WeatherPayload)
+                            : undefined,
                       }))
                       .filter((t) => t.id && t.name)
                   : undefined,

@@ -1,7 +1,9 @@
 /**
- * Агентские web-tools: поиск (SearXNG → fallback) и чтение страниц.
+ * Агентские web-tools: поиск (SearXNG → fallback), чтение страниц, погода (Open-Meteo).
  * Выполняются только на VPS — клиент вызывает /api/tools.
  */
+
+import { executeGetWeather, type WeatherPayload } from './weatherTools';
 
 const SEARXNG_URL = (process.env.SEARXNG_URL || 'http://127.0.0.1:8888').replace(/\/$/, '');
 const FETCH_TIMEOUT_MS = 12_000;
@@ -27,6 +29,7 @@ export type WebToolResult = {
   url?: string;
   query?: string;
   links?: WebToolLink[];
+  weather?: WeatherPayload;
 };
 
 function isPrivateHostname(hostname: string): boolean {
@@ -595,6 +598,21 @@ export async function runWebTool(
   }
   if (name === 'web_fetch') {
     return executeWebFetchMany(collectFetchUrls(args));
+  }
+  if (name === 'get_weather') {
+    const daysRaw = args.days;
+    const days =
+      typeof daysRaw === 'number'
+        ? daysRaw
+        : typeof daysRaw === 'string'
+          ? Number(daysRaw)
+          : undefined;
+    return executeGetWeather({
+      location: typeof args.location === 'string' ? args.location : undefined,
+      latitude: typeof args.latitude === 'number' ? args.latitude : undefined,
+      longitude: typeof args.longitude === 'number' ? args.longitude : undefined,
+      days: Number.isFinite(days) ? days : undefined,
+    });
   }
   return {
     ok: false,

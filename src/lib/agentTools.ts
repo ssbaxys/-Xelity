@@ -1,6 +1,7 @@
 import { auth } from './firebase';
 import { classifyHttpError, wrapFetchError } from './chatApiError';
 import type { ToolActivity, ToolActivityLink } from './chatStore';
+import type { WeatherPayload } from './weather';
 
 export type RemoteToolResult = {
   ok: boolean;
@@ -11,6 +12,7 @@ export type RemoteToolResult = {
   url?: string;
   query?: string;
   links?: ToolActivityLink[];
+  weather?: WeatherPayload;
 };
 
 export async function executeRemoteTool(
@@ -55,6 +57,10 @@ export async function executeRemoteTool(
     url: data.url,
     query: data.query,
     links: Array.isArray(data.links) ? data.links : undefined,
+    weather:
+      data.weather && typeof data.weather === 'object'
+        ? (data.weather as WeatherPayload)
+        : undefined,
   };
 }
 
@@ -96,19 +102,36 @@ export function activityFromWebTool(
   let query: string | undefined;
   let url: string | undefined;
   let urls: string[] | undefined;
+  let location: string | undefined;
   try {
     const args = JSON.parse(argsJson || '{}') as {
       query?: string;
       url?: string;
       urls?: string[];
+      location?: string;
     };
     query = args.query ? String(args.query) : undefined;
     url = args.url ? String(args.url) : undefined;
+    location = args.location ? String(args.location) : undefined;
     if (Array.isArray(args.urls)) {
       urls = args.urls.map(String).filter(Boolean).slice(0, 5);
     }
   } catch {
     /* ignore */
+  }
+
+  if (name === 'get_weather') {
+    return {
+      id,
+      name,
+      kind: 'weather',
+      ok: result.ok,
+      error: result.error,
+      path: result.weather?.place || location || 'погода',
+      after: result.content.slice(0, 8_000),
+      weather: result.weather,
+      pending: false,
+    };
   }
 
   if (name === 'web_search') {
@@ -149,4 +172,4 @@ export function activityFromWebTool(
   };
 }
 
-export const WEB_TOOL_NAMES = new Set(['web_search', 'web_fetch']);
+export const WEB_TOOL_NAMES = new Set(['web_search', 'web_fetch', 'get_weather']);

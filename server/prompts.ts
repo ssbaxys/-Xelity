@@ -9,6 +9,7 @@
  * 5) ★ Админ: model prompt + chat prompt — ВЫСШИЙ приоритет поведения и стиля
  */
 import { normalizeModelId, type UiModelId } from '../src/lib/models';
+import { buildNuclearClockBlock } from './nuclearClock';
 
 /** Реальный upstream model id — только на сервере */
 export const AITUNNEL_MODEL_ID = 'gemma-4-31b-it';
@@ -238,9 +239,11 @@ export function buildSystemPrompt(
   const id = normalizeModelId(modelId);
   const modelSystemExtra = opts?.modelSystemExtra ?? null;
 
+  const clock = buildNuclearClockBlock();
+
   if (opts?.reasoningPhase === 'think') {
-    // на think — админ тоже в конце, но без tools
-    return appendAdminExtras(thinkOnlySystemPrompt(id), {
+    // на think — админ тоже в конце, но без tools; часы всё равно нужны
+    return appendAdminExtras(`${thinkOnlySystemPrompt(id)}\n\n---\n${clock}`, {
       modelSystemExtra,
       chatExtra: extra,
     });
@@ -250,6 +253,8 @@ export function buildSystemPrompt(
   if (opts?.reasoningPhase === 'answer') {
     base = `${base}\n\n---\n${REASONING_ANSWER_PROMPT}`;
   }
+  // ядерный таймер — до tools, чтобы модель опиралась на актуальное «сейчас»
+  base = `${base}\n\n---\n${clock}`;
   if (opts?.webTools && opts.webExtra) {
     base = `${base}\n\n---\n${opts.webExtra}`;
   }
