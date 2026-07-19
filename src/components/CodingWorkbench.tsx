@@ -344,7 +344,9 @@ export default function CodingWorkbench({
             <iframe
               key={`${previewSrc}-${viewBuildId}`}
               title="Превью сайта"
-              className={`h-full w-full min-h-[280px] border-0 bg-white ${showDevOverlay ? 'is-dimmed' : ''}`}
+              className={`h-full w-full min-h-[280px] border-0 bg-black ${
+                showDevOverlay ? 'is-hidden-build' : ''
+              }`}
               sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
               src={previewSrc}
             />

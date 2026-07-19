@@ -37,6 +37,18 @@ function escapeScript(src: string): string {
   return src.replace(/<\/script/gi, '<\\/script');
 }
 
+const CODE_EXT = /\.(jsx?|tsx?)$/i;
+const STYLE_EXT = /\.(css|scss|sass|less)$/i;
+const ASSET_EXT = /\.(png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|mp4|webm|json)$/i;
+
+function isBundlableCode(path: string): boolean {
+  return CODE_EXT.test(path);
+}
+
+function isStyleOrAsset(path: string): boolean {
+  return STYLE_EXT.test(path) || ASSET_EXT.test(path);
+}
+
 function resolveSandboxModule(
   fromPath: string,
   spec: string,
@@ -53,6 +65,10 @@ function resolveSandboxModule(
     else stack.push(p);
   }
   const base = stack.join('/');
+  // не резолвить CSS/ассеты как JS-модули (иначе стили попадают в PreviewApp.jsx)
+  if (isStyleOrAsset(base) || STYLE_EXT.test(spec) || ASSET_EXT.test(spec)) {
+    return null;
+  }
   for (const c of [
     base,
     `${base}.jsx`,
@@ -62,12 +78,12 @@ function resolveSandboxModule(
     `${base}/index.jsx`,
     `${base}/index.js`,
   ]) {
-    if (files[c]) return c;
+    if (files[c] && isBundlableCode(c)) return c;
   }
   return null;
 }
 
-/** Собирает локальные модули в один JSX-файл */
+/** Собирает локальные JS/JSX-модули в один файл. CSS и ассеты НЕ включаются в бандл. */
 export function bundleReactSources(entryPath: string, files: PreviewFiles): string {
   const visited = new Set<string>();
   const chunks: string[] = [];
@@ -75,6 +91,11 @@ export function bundleReactSources(entryPath: string, files: PreviewFiles): stri
   const walk = (path: string) => {
     const norm = normalizePath(path);
     if (visited.has(norm) || !files[norm]) return;
+    // критично: .css/.png и т.п. нельзя класть в PreviewApp.jsx
+    if (isStyleOrAsset(norm) || !isBundlableCode(norm)) {
+      visited.add(norm);
+      return;
+    }
     visited.add(norm);
 
     let src = files[norm].content.replace(/\r\n/g, '\n');
@@ -83,8 +104,11 @@ export function bundleReactSources(entryPath: string, files: PreviewFiles): stri
       /^\s*import\s+(?:([\w*{}\s,]+)\s+from\s+)?['"](\.[^'"]+)['"]\s*;?\s*$/gm;
     let m: RegExpExecArray | null;
     while ((m = importRe.exec(src))) {
-      const mod = resolveSandboxModule(norm, m[2], files);
-      if (mod) walk(mod);
+      const spec = m[2];
+      // side-effect CSS / ассеты — пропускаем, стили уже инжектятся отдельно в <style>
+      if (STYLE_EXT.test(spec) || ASSET_EXT.test(spec)) continue;
+      const mod = resolveSandboxModule(norm, spec, files);
+      if (mod && isBundlableCode(mod)) walk(mod);
     }
 
     src = src
@@ -233,6 +257,32 @@ export function checkReactPreviewBuild(files: PreviewFiles): PreviewBuildCheck {
         },
       ],
       summary: 'Ошибка: нет src/App.jsx и index.html',
+    };
+  }
+
+  // частая ошибка агента: сырой CSS внутри .jsx/.js
+  const cssInJs: PreviewBuildError[] = [];
+  for (const [path, file] of Object.entries(files)) {
+    if (!isBundlableCode(path)) continue;
+    const src = file.content || '';
+    if (
+      /(?:^|\n)\s*(?:body|html|:root|\.[\w-]+)\s*\{/.test(src) &&
+      !/styled-components|createGlobalStyle|css`/.test(src)
+    ) {
+      cssInJs.push({
+        message:
+          'Похоже, CSS-селекторы лежат внутри JS/JSX. Вынеси стили в src/styles.css и подключи import \'./styles.css\'.',
+        file: path,
+      });
+    }
+  }
+  if (cssInJs.length) {
+    return {
+      ok: false,
+      entry,
+      mode: 'react',
+      errors: cssInJs.slice(0, 3),
+      summary: cssInJs[0]!.message,
     };
   }
 
