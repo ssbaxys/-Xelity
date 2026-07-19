@@ -20,6 +20,7 @@ import {
   runSandboxTool,
 } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
+import { extractTextualToolCalls } from './parseTextToolCalls';
 
 const MAX_TOOL_ROUNDS = 10;
 /** Минимальное время серой «pending»-карточки, чтобы UI успел показать часы / спин */
@@ -317,10 +318,21 @@ async function runWithAgentTools(params: {
       webTools: web,
     });
 
-    const calls = reply.tool_calls || [];
+    let calls = reply.tool_calls || [];
+    let replyContent = reply.content || '';
+    // запасной парсер, если бэкенд ещё не вырезал текстовые <|tool_call|>
+    if (!calls.length && /tool_call|call:\s*\w+/i.test(replyContent)) {
+      const parsed = extractTextualToolCalls(replyContent);
+      if (parsed.tool_calls.length) {
+        calls = parsed.tool_calls;
+        replyContent = parsed.cleaned;
+      } else {
+        replyContent = parsed.cleaned;
+      }
+    }
     if (!calls.length) {
       maybeCommitCodingBuild(params.chatId, coding, activities);
-      return { content: reply.content.trim(), toolActivity: activities };
+      return { content: replyContent.trim(), toolActivity: activities };
     }
 
     const toolMsgs: ChatApiMessage[] = [];
@@ -419,7 +431,7 @@ async function runWithAgentTools(params: {
       ...messages,
       {
         role: 'assistant',
-        content: reply.content || '',
+        content: replyContent,
         tool_calls: calls,
       },
       ...toolMsgs,

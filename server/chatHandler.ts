@@ -14,6 +14,7 @@ import {
   buildToolList,
   type ToolCallFn,
 } from './tools';
+import { extractTextualToolCalls } from './parseTextToolCalls';
 
 export type ChatBodyMessage = {
   role: string;
@@ -295,10 +296,21 @@ export async function handleChat(
     }
 
     const message = data?.choices?.[0]?.message;
-    const toolCalls = Array.isArray(message?.tool_calls)
+    let toolCalls = Array.isArray(message?.tool_calls)
       ? message!.tool_calls!.slice(0, 8)
       : [];
-    const content = (message?.content || '').trim();
+    let content = (message?.content || '').trim();
+
+    // Gemma и др. иногда пишут tool call текстом вместо API tool_calls
+    if (!toolCalls.length && content) {
+      const parsed = extractTextualToolCalls(content);
+      if (parsed.tool_calls.length) {
+        toolCalls = parsed.tool_calls;
+        content = parsed.cleaned;
+      } else if (parsed.cleaned !== content) {
+        content = parsed.cleaned;
+      }
+    }
 
     if (!content && !toolCalls.length) {
       sendJson(res, 502, { error: 'Пустой ответ от AITUNNEL' });

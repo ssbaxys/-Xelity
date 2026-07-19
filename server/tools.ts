@@ -182,6 +182,7 @@ export const WEB_TOOLS = [
 
 export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный доступ):
 У тебя есть tools: web_search, web_fetch и get_weather (Open-Meteo).
+Вызывай их ТОЛЬКО через API tool_calls (function calling). ЗАПРЕЩЕНО писать в ответ текст вроде <|tool_call|>, call:get_weather{…}, XML tool_call — пользователь это увидит как мусор.
 
 ПОГОДА:
 - Если пользователь спрашивает про погоду / температуру / дождь / прогноз — ОБЯЗАТЕЛЬНО вызови get_weather. ЗАПРЕЩЕНО web_search для погоды.
