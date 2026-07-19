@@ -10,6 +10,7 @@ import {
 import { AITUNNEL_MODEL_ID, buildSystemPrompt, type ReasoningPhase } from './prompts';
 import {
   CODING_SYSTEM_EXTRA,
+  NO_WEB_WEATHER_EXTRA,
   WEB_SYSTEM_EXTRA,
   buildToolList,
   type ToolCallFn,
@@ -245,13 +246,14 @@ export async function handleChat(
       typeof body.systemExtra === 'string' ? body.systemExtra.trim().slice(0, 2000) : '';
     const modelSystemExtra = await getModelSystemPrompt(modelId);
 
+    const webOn = allowTools && webTools;
     const systemContent = buildSystemPrompt(modelId, systemExtra || null, {
       reasoningPhase: phase,
       modelSystemExtra: modelSystemExtra || null,
       codingTools,
       codingExtra: codingTools ? CODING_SYSTEM_EXTRA : null,
-      webTools: allowTools && webTools,
-      webExtra: allowTools && webTools ? WEB_SYSTEM_EXTRA : null,
+      webTools: webOn,
+      webExtra: webOn ? WEB_SYSTEM_EXTRA : NO_WEB_WEATHER_EXTRA,
     });
 
     const upstreamBody: Record<string, unknown> = {

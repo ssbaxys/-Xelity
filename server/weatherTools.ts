@@ -36,7 +36,7 @@ export type WeatherPayload = {
   longitude: number;
   timezone: string;
   updatedAt: string;
-  source: 'Open-Meteo';
+  source: string;
   current: WeatherCurrent;
   daily: WeatherDay[];
 };
@@ -741,7 +741,7 @@ export async function executeGetWeather(args: {
     if (!cur || cur.temperature_2m == null || cur.weather_code == null) {
       return {
         ok: false,
-        forModel: 'get_weather: пустой ответ Open-Meteo',
+        forModel: 'get_weather: пустой ответ сервиса погоды',
         error: 'Нет данных',
       };
     }
@@ -755,7 +755,7 @@ export async function executeGetWeather(args: {
       longitude: lon,
       timezone: fc.timezone || tzHint || 'auto',
       updatedAt: cur.time || new Date().toISOString(),
-      source: 'Open-Meteo',
+      source: 'Xelity Weather',
       current: {
         tempC: round1(cur.temperature_2m),
         feelsLikeC: round1(cur.apparent_temperature ?? cur.temperature_2m),
@@ -785,7 +785,7 @@ export async function executeGetWeather(args: {
     const where = [place, admin1, country].filter(Boolean).join(', ');
     const today = weather.daily[0];
     const forModel = [
-      `WEATHER (Open-Meteo) for ${where}`,
+      `WEATHER for ${where}`,
       `Coords: ${lat.toFixed(4)}, ${lon.toFixed(4)} · TZ: ${weather.timezone}`,
       `Updated: ${weather.updatedAt}`,
       `Now (current): ${weather.current.tempC}°C (feels ${weather.current.feelsLikeC}°C), ${weather.current.label}, humidity ${weather.current.humidity}%, wind ${weather.current.windKmh} km/h, precip ${weather.current.precipMm} mm`,

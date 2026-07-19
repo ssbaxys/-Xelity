@@ -31,7 +31,7 @@ export type WeatherPayload = {
   longitude: number;
   timezone: string;
   updatedAt: string;
-  source: 'Open-Meteo';
+  source: string;
   current: WeatherCurrent;
   daily: WeatherDay[];
 };

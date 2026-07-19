@@ -255,7 +255,8 @@ export function buildSystemPrompt(
   }
   // ядерный таймер — до tools, чтобы модель опиралась на актуальное «сейчас»
   base = `${base}\n\n---\n${clock}`;
-  if (opts?.webTools && opts.webExtra) {
+  // webExtra: либо инструкция по tools, либо запрет выдумывать погоду без поиска
+  if (opts?.webExtra) {
     base = `${base}\n\n---\n${opts.webExtra}`;
   }
   if (opts?.codingTools && opts.codingExtra) {

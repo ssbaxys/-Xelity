@@ -150,22 +150,22 @@ export const WEB_TOOLS = [
     function: {
       name: 'get_weather',
       description:
-        'Get live weather and multi-day forecast via Open-Meteo. ALWAYS pass the place the user asked for in location (exact settlement). Do NOT reuse coordinates from a previous place. Do not invent numbers.',
+        'Current weather and multi-day forecast for a place. Pass the settlement the user asked about in location. Do not reuse old coordinates. Never invent temperatures.',
       parameters: {
         type: 'object',
         properties: {
           location: {
             type: 'string',
             description:
-              'Settlement name as the user meant it, e.g. «Усть-Кокса», «Горно-Алтайск», «Москва». Prefer «Name, Region» for small towns.',
+              'Settlement name, e.g. «Усть-Кокса», «Горно-Алтайск», «Москва». Prefer «Name, Region» for small towns.',
           },
           latitude: {
             type: 'number',
-            description: 'Only if user gave exact coordinates; never copy from an earlier weather call',
+            description: 'Only if the user gave exact coordinates',
           },
           longitude: {
             type: 'number',
-            description: 'Only if user gave exact coordinates; never copy from an earlier weather call',
+            description: 'Only if the user gave exact coordinates',
           },
           days: {
             type: 'integer',
@@ -180,36 +180,37 @@ export const WEB_TOOLS = [
   },
 ];
 
-export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный доступ):
-У тебя есть tools: web_search, web_fetch и get_weather (Open-Meteo).
-Вызывай их ТОЛЬКО через API tool_calls (function calling). ЗАПРЕЩЕНО писать в ответ текст вроде <|tool_call|>, call:get_weather{…}, XML tool_call — пользователь это увидит как мусор.
+/** Когда поиск/погода выключены — модель не должна фантазировать градусы */
+export const NO_WEB_WEATHER_EXTRA = `ПОГОДА БЕЗ ДОСТУПА К ДАННЫМ:
+У тебя сейчас нет tools для актуальной погоды. ЗАПРЕЩЕНО называть температуру, влажность, ветер, осадки или «прогноз на сегодня» из памяти/догадок.
+Если пользователь спрашивает про погоду — вежливо скажи, что нужны актуальные данные, и попроси включить «Поиск» в чате (или просто повторить запрос — поиск может включиться сам). Не выдумывай числа.`;
+
+export const WEB_SYSTEM_EXTRA = `WEB-TOOLS:
+Доступны: web_search, web_fetch, get_weather.
+Вызывай ТОЛЬКО через API tool_calls (function calling). ЗАПРЕЩЕНО писать в ответ текст <|tool_call|>, call:get_weather{…} и т.п.
 
 ПОГОДА:
-- Если пользователь спрашивает про погоду / температуру / дождь / прогноз — ОБЯЗАТЕЛЬНО вызови get_weather. ЗАПРЕЩЕНО web_search для погоды.
-- В location передай ИМЕННО тот населённый пункт (напр. «Усть-Кокса, Республика Алтай»). Не подменяй на областной центр.
-- Не передавай latitude/longitude от прошлого запроса — только свежий location (или city/place).
-- Если tool пишет «не найдено» / опечатка — НЕ выдумывай, что «города нет в метео-базах мира». Повтори get_weather с исправленным названием из подсказки tool (напр. Баранул → Барнаул).
-- UI сам покажет карточку погоды. В ответе укажи: сейчас X°C и сегодня min…max (днём часто сравнивают с Google по максимуму дня, не по «сейчас»).
-- Asia/Barnaul в TZ — пояс Алтая, это не город Барнаул.
+- Вопрос про погоду / температуру / дождь / прогноз → ОБЯЗАТЕЛЬНО get_weather. Не угадывай градусы.
+- Не бери погоду из web_search и не выдумывай цифры без результата get_weather.
+- В location — тот населённый пункт, о котором спросили (можно «Город, регион»). Не подменяй на другой город.
+- Не таскай latitude/longitude от прошлого запроса.
+- Если tool: не найдено / опечатка — повтори get_weather с исправленным названием из подсказки (Баранул → Барнаул). Не пиши, что «города нет в мире».
+- В ответе: сейчас X°C и сегодня min…max. Не раскрывай внутренние детали tools пользователю.
 
 ЭКОНОМИЯ ТОКЕНОВ (поиск):
-1) web_search даёт список: номер, title, URL, snippet; иногда строку IMAGE: (прямая картинка).
-2) После поиска САМА выбери, что читать:
-   - если сниппетов достаточно — НЕ вызывай web_fetch;
-   - обычно 1–3 URL; «все» — только если нужно; urls до 5 за один web_fetch.
-3) НЕ выдумывай содержимое сайтов и НЕ утверждай, что «проверил интернет», если tool не вызывался.
+1) web_search → title, URL, snippet; иногда IMAGE:.
+2) web_fetch только если сниппетов мало; обычно 1–3 URL, urls до 5.
+3) Не выдумывай сайты и не утверждай, что «проверил интернет», без вызова tool.
 
-КАРТИНКИ В ОТВЕТЕ ПОЛЬЗОВАТЕЛЮ:
-- Нужны фото/иллюстрации → web_search с images:true (или обычный поиск, если есть IMAGE:).
-- Вставь в ответ блок (строго такой формат, до 4 шт.):
-  [[img: Заголовок | URL_картинки | URL_страницы_источника]]
-- UI покажет картинку, заголовок и ссылку на КОРЕНЬ источника (https://домен/).
-- Только реальные URL из результатов tools — не выдумывай картинки.
+КАРТИНКИ:
+- images:true в web_search при необходимости.
+- В ответ до 4 блоков: [[img: Заголовок | URL_картинки | URL_страницы_источника]]
+- Только реальные URL из tools.
 
 КОГДА ВЫЗЫВАТЬ:
-- Свежие факты / новости / доки / цены → web_search → выборочный web_fetch.
-- Картинки к ответу → web_search (images:true) + блоки [[img: …]].
-- Ссылка от пользователя → web_fetch.
+- Факты / новости / цены → web_search → выборочный web_fetch.
+- Картинки → web_search (images:true).
+- Ссылка пользователя → web_fetch.
 - Погода → get_weather.
 
 ЗАПРЕЩЕНО: localhost, внутренние IP, не-http(s). При ошибке — скажи честно.`;

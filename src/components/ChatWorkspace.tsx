@@ -34,6 +34,7 @@ import {
   isChatGenerating,
   subscribeChatStoreUpdates,
 } from '../lib/chatGeneration';
+import { looksLikeWeatherQuery } from '../lib/weatherIntent';
 import { clearSandbox, ensureReactSiteTemplate } from '../lib/projectSandbox';
 import {
   MODELS,
@@ -961,6 +962,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     }));
     const chatId = active.id;
     const modelId = active.modelId;
+    // Погода → автоматически включаем поиск (иначе get_weather недоступен и модель врёт градусы)
+    const autoWeb = looksLikeWeatherQuery(text);
+    const webToolsOn = autoWeb || active.webTools !== false;
+    if (autoWeb) setLastWebTools(true);
 
     persist({
       ...store,
@@ -972,6 +977,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
               messages: [...c.messages, userMsg],
               updatedAt: Date.now(),
               draft: '',
+              webTools: webToolsOn,
             }
           : c,
       ),
@@ -992,7 +998,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       systemExtra: active.adminSystemPrompt,
       reasoning: Boolean(active.reasoning),
       codingTools: Boolean(active.codingTools),
-      webTools: active.webTools !== false,
+      webTools: webToolsOn,
     }).finally(() => {
       setSending(isChatGenerating(chatId));
       if (user) {

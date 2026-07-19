@@ -43,7 +43,7 @@ export default function WeatherCard({ weather, pending, pendingPlace }: Props) {
             <p className="weather-card-place truncate">
               {pendingPlace?.trim() || 'Погода'}
             </p>
-            <p className="weather-card-meta">Загрузка Open-Meteo…</p>
+            <p className="weather-card-meta">Загрузка погоды…</p>
           </div>
           <WeatherIcon kind="partly" isDay className="weather-card-hero-icon tool-icon-spin" />
         </header>
