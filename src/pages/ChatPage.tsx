@@ -16,8 +16,21 @@ export default function ChatPage() {
     });
   }, []);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
+
   return (
-    <div className="chat-app fixed inset-0 bg-[var(--c-bg)] text-[var(--c-text)] antialiased">
+    <div className="chat-app fixed inset-0 h-dvh max-h-dvh overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] antialiased">
       <ChatWorkspace
         homeSlot={
           <Link

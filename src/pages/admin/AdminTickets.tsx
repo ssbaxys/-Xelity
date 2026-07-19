@@ -170,8 +170,8 @@ export default function AdminTickets() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="admin-page--fill flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Тикеты поддержки</h2>
           <p className="text-sm text-[var(--a-muted)]">
@@ -186,7 +186,7 @@ export default function AdminTickets() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex shrink-0 flex-wrap gap-1.5">
         {(
           [
             ['needs_reply', `Ждут ответа (${counts.needs_reply})`],
@@ -208,7 +208,7 @@ export default function AdminTickets() {
         ))}
       </div>
 
-      <div className="admin-split is-tickets">
+      <div className="admin-split is-tickets min-h-0 flex-1">
         <div
           className={`admin-panel admin-split-list admin-split-pane overflow-hidden p-2 ${
             activeId ? 'is-hidden-mobile' : ''

@@ -160,10 +160,14 @@ function upsertAssistantInStore(
       idx >= 0
         ? c.messages.map((m, i) => (i === idx ? { ...m, ...assistantMsg } : m))
         : [...c.messages, assistantMsg];
+    const stillDefault =
+      !c.manualTitle &&
+      (c.title === 'Новый чат' || /^Чат\s+\d+$/i.test(c.title));
     return {
       ...c,
+      // не затираем уже сгенерированный ИИ-заголовок эвристикой
       title:
-        opts?.titleIfNotManual && !c.manualTitle ? opts.titleIfNotManual : c.title,
+        stillDefault && opts?.titleIfNotManual ? opts.titleIfNotManual : c.title,
       messages,
       updatedAt: Date.now(),
     };

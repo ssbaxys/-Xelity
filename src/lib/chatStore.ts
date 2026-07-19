@@ -259,9 +259,11 @@ export function mergeChatStores(a: ChatStore, b: ChatStore): ChatStore {
   const aTs = a.updatedAt || 0;
   const bTs = b.updatedAt || 0;
   const preferActive = aTs >= bTs ? a : b;
+  // Папки берём у более нового стора целиком (включая []), иначе удалённые «воскресают»
+  const folders = Array.isArray(preferActive.folders) ? preferActive.folders : [];
   return {
     chats: [...byId.values()].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)),
-    folders: (preferActive.folders?.length ? preferActive.folders : a.folders?.length ? a.folders : b.folders) || [],
+    folders,
     activeId: preferActive.activeId ?? a.activeId ?? b.activeId ?? null,
     updatedAt: Math.max(aTs, bTs, Date.now()),
   };

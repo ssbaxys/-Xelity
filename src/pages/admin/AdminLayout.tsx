@@ -46,13 +46,17 @@ export default function AdminLayout() {
   }, []);
 
   useEffect(() => {
-    if (!navOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = prev;
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
     };
-  }, [navOpen]);
+  }, []);
 
   const shellClass = `admin-shell admin-theme-${brand.theme} admin-scroll ${
     isLight ? 'is-light' : ''
@@ -87,8 +91,8 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className={`${shellClass} min-h-dvh`} style={shellStyle}>
-      <header className="admin-header sticky top-0 z-40">
+    <div className={`${shellClass} flex h-dvh max-h-dvh flex-col overflow-hidden`} style={shellStyle}>
+      <header className="admin-header z-40 shrink-0">
         <div className="admin-header-inner">
           <div className="admin-header-brand">
             <NavLink to="/chat" className="admin-back-chat">
@@ -162,8 +166,11 @@ export default function AdminLayout() {
         )}
       </header>
 
-      <main className="admin-main">
-        <div key={location.pathname} className="admin-page min-w-0">
+      <main className="admin-main min-h-0 flex-1 overflow-hidden">
+        <div
+          key={location.pathname}
+          className="admin-page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+        >
           <Outlet />
         </div>
       </main>

@@ -52,6 +52,11 @@ import {
   readGuestUsage,
   writeChatMeta,
 } from '../lib/rtdb';
+import {
+  generateChatTitle,
+  inventChatTitle,
+  isDefaultChatTitle,
+} from '../lib/chatTitle';
 import AuthModal, { type AuthMode } from './AuthModal';
 import BroadcastBanner from './BroadcastBanner';
 import AssistantReply from './AssistantReply';
@@ -124,139 +129,8 @@ function loadStore(): Store {
   return loadLocalChatStore();
 }
 
-const STOP_WORDS = new Set([
-  'и',
-  'в',
-  'во',
-  'на',
-  'по',
-  'с',
-  'со',
-  'к',
-  'ко',
-  'у',
-  'о',
-  'об',
-  'от',
-  'до',
-  'за',
-  'из',
-  'для',
-  'при',
-  'про',
-  'а',
-  'но',
-  'или',
-  'как',
-  'что',
-  'это',
-  'этот',
-  'эта',
-  'эти',
-  'мне',
-  'меня',
-  'мой',
-  'моя',
-  'мои',
-  'пожалуйста',
-  'привет',
-  'здравствуйте',
-  'помоги',
-  'помогите',
-  'сделай',
-  'сделайте',
-  'напиши',
-  'напишите',
-  'расскажи',
-  'объясни',
-  'скажи',
-  'можно',
-  'нужно',
-  'хочу',
-  'хотел',
-  'хотела',
-  'бы',
-  'ли',
-  'же',
-  'то',
-  'не',
-  'да',
-  'нет',
-  'the',
-  'a',
-  'an',
-  'to',
-  'of',
-  'and',
-  'or',
-  'in',
-  'on',
-  'for',
-  'with',
-  'please',
-  'help',
-  'me',
-  'my',
-  'i',
-  'you',
-  'can',
-  'could',
-  'would',
-  'write',
-  'make',
-  'create',
-  'explain',
-]);
-
-/** ИИ-название чата по первому сообщению */
-function inventChatTitle(raw: string, modelId: ModelId): string {
-  let text = raw
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`]+`/g, ' ')
-    .replace(/https?:\/\/\S+/gi, ' ')
-    .replace(/[#>*_~\[\](){}]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!text) {
-    const fallback = MODELS.find((m) => m.id === modelId)?.name ?? 'Новый чат';
-    return fallback;
-  }
-
-  // Берём первое предложение / строку
-  const firstChunk = text.split(/[.!?\n]/)[0]?.trim() || text;
-
-  const words = firstChunk
-    .split(/\s+/)
-    .map((w) => w.replace(/^[^0-9A-Za-zА-Яа-яЁё]+|[^0-9A-Za-zА-Яа-яЁё]+$/g, ''))
-    .filter(Boolean);
-
-  const meaningful = words.filter((w) => !STOP_WORDS.has(w.toLowerCase()));
-  const picked = (meaningful.length >= 2 ? meaningful : words).slice(0, 6);
-
-  let title = picked.join(' ').trim();
-  if (!title) title = firstChunk.slice(0, 42).trim();
-
-  // Капитализация первой буквы
-  title = title.charAt(0).toUpperCase() + title.slice(1);
-
-  if (title.length > 48) {
-    title = `${title.slice(0, 45).trim()}…`;
-  }
-
-  if (modelId === 'xlaude-pro-k2' && !/pro|k2|архит|стратег|спец/i.test(title)) {
-    if (picked.length <= 4) title = `Pro: ${title}`;
-  } else if (modelId === 'xlaude-pro-k1' && !/про|задач|план|отчёт|документ/i.test(title)) {
-    if (picked.length <= 4) title = `Рабочий: ${title}`;
-  } else if (modelId === 'xlaude-mini-k2' && !/k2|разбор|анализ|обзор/i.test(title)) {
-    if (picked.length <= 4) title = `Разбор: ${title}`;
-  }
-
-  return title || 'Новый чат';
-}
-
 function isDefaultTitle(title: string) {
-  return title === 'Новый чат' || /^Чат\s+\d+$/i.test(title);
+  return isDefaultChatTitle(title);
 }
 
 function shouldAutoName(chat: ChatThread) {
@@ -368,6 +242,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [godControl, setGodControl] = useState<GodChatControl | null>(null);
   const [usageToday, setUsageToday] = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
+  const threadScrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatMenuRef = useRef<HTMLDivElement>(null);
   const userRef = useRef(user);
@@ -393,9 +268,13 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const persist = useCallback(
     (next: Store) => {
-      const stamped = { ...next, updatedAt: next.updatedAt ?? Date.now() };
+      const stamped = { ...next, updatedAt: Date.now() };
       setStore(stamped);
-      saveLocalChatStore(stamped);
+      try {
+        saveLocalChatStore(stamped);
+      } catch {
+        /* quota / private mode */
+      }
       if (user) {
         void saveUserChatStore(user.uid, stamped).catch(() => {
           /* offline / rules — локальная копия уже сохранена */
@@ -415,9 +294,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         if (!cur || (cur.draft || '') === clipped) return prev;
         const next = {
           ...prev,
+          updatedAt: Date.now(),
           chats: prev.chats.map((c) => (c.id === chatId ? { ...c, draft: clipped } : c)),
         };
-        saveLocalChatStore(next);
+        try {
+          saveLocalChatStore(next);
+        } catch {
+          /* ignore */
+        }
         const u = userRef.current;
         if (u) void saveUserChatStore(u.uid, next).catch(() => {});
         return next;
@@ -444,8 +328,12 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           chats = chats.map((c) => (c.id === prevId ? { ...c, draft } : c));
         }
       }
-      const next = { ...prev, chats, activeId: nextId };
-      saveLocalChatStore(next);
+      const next = { ...prev, chats, activeId: nextId, updatedAt: Date.now() };
+      try {
+        saveLocalChatStore(next);
+      } catch {
+        /* ignore */
+      }
       const u = userRef.current;
       if (u) void saveUserChatStore(u.uid, next).catch(() => {});
       return next;
@@ -542,7 +430,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   }, []);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const el = threadScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
   }, [active?.messages.length, sending, activeId]);
 
   useEffect(() => {
@@ -1006,7 +898,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     };
 
     const nameNow = shouldAutoName(active);
-    const invented = nameNow ? inventChatTitle(text, active.modelId) : active.title;
+    const quickTitle = nameNow ? inventChatTitle(text, active.modelId) : active.title;
     const historyForApi = [...active.messages, userMsg].map((m) => ({
       role: m.role,
       content: m.content,
@@ -1024,7 +916,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         c.id === chatId
           ? {
               ...c,
-              title: invented,
+              title: quickTitle,
               messages: [...c.messages, userMsg],
               updatedAt: Date.now(),
               draft: '',
@@ -1037,13 +929,44 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     setSending(true);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    if (nameNow) {
+      void generateChatTitle({ firstMessage: text, modelId })
+        .then((aiTitle) => {
+          setStore((prev) => {
+            const chat = prev.chats.find((c) => c.id === chatId);
+            if (!chat || chat.manualTitle) return prev;
+            // обновляем только «Новый чат» или наш быстрый эвристический заголовок
+            if (!isDefaultTitle(chat.title) && chat.title !== quickTitle) return prev;
+            if (chat.title === aiTitle) return prev;
+            const next = {
+              ...prev,
+              updatedAt: Date.now(),
+              chats: prev.chats.map((c) =>
+                c.id === chatId ? { ...c, title: aiTitle, updatedAt: Date.now() } : c,
+              ),
+            };
+            try {
+              saveLocalChatStore(next);
+            } catch {
+              /* ignore */
+            }
+            const u = userRef.current;
+            if (u) void saveUserChatStore(u.uid, next).catch(() => {});
+            return next;
+          });
+        })
+        .catch(() => {
+          /* остаётся quickTitle */
+        });
+    }
+
     // Не ждём в React: генерация допишет ответ в storage даже после ухода со страницы
     void generateAssistantInBackground({
       chatId,
       modelId,
       messages: historyForApi,
       maxTokens: plan.maxTokens,
-      titleIfNotManual: invented,
+      titleIfNotManual: quickTitle,
       firebaseUid: user?.uid ?? null,
       promptText: text,
       systemExtra: active.adminSystemPrompt,
@@ -1053,7 +976,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     }).finally(() => {
       setSending(isChatGenerating(chatId));
       if (user) {
-        void canSendMessage(user.uid, planId, 1).then((g) => setUsageToday(g.used));
+        void canSendMessage(user.uid, planId, 1).then((g) => setUsageToday(g.used)).catch(() => {});
       } else {
         setUsageToday(readGuestUsage().credits);
       }
@@ -1856,7 +1779,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           </div>
         ) : (
           <>
-            <div className="chat-thread-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+            <div
+              ref={threadScrollRef}
+              className="chat-thread-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+            >
               <div
                 className={`mx-auto flex min-h-full flex-col px-4 py-4 sm:px-6 ${
                   active.codingTools ? 'max-w-[640px]' : 'max-w-[720px]'

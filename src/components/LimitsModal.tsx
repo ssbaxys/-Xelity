@@ -22,54 +22,6 @@ type Props = {
   reasoning?: boolean;
 };
 
-function LimitSlider({
-  label,
-  value,
-  max,
-  hint,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  hint?: string;
-}) {
-  const safeMax = Math.max(1, max);
-  const clamped = Math.min(Math.max(0, value), safeMax);
-  const pct = Math.round((clamped / safeMax) * 100);
-  const low = pct >= 90;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[12px] font-medium text-[var(--c-text)]">{label}</p>
-        <p className={`text-[12px] tabular-nums ${low ? 'text-[#e57373]' : 'text-[var(--c-muted)]'}`}>
-          {clamped} / {max}
-          <span className="ml-1 text-[10px] text-[var(--c-faint)]">({pct}%)</span>
-        </p>
-      </div>
-      <div className="relative h-2 overflow-hidden rounded-full bg-[var(--c-soft)]">
-        <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out ${
-            low ? 'bg-[#e57373]' : 'bg-[#c62828]'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={safeMax}
-        value={clamped}
-        readOnly
-        tabIndex={-1}
-        aria-valuetext={`${clamped} из ${max}`}
-        className="limits-range w-full"
-      />
-      {hint && <p className="text-[11px] text-[var(--c-faint)]">{hint}</p>}
-    </div>
-  );
-}
-
 export default function LimitsModal({
   open,
   onClose,
@@ -92,18 +44,29 @@ export default function LimitsModal({
 
   useEffect(() => {
     if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   const limit = plan.creditsPerDay;
-  const remaining = limit == null ? null : Math.max(0, limit - usedToday);
+  const used = Math.max(0, usedToday);
+  const remaining = limit == null ? null : Math.max(0, limit - used);
+  const pct =
+    limit == null || limit <= 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
+  const exhausted = remaining === 0;
+  const low = remaining != null && remaining > 0 && pct >= 14;
   const model = MODELS.find((m) => m.id === modelId);
+  const canAffordNext = remaining == null || remaining >= answerCost;
 
   return createPortal(
     <div className="fixed inset-0 z-[90] flex items-end justify-center p-3 sm:items-center sm:p-4">
@@ -117,74 +80,106 @@ export default function LimitsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="limits-title"
-        className="ui-sheet relative z-10 flex max-h-[min(92vh,640px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] shadow-2xl"
+        className="ui-sheet relative z-10 flex max-h-[min(90dvh,36rem)] w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-panel)] shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3.5">
-          <div>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3.5">
+          <div className="min-w-0">
             <h2 id="limits-title" className="text-[15px] font-semibold text-[var(--c-text)]">
               Лимиты
             </h2>
-            <p className="mt-0.5 text-[12px] text-[var(--c-muted)]">
+            <p className="mt-0.5 truncate text-[12px] text-[var(--c-muted)]">
               {plan.name} · {formatLimit(plan)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--c-faint)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--c-faint)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
             aria-label="Закрыть"
           >
             <IconClose className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-5 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
           {limit != null ? (
-            <>
-              <LimitSlider
-                label="Кредиты сегодня"
-                value={usedToday}
-                max={limit}
-                hint={
-                  remaining === 0
-                    ? 'Лимит на сегодня исчерпан — подождите сброса или смените тариф.'
-                    : `Осталось ${remaining} кр. до сброса.`
-                }
-              />
-              <LimitSlider
-                label="Остаток на сегодня"
-                value={remaining ?? 0}
-                max={limit}
-                hint={`${formatLimit(plan)} · использовано ${usedToday} кр.`}
-              />
-            </>
+            <div className="space-y-2.5">
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--c-faint)]">
+                    Сегодня
+                  </p>
+                  <p
+                    className={`mt-0.5 text-[22px] font-semibold tabular-nums leading-none ${
+                      exhausted ? 'text-[#e57373]' : 'text-[var(--c-text)]'
+                    }`}
+                  >
+                    {remaining}
+                    <span className="text-[14px] font-normal text-[var(--c-muted)]">
+                      {' '}
+                      / {limit} кр.
+                    </span>
+                  </p>
+                </div>
+                <p className="text-[11px] tabular-nums text-[var(--c-faint)]">
+                  использовано {used}
+                </p>
+              </div>
+              <div
+                className="h-2 overflow-hidden rounded-full bg-[var(--c-soft)]"
+                role="progressbar"
+                aria-valuenow={used}
+                aria-valuemin={0}
+                aria-valuemax={limit}
+                aria-label="Использование кредитов"
+              >
+                <div
+                  className={`h-full rounded-full transition-[width] duration-500 ease-out ${
+                    exhausted ? 'bg-[#e57373]' : low ? 'bg-[#ef9a9a]' : 'bg-[#c62828]'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <p className="text-[12px] text-[var(--c-muted)]">
+                {exhausted
+                  ? 'Лимит на сегодня исчерпан. Сброс в 00:00 или смена тарифа.'
+                  : !canAffordNext
+                    ? `Для следующего ответа нужно ${answerCost} кр., осталось ${remaining}.`
+                    : `Осталось ${remaining} кр. до сброса.`}
+              </p>
+            </div>
           ) : (
-            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-3 py-2.5 text-[12px] text-[var(--c-muted)]">
-              Сегодня использовано {usedToday} кр. · без дневного потолка
+            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/70 px-3 py-3">
+              <p className="text-[13px] font-medium text-[var(--c-text)]">Без дневного потолка</p>
+              <p className="mt-1 text-[12px] text-[var(--c-muted)]">
+                Сегодня использовано {used} кр.
+              </p>
             </div>
           )}
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/60 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--c-faint)]">Следующий ответ</p>
-              <p className="mt-1 text-[13px] font-medium text-[var(--c-text)]">−{answerCost} кр.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/50 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--c-faint)]">
+                След. ответ
+              </p>
+              <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--c-text)]">
+                −{answerCost} кр.
+              </p>
               <p className="mt-0.5 truncate text-[11px] text-[var(--c-faint)]">
-                {model
-                  ? `${model.name}${reasoning ? ' · рассуждения' : ''}`
-                  : 'текущая модель'}
+                {model ? `${model.tab}${reasoning ? ' · мысли' : ''}` : 'модель'}
               </p>
             </div>
-            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/60 px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[var(--c-faint)]">Сброс кредитов</p>
-              <p className="mt-1 text-[13px] font-medium tabular-nums text-[var(--c-text)]">
-                через {formatCountdown(Math.max(0, resetLeft))}
+            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/50 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--c-faint)]">Сброс</p>
+              <p className="mt-1 text-[14px] font-semibold tabular-nums text-[var(--c-text)]">
+                {formatCountdown(Math.max(0, resetLeft))}
               </p>
-              <p className="mt-0.5 text-[11px] text-[var(--c-faint)]">каждый день в 00:00</p>
+              <p className="mt-0.5 text-[11px] text-[var(--c-faint)]">каждый день 00:00</p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/60 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--c-faint)]">Подписка</p>
+          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)]/50 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--c-faint)]">Подписка</p>
             {planExpiresAt ? (
               <>
                 <p className="mt-1 text-[13px] font-medium text-[var(--c-text)]">
@@ -194,33 +189,42 @@ export default function LimitsModal({
                   до {new Date(planExpiresAt).toLocaleString('ru-RU')}
                 </p>
               </>
+            ) : plan.id === 'free' ? (
+              <p className="mt-1 text-[13px] text-[var(--c-muted)]">Бесплатный тариф без срока</p>
             ) : (
-              <p className="mt-1 text-[13px] text-[var(--c-muted)]">Бессрочный Free</p>
+              <p className="mt-1 text-[13px] text-[var(--c-muted)]">Срок не задан</p>
             )}
           </div>
 
           <div>
-            <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--c-faint)]">
+            <p className="mb-1.5 text-[10px] uppercase tracking-wide text-[var(--c-faint)]">
               Стоимость моделей
             </p>
-            <ul className="space-y-1.5">
-              {MODELS.map((m) => (
-                <li
-                  key={m.id}
-                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[12px] text-[var(--c-muted)] hover:bg-[var(--c-hover)]"
-                >
-                  <span className="text-[var(--c-text)]">{m.name}</span>
-                  <span className="tabular-nums text-[var(--c-faint)]">
-                    {creditCostForRequest(m.id, false)} / {creditCostForRequest(m.id, true)} кр.
-                  </span>
-                </li>
-              ))}
+            <ul className="divide-y divide-[var(--c-border)] rounded-xl border border-[var(--c-border)] overflow-hidden">
+              {MODELS.map((m) => {
+                const active = m.id === modelId;
+                return (
+                  <li
+                    key={m.id}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 text-[12px] ${
+                      active ? 'bg-[var(--c-soft)]' : ''
+                    }`}
+                  >
+                    <span className={active ? 'font-medium text-[var(--c-text)]' : 'text-[var(--c-muted)]'}>
+                      {m.name}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[var(--c-faint)]">
+                      {creditCostForRequest(m.id, false)}/{creditCostForRequest(m.id, true)} кр.
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-1.5 text-[10px] text-[var(--c-faint)]">обычный / с рассуждениями</p>
           </div>
         </div>
 
-        <div className="flex gap-2 border-t border-[var(--c-border)] px-4 py-3">
+        <div className="flex shrink-0 gap-2 border-t border-[var(--c-border)] px-4 py-3">
           <button
             type="button"
             onClick={onClose}
@@ -233,7 +237,7 @@ export default function LimitsModal({
             onClick={onClose}
             className="flex-1 rounded-xl bg-[#c62828] px-3 py-2.5 text-center text-[13px] font-semibold text-white transition hover:brightness-110"
           >
-            Тарифы
+            {exhausted || !canAffordNext ? 'Повысить тариф' : 'Тарифы'}
           </Link>
         </div>
       </div>

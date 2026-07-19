@@ -3321,6 +3321,9 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   animation: admin-fade-up 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -3624,19 +3627,16 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-split-pane {
   display: flex;
   flex-direction: column;
-  max-height: min(78vh, calc(100dvh - 9.5rem));
-  min-height: 16rem;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  overflow: hidden;
 }
 
 @media (max-width: 1023px) {
   .admin-split-list.is-hidden-mobile,
   .admin-split-detail.is-hidden-mobile {
     display: none !important;
-  }
-
-  .admin-split-pane {
-    max-height: min(82vh, calc(100dvh - 8.5rem));
-    min-height: 18rem;
   }
 }
 
@@ -3667,19 +3667,35 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-main {
+  display: flex;
+  flex-direction: column;
   margin: 0 auto;
+  width: 100%;
   min-width: 0;
   max-width: 80rem;
   padding: 1rem 0.75rem;
-  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
   padding-left: max(0.75rem, env(safe-area-inset-left));
   padding-right: max(0.75rem, env(safe-area-inset-right));
 }
 
+.admin-page--fill {
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+}
+
+.admin-page--fill .admin-split {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  align-items: stretch;
+}
+
 @media (min-width: 640px) {
   .admin-main {
-    padding: 1.5rem 1rem;
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding: 1.25rem 1rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 
@@ -4249,7 +4265,7 @@ html[data-theme='light'] .weather-card {
   animation: broadcast-fade-in 0.28s ease both;
 }
 
-/* ?????? ?????? scrim ? ?? bg-ink (? dark ???? ink ??????? ? «???????????») */
+/* ?????? ?????? scrim ? ?? bg-ink (? dark ???? ink ??????? ? ?????????????) */
 .broadcast-scrim {
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(3px);

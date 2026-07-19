@@ -372,8 +372,14 @@ export default function AdminChats() {
   const folders = store?.folders || [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div
+      className={
+        step === 'thread'
+          ? 'admin-page--fill flex min-h-0 flex-1 flex-col gap-3'
+          : 'flex min-h-0 flex-1 flex-col gap-3'
+      }
+    >
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">
             {godMode ? (
@@ -463,7 +469,7 @@ export default function AdminChats() {
                   { value: 'hasChats', label: 'Есть чаты' },
                   { value: 'banned', label: 'Забанены' },
                   { value: 'muted', label: 'Мут' },
-                  { value: 'staff', label: 'Staff' },
+                  { value: 'staff', label: 'Персонал' },
                 ]}
                 onChange={(v) => setFilterFlag(v as typeof filterFlag)}
                 className="w-full"
@@ -589,8 +595,8 @@ export default function AdminChats() {
 
       {/* ——— Шаг C: история (+ god UI) ——— */}
       {step === 'thread' && thread && (
-        <div className="space-y-3">
-          <div className="admin-panel flex flex-wrap items-center justify-between gap-2 p-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+          <div className="admin-panel flex shrink-0 flex-wrap items-center justify-between gap-2 p-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{thread.title || 'Без названия'}</p>
               <p className="text-[11px] text-[var(--a-faint)]">
@@ -616,7 +622,7 @@ export default function AdminChats() {
           </div>
 
           {godMode && (
-            <div className="admin-panel space-y-3 p-3 text-xs text-[var(--a-muted)]">
+            <div className="admin-panel max-h-[min(42%,22rem)] shrink-0 space-y-3 overflow-y-auto overscroll-contain p-3 text-xs text-[var(--a-muted)]">
               <div>
                 <p className="font-medium text-[var(--a-strong)]">Инструменты чата</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -720,7 +726,7 @@ export default function AdminChats() {
             </div>
           )}
 
-          <div className="admin-panel max-h-[min(60vh,32rem)] space-y-3 overflow-y-auto p-3 sm:p-4">
+          <div className="admin-panel min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-4">
             {thread.messages.map((m) => (
               <div
                 key={m.id}
