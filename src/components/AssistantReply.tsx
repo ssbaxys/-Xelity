@@ -31,18 +31,21 @@ export default function AssistantReply({
   const thinking = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
 
   const [dotsExit, setDotsExit] = useState(false);
-  const [showDots, setShowDots] = useState(!hasContent);
+  // точки только пока ждём ответ без блока мыслей
+  const [showDots, setShowDots] = useState(!hasContent && !hasReasoning && !thinking);
   const [showAnswer, setShowAnswer] = useState(hasContent && !live);
   const [animateAnswer, setAnimateAnswer] = useState(false);
   const seenRef = useRef<string | null>(hasContent && !live ? content : null);
 
   useEffect(() => {
-    if (hasContent || hasReasoning) {
+    // мысли / ответ уже на экране — точки не нужны
+    if (hasContent || hasReasoning || thinking) {
       setDotsExit(true);
-      const t = window.setTimeout(() => setShowDots(false), 280);
+      const t = window.setTimeout(() => setShowDots(false), 180);
       return () => window.clearTimeout(t);
     }
-    if (live || thinking) {
+    // обычная генерация без reasoning: ждём контент
+    if (live) {
       setShowDots(true);
       setDotsExit(false);
     }
@@ -87,7 +90,7 @@ export default function AssistantReply({
         />
       )}
 
-      {showDots && !hasContent && !hasReasoning && (
+      {showDots && !hasContent && !hasReasoning && !thinking && (
         <div className="mt-1 min-h-[1.5rem]">
           <TypingDots exiting={dotsExit} />
         </div>
