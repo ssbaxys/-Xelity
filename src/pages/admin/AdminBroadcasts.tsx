@@ -15,6 +15,7 @@ import {
   type Broadcast,
   type BroadcastKind,
 } from '../../lib/rtdb';
+import AdminSelect from './AdminSelect';
 
 type WrapKind = 'bold' | 'italic' | 'code' | 'link' | 'h2' | 'ul' | 'quote';
 
@@ -156,20 +157,15 @@ export default function AdminBroadcasts() {
 
       <form onSubmit={onSubmit} className="admin-panel space-y-4 p-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-[var(--a-muted)]">
-            Тип
-            <select
+          <div className="block text-xs text-[var(--a-muted)]">
+            <span className="mb-1 block">Тип</span>
+            <AdminSelect
               value={kind}
-              onChange={(e) => setKind(e.target.value as BroadcastKind)}
-              className="mt-1 w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
-            >
-              {KIND_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={KIND_OPTIONS}
+              onChange={(v) => setKind(v)}
+              className="w-full"
+            />
+          </div>
           <label className="block text-xs text-[var(--a-muted)]">
             Подпись (eyebrow)
             <input
