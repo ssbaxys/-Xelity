@@ -1,0 +1,10 @@
+[Unit]
+Description=Xelity pull & update from GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+# update.sh сам делает fetch/pull/npm/restart при необходимости
+ExecStart=/bin/bash /opt/xelity/deploy/update.sh

@@ -209,6 +209,12 @@ show_status() {
   else
     c_warn "$(systemctl is-active "${SERVICE}" 2>/dev/null || echo stopped)"
   fi
+  echo -n "Автообн.:  "
+  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+    c_ok "on (каждые 2 мин)"
+  else
+    c_warn "off"
+  fi
   local port
   port=$(get_env PORT)
   port=${port:-8088}
@@ -271,6 +277,53 @@ set_port() {
 do_update() {
   need_root
   bash "${APP_DIR}/deploy/update.sh"
+}
+
+autoupdate_status() {
+  echo
+  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+    c_ok "Автообновление: включено (каждые 2 мин)"
+  else
+    c_warn "Автообновление: выключено"
+  fi
+  if [[ -f /etc/xelity-autoupdate.disabled ]]; then
+    c_warn "Флаг: /etc/xelity-autoupdate.disabled (не включать автоматически)"
+  fi
+  systemctl --no-pager --full status xelity-autoupdate.timer 2>/dev/null || true
+  echo
+  echo "Последний прогон:"
+  systemctl --no-pager --full status xelity-autoupdate.service 2>/dev/null | head -n 20 || true
+}
+
+autoupdate_on() {
+  need_root
+  if [[ ! -f "${APP_DIR}/deploy/xelity-autoupdate.timer" ]]; then
+    c_err "Нет файлов таймера — сначала: пункт 7 (обновить с GitHub)"
+    return
+  fi
+  install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.service" /etc/systemd/system/xelity-autoupdate.service
+  install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
+  rm -f /etc/xelity-autoupdate.disabled
+  systemctl daemon-reload
+  systemctl enable --now xelity-autoupdate.timer
+  c_ok "Автообновление включено"
+  autoupdate_status
+}
+
+autoupdate_off() {
+  need_root
+  systemctl disable --now xelity-autoupdate.timer 2>/dev/null || true
+  touch /etc/xelity-autoupdate.disabled
+  c_ok "Автообновление выключено"
+}
+
+toggle_autoupdate() {
+  need_root
+  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+    autoupdate_off
+  else
+    autoupdate_on
+  fi
 }
 
 test_chat() {
@@ -359,6 +412,7 @@ menu() {
     echo " 10) Открыть .env в редакторе"
     echo " 11) Включить HTTPS (api.xelity.ru) — нужно для сайта на https"
     echo " 12) Firebase Admin (service account) — доверие серверу, не клиенту"
+    echo " 13) Автообновление с GitHub (вкл/выкл)"
     echo "  0) Выход"
     echo
     choice=$(ask "Выбор: ")
@@ -375,6 +429,7 @@ menu() {
       10) edit_env ;;
       11) need_root; bash "${APP_DIR}/deploy/setup-https.sh" ;;
       12) install_firebase_sa ;;
+      13) toggle_autoupdate ;;
       0|q|Q) exit 0 ;;
       *) c_warn "Неизвестный пункт" ;;
     esac
@@ -383,7 +438,7 @@ menu() {
   done
 }
 
-# non-interactive shortcuts: ai-tool status|restart|stop|start|update|check
+# non-interactive: ai-tool status|restart|stop|start|update|check|autoupdate …
 cmd="${1:-}"
 case "${cmd}" in
   "") menu ;;
@@ -400,9 +455,20 @@ case "${cmd}" in
   stop) need_root; systemctl stop "${SERVICE}"; show_status ;;
   restart) need_root; systemctl restart "${SERVICE}"; show_status ;;
   update) do_update ;;
+  autoupdate)
+    case "${2:-status}" in
+      on|enable) autoupdate_on ;;
+      off|disable) autoupdate_off ;;
+      status|"") autoupdate_status ;;
+      *)
+        echo "Usage: ai-tool autoupdate [on|off|status]"
+        exit 1
+        ;;
+    esac
+    ;;
   menu) menu ;;
   *)
-    echo "Usage: ai-tool [status|check|start|stop|restart|update|menu]"
+    echo "Usage: ai-tool [status|check|start|stop|restart|update|autoupdate|menu]"
     exit 1
     ;;
 esac

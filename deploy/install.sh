@@ -152,6 +152,8 @@ id -u www-data >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /
 chown -R www-data:www-data "${APP_DIR}"
 
 install -m 644 "${APP_DIR}/deploy/xelity.service" /etc/systemd/system/xelity.service
+install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.service" /etc/systemd/system/xelity-autoupdate.service
+install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
 install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
 
 # firewall if ufw active
@@ -161,6 +163,8 @@ fi
 
 systemctl daemon-reload
 systemctl enable xelity
+systemctl enable --now xelity-autoupdate.timer
+rm -f /etc/xelity-autoupdate.disabled
 systemctl restart xelity
 sleep 1
 
@@ -172,6 +176,7 @@ systemctl --no-pager --full status xelity || true
 echo
 echo " Меню настроек:  sudo ai-tool"
 echo " Статус:         sudo ai-tool status"
+echo " Автообновление: sudo ai-tool autoupdate status"
 echo " Порт API:       ${PORT_VAL}"
 echo " Render env:     VITE_API_BASE_URL=http://IP_VPS:${PORT_VAL}"
 echo "══════════════════════════════════════"

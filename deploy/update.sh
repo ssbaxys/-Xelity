@@ -11,6 +11,13 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+# не запускать параллельно (таймер + ручной ai-tool update)
+exec 9>/var/lock/xelity-update.lock
+if ! flock -n 9; then
+  echo "Уже идёт обновление — пропуск."
+  exit 0
+fi
+
 git config --global --add safe.directory "${APP_DIR}"
 cd "${APP_DIR}"
 chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
@@ -21,13 +28,26 @@ git -c safe.directory="${APP_DIR}" fetch origin "${BRANCH}"
 OLD_HEAD="$(git -c safe.directory="${APP_DIR}" rev-parse HEAD)"
 NEW_HEAD="$(git -c safe.directory="${APP_DIR}" rev-parse "origin/${BRANCH}")"
 
+ensure_cli_and_timer() {
+  if [[ -f "${APP_DIR}/deploy/ai-tool" ]]; then
+    install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
+  fi
+  if [[ -f "${APP_DIR}/deploy/xelity-autoupdate.service" && -f "${APP_DIR}/deploy/xelity-autoupdate.timer" ]]; then
+    install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.service" /etc/systemd/system/xelity-autoupdate.service
+    install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
+    systemctl daemon-reload
+    if [[ ! -f /etc/xelity-autoupdate.disabled ]]; then
+      if ! systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+        systemctl enable --now xelity-autoupdate.timer
+        echo ">> autoupdate timer включён (каждые 2 мин)"
+      fi
+    fi
+  fi
+}
+
 if [[ "${OLD_HEAD}" == "${NEW_HEAD}" ]]; then
   echo "Уже актуально (${OLD_HEAD:0:7}). Нечего обновлять."
-  # на всякий случай поставим cli, если пропал
-  if [[ ! -x /usr/local/bin/ai-tool && -f "${APP_DIR}/deploy/ai-tool" ]]; then
-    install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
-    echo "Восстановлен /usr/local/bin/ai-tool"
-  fi
+  ensure_cli_and_timer
   exit 0
 fi
 
@@ -72,7 +92,7 @@ if path_match '^deploy/ai-tool$'; then
   need_cli=1
 fi
 
-if path_match '^deploy/xelity\.service$'; then
+if path_match '^deploy/(xelity\.service|xelity-autoupdate\.(service|timer))$'; then
   need_unit=1
 fi
 
@@ -112,10 +132,15 @@ if [[ ${need_cli} -eq 1 || ! -x /usr/local/bin/ai-tool ]]; then
 fi
 
 if [[ ${need_unit} -eq 1 ]]; then
-  echo ">> systemd unit"
+  echo ">> systemd units"
   install -m 644 "${APP_DIR}/deploy/xelity.service" /etc/systemd/system/xelity.service
-  systemctl daemon-reload
   need_restart=1
+fi
+
+# всегда синхронизируем таймер автообновления
+ensure_cli_and_timer
+if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+  systemctl restart xelity-autoupdate.timer || true
 fi
 
 chown -R www-data:www-data "${APP_DIR}"

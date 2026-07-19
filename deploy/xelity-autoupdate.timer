@@ -1,0 +1,13 @@
+[Unit]
+Description=Xelity auto-update from GitHub (every 2 min)
+After=network-online.target
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Persistent=true
+Unit=xelity-autoupdate.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,54 @@
+# Мгновенный деплой API на VPS после push в main.
+# Нужны secrets репозитория:
+#   VPS_HOST      — IP или hostname
+#   VPS_USER      — обычно root
+#   VPS_SSH_KEY   — private key (весь PEM)
+# Без secrets job просто пропускается (остаётся systemd-таймер на VPS).
+name: Deploy VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'server.ts'
+      - 'src/lib/models.ts'
+      - 'src/lib/plans.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'deploy/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SSH secrets
+        id: check
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_SSH_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Secrets VPS_HOST / VPS_SSH_KEY не заданы — пропуск. На VPS работает таймер xelity-autoupdate."
+          fi
+
+      - name: SSH update
+        if: steps.check.outputs.ready == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER != '' && secrets.VPS_USER || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            if [[ -x /usr/local/bin/ai-tool ]]; then
+              /usr/local/bin/ai-tool update
+            else
+              bash /opt/xelity/deploy/update.sh
+            fi
