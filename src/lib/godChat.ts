@@ -1,5 +1,6 @@
 import { get, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
 import { database } from './firebase';
+import { normalizePrankIds, type GodPrankId } from './godPranks';
 
 export type GodChatMode = 'auto' | 'auto_manual' | 'manual' | 'admin';
 
@@ -16,6 +17,10 @@ export type GodChatControl = {
   queueReason?: string | null;
   heldAssistantId?: string | null;
   pendingJobId?: string | null;
+  /** Системный промпт поверх остальных (режим бога) */
+  godSystemPrompt?: string | null;
+  /** Активные троллинг-механики */
+  pranks?: GodPrankId[];
 };
 
 export const GOD_MODE_OPTIONS: { value: GodChatMode; label: string; hint: string }[] = [
@@ -25,12 +30,12 @@ export const GOD_MODE_OPTIONS: { value: GodChatMode; label: string; hint: string
     label: 'Авто + ручной',
     hint: '5 сек на перехват перед генерацией',
   },
-  { value: 'manual', label: 'Ручной', hint: 'Только ответ Owner, чат в очереди' },
+  { value: 'manual', label: 'Ручной', hint: 'Только ответ владельца, чат в очереди' },
   { value: 'admin', label: 'Админ', hint: 'Ответы от лица администрации' },
 ];
 
 export function defaultGodControl(mode: GodChatMode = 'auto'): GodChatControl {
-  return { mode, updatedAt: Date.now() };
+  return { mode, updatedAt: Date.now(), pranks: [], godSystemPrompt: null };
 }
 
 export function normalizeGodControl(raw: unknown): GodChatControl {
@@ -48,6 +53,9 @@ export function normalizeGodControl(raw: unknown): GodChatControl {
     queueReason: v.queueReason ?? null,
     heldAssistantId: v.heldAssistantId ?? null,
     pendingJobId: v.pendingJobId ?? null,
+    godSystemPrompt:
+      typeof v.godSystemPrompt === 'string' ? v.godSystemPrompt.slice(0, 8000) : null,
+    pranks: normalizePrankIds(v.pranks),
   };
 }
 
@@ -81,14 +89,51 @@ export async function setGodChatMode(
     mode,
     updatedAt: Date.now(),
     queueActive: mode === 'manual' || mode === 'admin' ? prev.queueActive : false,
-    queueReason:
-      mode === 'manual' || mode === 'admin' ? prev.queueReason : null,
+    queueReason: mode === 'manual' || mode === 'admin' ? prev.queueReason : null,
     interceptUntil: null,
     interceptDecision: null,
     heldAssistantId: null,
     pendingJobId: null,
   };
   await set(ref(database, `godChatControl/${uid}/${chatId}`), next);
+}
+
+export async function setGodSystemPrompt(
+  uid: string,
+  chatId: string,
+  prompt: string | null,
+): Promise<void> {
+  const prev = await fetchGodChatControl(uid, chatId);
+  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
+    ...prev,
+    godSystemPrompt: (prompt || '').trim().slice(0, 8000) || null,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function setGodPranks(
+  uid: string,
+  chatId: string,
+  pranks: GodPrankId[],
+): Promise<void> {
+  const prev = await fetchGodChatControl(uid, chatId);
+  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
+    ...prev,
+    pranks: normalizePrankIds(pranks),
+    updatedAt: Date.now(),
+  });
+}
+
+export async function toggleGodPrank(
+  uid: string,
+  chatId: string,
+  prankId: GodPrankId,
+): Promise<void> {
+  const prev = await fetchGodChatControl(uid, chatId);
+  const cur = new Set(prev.pranks || []);
+  if (cur.has(prankId)) cur.delete(prankId);
+  else cur.add(prankId);
+  await setGodPranks(uid, chatId, [...cur]);
 }
 
 export async function beginInterceptWindow(params: {
@@ -185,4 +230,17 @@ export async function waitForInterceptDecision(
       if (Date.now() >= until) finish('skip');
     }, 150);
   });
+}
+
+/** Склеить god-промпт поверх thread/admin system extra */
+export function composeGodSystemExtra(
+  base: string | null | undefined,
+  godPrompt: string | null | undefined,
+): string | null {
+  const a = (base || '').trim();
+  const b = (godPrompt || '').trim();
+  if (!a && !b) return null;
+  if (!b) return a;
+  if (!a) return `[Инструкция владельца — приоритет]\n${b}`;
+  return `[Инструкция владельца — поверх остального]\n${b}\n\n${a}`;
 }

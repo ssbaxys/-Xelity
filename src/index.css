@@ -4505,3 +4505,276 @@ html[data-theme='light'] .broadcast-banner-hero {
     opacity: 0.3;
   }
 }
+
+/* ??? God prank effects ??? */
+.god-prank-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+}
+
+.god-prank-banner {
+  position: absolute;
+  left: 50%;
+  top: max(0.75rem, env(safe-area-inset-top));
+  z-index: 2;
+  max-width: min(92vw, 28rem);
+  transform: translateX(-50%);
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  animation: god-prank-fade 0.45s ease both;
+}
+
+.god-prank-banner--fsb {
+  background: #1a2a1a;
+  color: #b8f0b8;
+  border: 1px solid #3d6b3d;
+}
+
+.god-prank-banner--fbi {
+  background: #0f1a33;
+  color: #c5d4ff;
+  border: 1px solid #3a5080;
+}
+
+.god-prank-banner--offline {
+  background: #2a1212;
+  color: #ffb4b4;
+  border: 1px solid #6b3030;
+}
+
+.god-prank-banner--review {
+  top: auto;
+  bottom: max(5.5rem, env(safe-area-inset-bottom));
+  background: #2a2410;
+  color: #ffe08a;
+  border: 1px solid #6b5a20;
+}
+
+.god-prank-typing {
+  position: absolute;
+  left: 1rem;
+  bottom: max(6.5rem, env(safe-area-inset-bottom));
+  z-index: 2;
+  border-radius: 999px;
+  background: rgba(20, 15, 15, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.75rem;
+  font-size: 12px;
+  color: #c9b8b8;
+  animation: god-prank-pulse 1.2s ease-in-out infinite;
+}
+
+.god-prank-nuke {
+  position: absolute;
+  right: 1rem;
+  top: max(3.5rem, env(safe-area-inset-top));
+  z-index: 2;
+  border-radius: 0.5rem;
+  background: #4a1010;
+  color: #ff8a80;
+  border: 1px solid #8e1b1b;
+  padding: 0.4rem 0.7rem;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.god-prank-toast {
+  position: absolute;
+  left: 50%;
+  bottom: max(8rem, env(safe-area-inset-bottom));
+  z-index: 3;
+  transform: translateX(-50%);
+  border-radius: 0.75rem;
+  background: #c62828;
+  color: #fff;
+  padding: 0.55rem 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  animation: god-prank-fade 0.35s ease both;
+}
+
+.god-prank-matrix {
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 70, 0.08) 2px,
+      rgba(0, 255, 70, 0.08) 4px
+    );
+  animation: god-prank-matrix 2.4s linear infinite;
+  pointer-events: none;
+}
+
+.god-prank-double {
+  position: absolute;
+  inset: 8% 6%;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  opacity: 0.25;
+  transform: translate(6px, 4px);
+  pointer-events: none;
+}
+
+.god-prank-confetti {
+  position: absolute;
+  top: -8px;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  background: hsl(calc(var(--h, 20) * 1deg), 80%, 55%);
+  animation: god-prank-fall 1.5s ease-in forwards;
+}
+
+.god-prank-confetti:nth-child(odd) {
+  --h: 40;
+  background: #c62828;
+}
+.god-prank-confetti:nth-child(even) {
+  --h: 200;
+  background: #e09f3e;
+}
+
+.god-prank-emoji {
+  position: absolute;
+  top: -1.5rem;
+  font-size: 1.25rem;
+  animation: god-prank-fall 2.2s linear forwards;
+}
+
+.god-prank-cursor-dot {
+  position: fixed;
+  z-index: 200;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 999px;
+  background: rgba(198, 40, 40, 0.55);
+  pointer-events: none;
+  animation: god-prank-fade 0.7s ease forwards;
+}
+
+.god-prank-compose-mirror {
+  direction: rtl;
+  unicode-bidi: bidi-override;
+  text-align: left;
+}
+
+.chat-app.god-prank--visual_lag {
+  animation: god-prank-jitter 2.8s steps(2, end) infinite;
+}
+.chat-app.god-prank--visual_lag * {
+  transition-duration: 0.55s !important;
+}
+
+.chat-app.god-prank--scroll_stutter .chat-thread-scroll {
+  animation: god-prank-scroll-jump 3.2s ease-in-out infinite;
+}
+
+.chat-app.god-prank--invert_colors {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.chat-app.god-prank--blur_messages .assistant-answer-wrap,
+.chat-app.god-prank--blur_messages .chat-md {
+  filter: blur(3.5px);
+}
+
+.chat-app.god-prank--mirror_ui {
+  transform: scaleX(-1);
+}
+.chat-app.god-prank--mirror_ui .god-prank-layer {
+  transform: scaleX(-1);
+}
+
+.chat-app.god-prank--tiny_text {
+  font-size: 10px !important;
+}
+.chat-app.god-prank--giant_text .chat-thread-scroll {
+  font-size: 1.45rem;
+  line-height: 1.35;
+}
+
+.chat-app.god-prank--whisper_mode .anim-msg {
+  opacity: 0.28;
+}
+
+@keyframes god-prank-fade {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes god-prank-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes god-prank-jitter {
+  0%,
+  90%,
+  100% {
+    transform: none;
+  }
+  92% {
+    transform: translate(1px, 0);
+  }
+  94% {
+    transform: translate(-1px, 1px);
+  }
+  96% {
+    transform: translate(0, -1px);
+  }
+}
+
+@keyframes god-prank-scroll-jump {
+  0%,
+  70%,
+  100% {
+    scroll-behavior: auto;
+  }
+  72% {
+    transform: translateY(4px);
+  }
+  74% {
+    transform: translateY(-8px);
+  }
+  76% {
+    transform: none;
+  }
+}
+
+@keyframes god-prank-matrix {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 40px;
+  }
+}
+
+@keyframes god-prank-fall {
+  to {
+    transform: translateY(110vh) rotate(220deg);
+    opacity: 0;
+  }
+}

@@ -24,6 +24,7 @@ import { extractTextualToolCalls } from './parseTextToolCalls';
 import {
   beginInterceptWindow,
   clearGodHold,
+  composeGodSystemExtra,
   fetchGodChatControl,
   setGodQueue,
   waitForInterceptDecision,
@@ -461,10 +462,12 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
   const run = (async () => {
     const assistantId = uid('ai');
     const thinkStarted = Date.now();
+    let systemExtra = params.systemExtra ?? null;
     try {
       // ——— God Mode: manual / admin / auto_manual intercept ———
       if (params.firebaseUid) {
         const control = await fetchGodChatControl(params.firebaseUid, params.chatId);
+        systemExtra = composeGodSystemExtra(systemExtra, control.godSystemPrompt);
 
         if (control.mode === 'manual' || control.mode === 'admin') {
           const loadKind = 'queue' as const;
@@ -602,7 +605,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             },
           ],
           maxTokens: Math.min(1024, params.maxTokens),
-          systemExtra: params.systemExtra,
+          systemExtra,
           reasoningPhase: 'think',
           reasoning: true,
         });
@@ -641,7 +644,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           modelId: params.modelId,
           messages: answerMessages,
           maxTokens: params.maxTokens,
-          systemExtra: params.systemExtra,
+          systemExtra,
           reasoning: true,
           reasoningPhase: 'answer',
           codingTools: params.codingTools,
@@ -705,7 +708,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         modelId: params.modelId,
         messages: params.messages,
         maxTokens: params.maxTokens,
-        systemExtra: params.systemExtra,
+        systemExtra,
         reasoning: false,
         codingTools: params.codingTools,
         webTools: params.webTools,

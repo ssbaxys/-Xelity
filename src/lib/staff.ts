@@ -21,9 +21,9 @@ export type StaffPermission =
   | 'credits.bypass';
 
 export type StaffBrand = {
-  /** Короткий ярлык в шапке: HELPER / MODERATOR / ADMIN / OWNER */
+  /** Короткий ярлык в шапке */
   code: string;
-  /** Полная строка: XELITY HELPER */
+  /** Полная строка в шапке */
   title: string;
   /** CSS-модификатор темы панели */
   theme: 'helper' | 'moderator' | 'admin' | 'owner';
@@ -87,32 +87,32 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
 
 export const STAFF_BRAND: Record<StaffRole, StaffBrand> = {
   helper: {
-    code: 'HELPER',
-    title: 'XELITY HELPER',
+    code: 'Хелпер',
+    title: 'Xelity · Хелпер',
     theme: 'helper',
     accent: '#2a9d8f',
     accentSoft: 'rgba(42, 157, 143, 0.18)',
     hint: 'Только тикеты поддержки',
   },
   moderator: {
-    code: 'MODERATOR',
-    title: 'XELITY MODERATOR',
+    code: 'Модератор',
+    title: 'Xelity · Модератор',
     theme: 'moderator',
     accent: '#e09f3e',
     accentSoft: 'rgba(224, 159, 62, 0.18)',
     hint: 'Тикеты, модерация и чаты',
   },
   admin: {
-    code: 'ADMIN',
-    title: 'XELITY ADMIN',
+    code: 'Админ',
+    title: 'Xelity · Админ',
     theme: 'admin',
     accent: '#c62828',
     accentSoft: 'rgba(198, 40, 40, 0.2)',
-    hint: 'Полная панель; роли назначает только Owner',
+    hint: 'Полная панель; роли назначает только владелец',
   },
   owner: {
-    code: 'OWNER',
-    title: 'XELITY OWNER',
+    code: 'Владелец',
+    title: 'Xelity · Владелец',
     theme: 'owner',
     accent: '#d4a017',
     accentSoft: 'rgba(212, 160, 23, 0.2)',
@@ -123,10 +123,10 @@ export const STAFF_BRAND: Record<StaffRole, StaffBrand> = {
 export const STAFF_ROLE_ORDER: StaffRole[] = ['helper', 'moderator', 'admin', 'owner'];
 
 export const STAFF_ROLE_LABEL: Record<StaffRole, string> = {
-  helper: 'Helper',
-  moderator: 'Moderator',
-  admin: 'Admin',
-  owner: 'Owner',
+  helper: 'Хелпер',
+  moderator: 'Модератор',
+  admin: 'Админ',
+  owner: 'Владелец',
 };
 
 export function isStaffRole(value: unknown): value is StaffRole {

@@ -97,7 +97,7 @@ export default function AdminLayout() {
             <div className="admin-header-divider" aria-hidden />
             <div className="min-w-0">
               <h1 className="admin-header-title">
-                XELITY <span className="admin-brand-code">{brand.code}</span>
+                Xelity <span className="admin-brand-code">{brand.code}</span>
               </h1>
               <p className="admin-brand-hint truncate">{brand.hint}</p>
             </div>

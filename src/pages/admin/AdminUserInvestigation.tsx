@@ -294,7 +294,10 @@ export default function AdminUserInvestigation({
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Тариф', value: PLANS[plan].name },
-          { label: 'Статус', value: banned ? 'BAN' : profile.muted ? 'MUTE' : 'OK' },
+          {
+            label: 'Статус',
+            value: banned ? 'Забанен' : profile.muted ? 'Мут' : 'Незабанен',
+          },
           { label: 'Сегодня', value: `${usageToday.credits} кр. (${usageToday.messages} отв.)` },
           { label: 'Чаты', value: `${store?.chats.length ?? 0} / ${msgCount} сообщ.` },
         ].map((c) => (

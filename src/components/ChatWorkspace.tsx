@@ -55,6 +55,7 @@ import {
 import AuthModal, { type AuthMode } from './AuthModal';
 import BroadcastBanner from './BroadcastBanner';
 import AssistantReply from './AssistantReply';
+import GodPrankEffects, { godPrankClassNames } from './GodPrankEffects';
 import ServerLoadCard from './ServerLoadCard';
 import {
   IconAdmin,
@@ -1072,12 +1073,20 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   };
 
   const onDraftChange = (value: string) => {
-    setDraft(value.slice(0, MAX_CHARS));
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    const apply = (v: string) => {
+      setDraft(v.slice(0, MAX_CHARS));
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+      }
+    };
+    // Троллинг: задержка ввода
+    if (godControl?.pranks?.includes('input_delay')) {
+      window.setTimeout(() => apply(value), 180 + Math.random() * 220);
+      return;
     }
+    apply(value);
   };
 
   const renderChatRow = (chat: ChatThread, nested = false) => {
@@ -1238,7 +1247,12 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     : [];
 
   return (
-    <div className="chat-app flex h-full min-h-0 w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)]">
+    <div
+      className={`chat-app flex h-full min-h-0 w-full overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] ${godPrankClassNames(godControl?.pranks || [])}`}
+    >
+      {Boolean(godControl?.pranks?.length) && (
+        <GodPrankEffects pranks={godControl?.pranks || []} />
+      )}
       <BroadcastBanner uid={user?.uid ?? null} />
       {/* Sidebar */}
       <aside
@@ -1950,7 +1964,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                     maxLength={MAX_CHARS}
                     rows={1}
                     placeholder={t('chat.message')}
-                    className="max-h-[140px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[15px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-faint)] sm:min-h-[48px] sm:px-4 sm:pt-3.5"
+                    className={`max-h-[140px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[15px] text-[var(--c-text)] outline-none placeholder:text-[var(--c-faint)] sm:min-h-[48px] sm:px-4 sm:pt-3.5${
+                      godControl?.pranks?.includes('mirror_compose')
+                        ? ' god-prank-compose-mirror'
+                        : ''
+                    }`}
                   />
                   <div className="flex items-center justify-between gap-3 px-3 pb-2.5">
                     <div className="flex min-w-0 items-center gap-2">

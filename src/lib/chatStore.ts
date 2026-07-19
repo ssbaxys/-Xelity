@@ -481,3 +481,55 @@ export async function adminSetChatSystemPrompt(
   await saveUserChatStore(uid, next);
   return next;
 }
+
+export async function adminEditMessage(params: {
+  uid: string;
+  chatId: string;
+  messageId: string;
+  content: string;
+}): Promise<ChatStore> {
+  const current = (await fetchUserChatStore(params.uid)) ?? emptyChatStore();
+  const text = params.content.trim();
+  if (!text) throw new Error('Пустое сообщение');
+  let found = false;
+  const now = Date.now();
+  const chats = current.chats.map((c) => {
+    if (c.id !== params.chatId) return c;
+    const messages = c.messages.map((m) => {
+      if (m.id !== params.messageId) return m;
+      found = true;
+      return {
+        ...m,
+        content: text,
+        serverLoad: null,
+        viaAdmin: true,
+      };
+    });
+    return { ...c, messages, updatedAt: now };
+  });
+  if (!found) throw new Error('Сообщение не найдено');
+  const next: ChatStore = { ...current, chats, updatedAt: now };
+  await saveUserChatStore(params.uid, next);
+  return next;
+}
+
+export async function adminDeleteMessage(params: {
+  uid: string;
+  chatId: string;
+  messageId: string;
+}): Promise<ChatStore> {
+  const current = (await fetchUserChatStore(params.uid)) ?? emptyChatStore();
+  let found = false;
+  const now = Date.now();
+  const chats = current.chats.map((c) => {
+    if (c.id !== params.chatId) return c;
+    const before = c.messages.length;
+    const messages = c.messages.filter((m) => m.id !== params.messageId);
+    if (messages.length !== before) found = true;
+    return { ...c, messages, updatedAt: now };
+  });
+  if (!found) throw new Error('Сообщение не найдено');
+  const next: ChatStore = { ...current, chats, updatedAt: now };
+  await saveUserChatStore(params.uid, next);
+  return next;
+}

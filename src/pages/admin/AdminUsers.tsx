@@ -261,17 +261,17 @@ export default function AdminUsers() {
                 u.planExpiresAt > Date.now();
               const bannedNow = isUserBanned(u);
               const roleOptions: { value: string; label: string }[] = [
-                { value: '', label: 'User' },
+                { value: '', label: 'Пользователь' },
                 ...STAFF_ROLE_ORDER.filter((r) => canAssignRole(actorRole, r)).map((r) => ({
                   value: r,
                   label: STAFF_ROLE_LABEL[r],
                 })),
               ];
-              // если у цели роль выше / owner — показать текущую даже если нельзя назначить
+              // если у цели роль выше / владелец — показать текущую даже если нельзя назначить
               if (targetRole && !roleOptions.some((o) => o.value === targetRole)) {
                 roleOptions.push({
                   value: targetRole,
-                  label: `${STAFF_ROLE_LABEL[targetRole]} (недоступно)`,
+                  label: `${STAFF_ROLE_LABEL[targetRole]} (нельзя)`,
                 });
               }
               return (
@@ -308,17 +308,24 @@ export default function AdminUsers() {
                       : ' / ∞ кр.'}
                   </td>
                   <td className="px-3 py-2 text-[11px]">
-                    <span className={bannedNow ? 'text-[var(--a-danger)]' : 'text-[var(--a-muted)]'}>
-                      {bannedNow ? 'ban' : 'ok'}
-                    </span>
-                    {' · '}
-                    <span
-                      className={
-                        targetRole ? 'text-[var(--admin-accent)]' : 'text-[var(--a-muted)]'
-                      }
-                    >
-                      {targetRole ? STAFF_ROLE_LABEL[targetRole] : 'user'}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className={
+                          bannedNow
+                            ? 'font-medium text-[var(--a-danger)]'
+                            : 'font-medium text-[var(--a-ok)]'
+                        }
+                      >
+                        {bannedNow ? 'Забанен' : 'Незабанен'}
+                      </span>
+                      <span
+                        className={
+                          targetRole ? 'text-[var(--admin-accent)]' : 'text-[var(--a-muted)]'
+                        }
+                      >
+                        {targetRole ? STAFF_ROLE_LABEL[targetRole] : 'Пользователь'}
+                      </span>
+                    </div>
                     {bannedNow && u.banReason && (
                       <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-[var(--a-danger)]/80" title={u.banReason}>
                         {u.banReason}
@@ -327,9 +334,9 @@ export default function AdminUsers() {
                     {(u.flagged || u.muted || u.reviewPriority) && (
                       <p className="mt-0.5 text-[10px] text-[var(--a-soft)]">
                         {[
-                          u.flagged ? 'flag' : null,
-                          u.muted ? 'mute' : null,
-                          u.reviewPriority ? `prio:${u.reviewPriority}` : null,
+                          u.flagged ? 'метка' : null,
+                          u.muted ? 'мут' : null,
+                          u.reviewPriority ? `приоритет ${u.reviewPriority}` : null,
                         ]
                           .filter(Boolean)
                           .join(' · ')}
@@ -403,7 +410,7 @@ export default function AdminUsers() {
                                 return;
                               }
                               if (targetRole === 'owner' && actorRole !== 'owner') {
-                                setError('Только Owner может менять Owner');
+                                setError('Только владелец может менять роль владельца');
                                 return;
                               }
                               void run(u.uid, () => setUserStaffRole(u.uid, next));
