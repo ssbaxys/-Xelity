@@ -36,6 +36,8 @@ export const sitePages: SitePage[] = [
           'Поиск по заголовкам и содержимому сообщений',
           'Сортировка по дате последнего сообщения или по алфавиту',
           'Выбор модели Mini K1 / Pro K1 / Mini K2 / Pro K2 со списанием кредитов',
+          'Поиск (Xelity Search), погода (Xelity Weather) и кодинг-панель в чате',
+          'Публичное API с ключами xel_… и виртуальными USD',
           'Markdown-ответы, копирование, перегенерация и очистка диалога',
           'Настройки аккаунта: язык, тема и размер интерфейса',
         ],
@@ -121,7 +123,7 @@ export const sitePages: SitePage[] = [
     title: 'Документация API',
     eyebrow: 'Разработчикам',
     summary:
-      'Подключайте линейку Xlaude к своим продуктам через HTTP API Xelity. Один эндпоинт чата, Bearer-авторизация и журналы использования по workspace.',
+      'Публичное API Xelity: модели Xlaude по нашим id, Xelity Search и Xelity Weather. Ключи xel_… и списание виртуальных USD с баланса аккаунта.',
     blocks: [
       {
         type: 'h2',
@@ -129,21 +131,41 @@ export const sitePages: SitePage[] = [
       },
       {
         type: 'p',
-        text: 'Создайте аккаунт, получите API-ключ в кабинете и отправляйте запросы на POST /v1/chat/completions с заголовком Authorization: Bearer <token>.',
+        text: 'Войдите в аккаунт → профиль в чате → «API кабинет» (или /account/api). Создайте ключ xel_… — он показывается один раз. Базовый URL: https://api.xelity.ru. Заголовок: Authorization: Bearer xel_…',
       },
       {
         type: 'h2',
-        text: 'Параметры запроса',
+        text: 'Продукты',
+      },
+      {
+        type: 'ul',
+        items: [
+          'POST /v1/chat/completions — модели xlaude-mini-k1, xlaude-pro-k1, xlaude-mini-k2, xlaude-pro-k2',
+          'GET /v1/models — список моделей и продуктов',
+          'POST /v1/search — Xelity Search (query, опционально images: true)',
+          'POST /v1/weather — Xelity Weather (location или latitude/longitude)',
+        ],
+      },
+      {
+        type: 'h2',
+        text: 'Chat completions',
       },
       {
         type: 'ul',
         items: [
           'model: xlaude-mini-k1 | xlaude-pro-k1 | xlaude-mini-k2 | xlaude-pro-k2',
           'messages: массив { role, content }',
-          'stream: true | false',
-          'temperature: 0–1 (по умолчанию сбалансированный режим)',
-          'max_tokens: верхняя граница длины ответа',
+          'reasoning: true — удваивает стоимость запроса',
+          'temperature, max_tokens — опционально',
         ],
+      },
+      {
+        type: 'h2',
+        text: 'Виртуальные USD',
+      },
+      {
+        type: 'p',
+        text: 'Новому аккаунту начисляется $1.00. Списание за запрос: Mini K1 $0.002 · Pro K1 $0.004 · Mini K2 $0.008 · Pro K2 $0.016; с reasoning ×2. Xelity Search $0.001 ($0.0015 с картинками). Xelity Weather $0.0005. При нулевом балансе — HTTP 402.',
       },
       {
         type: 'h2',
@@ -152,19 +174,12 @@ export const sitePages: SitePage[] = [
       {
         type: 'ul',
         items: [
-          '200 — успешный completion или stream chunk',
-          '401 — неверный или отозванный ключ',
-          '429 — превышена квота workspace',
-          '400 — невалидная схема messages или неизвестная model',
+          '200 — успех; в теле поле xelity.billedUsd и xelity.balanceUsd',
+          '401 — нет ключа или ключ отозван',
+          '402 — недостаточно виртуальных USD',
+          '400 — невалидный запрос',
+          '502 — ошибка поиска/погоды/апстрима',
         ],
-      },
-      {
-        type: 'h2',
-        text: 'Квоты и лимиты',
-      },
-      {
-        type: 'p',
-        text: 'В веб-чате сообщение ограничено 2000 символами. Через API лимиты зависят от тарифа workspace: RPM, TPM и суточный бюджет токенов видны в журнале использования.',
       },
       {
         type: 'h2',
@@ -173,13 +188,13 @@ export const sitePages: SitePage[] = [
       {
         type: 'ul',
         items: [
-          'Не вшивайте ключи в клиентский код',
-          'Ротируйте ключи при утечке',
-          'Ограничивайте IP и scopes, если доступно в кабинете',
-          'Логируйте user id своей системы, а не сырые секреты',
+          'Не вшивайте ключи в клиентский код и публичные репозитории',
+          'Храните ключ только на сервере',
+          'Отзывайте ключ в кабинете при утечке',
+          'Максимум 5 активных ключей на аккаунт',
         ],
       },
-      { type: 'cta', label: 'Создать аккаунт', to: '/#contact' },
+      { type: 'cta', label: 'Открыть API кабинет', to: '/account/api' },
     ],
   },
   {
@@ -188,6 +203,19 @@ export const sitePages: SitePage[] = [
     eyebrow: 'Обновления',
     summary: 'История релизов сайта, чата и модели Xlaude Mini 1. Короткие заметки о том, что изменилось и зачем.',
     blocks: [
+      {
+        type: 'h2',
+        text: 'Июль 2026 — публичное API',
+      },
+      {
+        type: 'ul',
+        items: [
+          'Ключи xel_… и кабинет /account/api с виртуальными USD',
+          'POST /v1/chat/completions по id моделей Xlaude',
+          'Xelity Search — POST /v1/search',
+          'Xelity Weather — POST /v1/weather',
+        ],
+      },
       {
         type: 'h2',
         text: 'Июль 2026 — чат и аккаунт',

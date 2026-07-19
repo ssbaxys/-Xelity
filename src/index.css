@@ -20,7 +20,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ——— Custom scrollbars (единая система цветов) ——— */
+/* ??? Custom scrollbars (?????? ??????? ??????) ??? */
 :root,
 html[data-theme='dark'] {
   --scroll-thumb: rgba(198, 40, 40, 0.5);
@@ -75,7 +75,7 @@ html[data-theme='light'] {
   background: transparent;
 }
 
-/* Чуть заметнее трек в плотных панелях чата/админки */
+/* ???? ???????? ???? ? ??????? ??????? ????/??????? */
 .chat-app,
 .admin-scroll,
 .coding-workbench,
@@ -119,7 +119,7 @@ html[data-theme='light'] body {
   color: #121212;
 }
 
-/* Hero: белая вуаль для светлой темы */
+/* Hero: ????? ????? ??? ??????? ???? */
 html[data-theme='light'] .hero-veil {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.82) 45%, rgba(255, 255, 255, 0.4) 100%),
@@ -302,7 +302,7 @@ body {
   }
 }
 
-/* Разворот «Думал» без вспышки скроллбара */
+/* ???????? ??????? ??? ??????? ?????????? */
 .reasoning-panel {
   overflow-x: clip;
   max-width: 100%;
@@ -572,7 +572,7 @@ body {
   animation: fade-in 0.4s ease both;
 }
 
-/* ——— Pricing / подписки ——— */
+/* ??? Pricing / ???????? ??? */
 @keyframes pricing-rise {
   from {
     opacity: 0;
@@ -769,7 +769,7 @@ body {
   }
 }
 
-/* Плавные нажатия / появление — везде */
+/* ??????? ??????? / ????????? ? ????? */
 @media (prefers-reduced-motion: no-preference) {
   a,
   button,
@@ -835,7 +835,7 @@ body {
   box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.2);
 }
 
-/* ——— Mobile nav ——— */
+/* ??? Mobile nav ??? */
 .nav-burger {
   position: relative;
   display: block;
@@ -955,7 +955,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* Markdown в чате — как естественный текст, без «карточек ради карточек» */
+/* Markdown ? ???? ? ??? ???????????? ?????, ??? ????????? ???? ????????? */
 .chat-md {
   color: var(--c-text);
   word-break: break-word;
@@ -1136,7 +1136,7 @@ body {
   font-family: inherit;
 }
 
-/* Подсветка синтаксиса (highlight.js) — тёмная */
+/* ????????? ?????????? (highlight.js) ? ?????? */
 .chat-md .hljs,
 .coding-hljs.hljs {
   color: #e8e0e0;
@@ -1232,7 +1232,7 @@ body {
   font-weight: 700;
 }
 
-/* Светлая тема */
+/* ??????? ???? */
 html[data-theme='light'] .chat-md .hljs,
 html[data-theme='light'] .coding-hljs.hljs {
   color: #2a2020;
@@ -1392,7 +1392,7 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   color: var(--c-md-head);
 }
 
-/* В пользовательском пузыре — чуть плотнее и без лишнего «документа» */
+/* ? ???????????????? ?????? ? ???? ??????? ? ??? ??????? ??????????? */
 .chat-md--bubble p {
   color: inherit;
   margin: 0.4em 0;
@@ -1504,7 +1504,7 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   animation-delay: 0.3s;
 }
 
-/* Ответ / мысли: сильное размытие → читаемый текст */
+/* ????? / ?????: ??????? ???????? ? ???????? ????? */
 .answer-blur {
   filter: blur(14px);
   opacity: 0.35;
@@ -1546,40 +1546,17 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   animation: thinking-pulse 1.4s ease-in-out infinite;
 }
 
-/* Кодинг: иконка крутится → замедляется → пауза → снова */
+/* Пока tool работает — иконка (глаз и др.) крутится */
 .tool-icon-spin {
   display: inline-block;
-  transform-origin: 50% 55%;
-  animation: tool-icon-cycle 2.6s cubic-bezier(0.33, 0.1, 0.25, 1) infinite;
-  will-change: transform, filter, opacity;
+  transform-origin: center;
+  animation: tool-icon-spin 1.05s linear infinite;
+  will-change: transform;
 }
 
-@keyframes tool-icon-cycle {
-  0% {
-    transform: rotate(0deg) scale(1);
-    filter: blur(0);
-    opacity: 1;
-  }
-  35% {
-    transform: rotate(320deg) scale(1.05);
-    filter: blur(1.6px);
-    opacity: 0.72;
-  }
-  55% {
-    transform: rotate(400deg) scale(1.02);
-    filter: blur(0.8px);
-    opacity: 0.85;
-  }
-  72% {
-    transform: rotate(420deg) scale(1);
-    filter: blur(0);
-    opacity: 1;
-  }
-  88%,
-  100% {
-    transform: rotate(420deg) scale(1);
-    filter: blur(0);
-    opacity: 1;
+@keyframes tool-icon-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -1605,6 +1582,7 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
 }
 
 .tool-card-pending {
+  background: color-mix(in srgb, var(--c-soft) 92%, #8a8f98);
   animation:
     tool-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both,
     tool-card-pulse 2.6s ease-in-out infinite;
@@ -1613,12 +1591,12 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
 @keyframes tool-card-pulse {
   0%,
   100% {
-    border-color: var(--c-border-strong);
+    border-color: var(--c-border);
     box-shadow: none;
   }
   50% {
-    border-color: color-mix(in srgb, #c62828 45%, var(--c-border));
-    box-shadow: 0 0 0 1px color-mix(in srgb, #c62828 12%, transparent);
+    border-color: color-mix(in srgb, var(--c-muted) 55%, var(--c-border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-muted) 10%, transparent);
   }
 }
 
@@ -1735,6 +1713,21 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
 }
 
 .tool-check-in {
+  animation: tool-check-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tool-clock-spin {
+  animation: tool-clock-spin 1.15s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes tool-clock-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tool-x-in {
   animation: tool-check-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1865,7 +1858,7 @@ html[data-theme='light'] .source-img-card {
   }
 }
 
-/* Успех / ошибка — перекрашиваем всю карточку и вложенный скролл */
+/* ????? / ?????? ? ????????????? ??? ???????? ? ????????? ?????? */
 .tool-card-ok,
 .tool-scroll-ok {
   --scroll-thumb: rgba(76, 175, 80, 0.55);
@@ -1898,18 +1891,19 @@ html[data-theme='light'] .tool-scroll-err {
   --scroll-track: rgba(198, 40, 40, 0.08);
 }
 
-/* Тогглы Кодинг / Рассуждения — плавное вкл и выкл */
+/* Toggle tools: icon centered when collapsed */
 .chat-tool-toggle {
   display: inline-flex;
   height: 1.75rem;
+  min-width: 1.75rem;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0;
   overflow: hidden;
   border-radius: 0.375rem;
   border: 1px solid var(--c-border);
   background: var(--c-soft);
-  padding: 0 0.375rem;
+  padding: 0;
   font-size: 11px;
   font-weight: 500;
   color: var(--c-muted);
@@ -1918,7 +1912,16 @@ html[data-theme='light'] .tool-scroll-err {
     background-color 0.32s ease,
     border-color 0.32s ease,
     box-shadow 0.32s ease,
-    padding 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    padding 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-tool-toggle > svg {
+  display: block;
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .chat-tool-toggle:hover {
@@ -1927,34 +1930,30 @@ html[data-theme='light'] .tool-scroll-err {
 }
 
 .chat-tool-toggle[data-on='true'] {
+  gap: 0.3rem;
+  min-width: 0;
   border-color: color-mix(in srgb, var(--x-red, #c62828) 50%, var(--c-border));
   background: var(--x-red-soft, rgba(198, 40, 40, 0.12));
   color: var(--c-text);
-  padding-left: 0.5rem;
+  padding-left: 0.45rem;
   padding-right: 0.5rem;
 }
 
 .chat-tool-toggle-label {
-  display: inline-block;
-  max-width: 0;
-  margin-left: 0;
+  display: none;
   overflow: hidden;
   opacity: 0;
   white-space: nowrap;
-  transition:
-    max-width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.28s ease,
-    margin-left 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  line-height: 1;
 }
 
 .chat-tool-toggle[data-on='true'] .chat-tool-toggle-label {
+  display: inline-block;
   max-width: 6.75rem;
-  margin-left: 0.15rem;
   opacity: 1;
 }
 
-/* Поиск — чуть короче лейбл */
-.chat-tool-toggle[aria-label='Поиск'][data-on='true'] .chat-tool-toggle-label {
+.chat-tool-toggle[aria-label='?????'][data-on='true'] .chat-tool-toggle-label {
   max-width: 3.5rem;
 }
 
@@ -1979,7 +1978,9 @@ html[data-theme='light'] .tool-scroll-err {
     animation: none !important;
     transition: none !important;
   }
-  .tool-icon-spin {
+  .tool-icon-spin,
+  .tool-clock-spin {
+    animation: none !important;
     filter: none !important;
   }
   .tool-card-body {
@@ -1987,7 +1988,7 @@ html[data-theme='light'] .tool-scroll-err {
   }
 }
 
-/* ── Правая панель кодинга ── */
+/* ?? ?????? ?????? ??????? ?? */
 .coding-dock-shell {
   display: none;
 }
@@ -2137,6 +2138,292 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   opacity: 0.35;
 }
 
+.coding-wb-builds {
+  position: relative;
+}
+
+.coding-wb-build-btn {
+  display: inline-flex;
+  max-width: 11rem;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--c-border);
+  padding: 0.3rem 0.5rem;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--c-muted);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.coding-wb-build-btn:hover,
+.coding-wb-build-btn.is-historic {
+  color: var(--c-text);
+  border-color: color-mix(in srgb, var(--x-red, #c62828) 45%, var(--c-border));
+  background: var(--x-red-soft, rgba(198, 40, 40, 0.1));
+}
+
+.coding-wb-build-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 40;
+  width: min(17rem, 70vw);
+  max-height: 14rem;
+  overflow: auto;
+  border-radius: 0.65rem;
+  border: 1px solid var(--c-border);
+  background: var(--c-panel);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  padding: 0.3rem;
+}
+
+.coding-wb-build-item {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.coding-wb-build-item:hover,
+.coding-wb-build-item.is-active {
+  background: var(--c-hover);
+}
+
+.coding-wb-build-meta {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-faint);
+}
+
+.coding-wb-build-empty {
+  padding: 0.55rem;
+  font-size: 11px;
+  color: var(--c-faint);
+}
+
+.coding-wb-bg-hint {
+  border-bottom: 1px solid var(--c-border);
+  padding: 0.35rem 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--c-muted);
+  background: color-mix(in srgb, var(--x-red, #c62828) 8%, transparent);
+  flex-shrink: 0;
+}
+
+.coding-wb-preview iframe.is-dimmed {
+  filter: blur(1.5px) saturate(0.85);
+  opacity: 0.45;
+  transition:
+    filter 0.45s ease,
+    opacity 0.45s ease;
+}
+
+.site-dev-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 40%, rgba(198, 40, 40, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(12, 14, 18, 0.28), rgba(12, 14, 18, 0.55));
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.site-dev-overlay.is-active,
+.site-dev-overlay.is-bg {
+  opacity: 1;
+}
+
+.site-dev-overlay.is-bg {
+  background: linear-gradient(180deg, rgba(12, 14, 18, 0.12), rgba(12, 14, 18, 0.35));
+}
+
+.site-dev-card {
+  display: flex;
+  max-width: 18rem;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 20, 26, 0.82);
+  padding: 1.25rem 1.35rem 1.1rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+  animation: site-dev-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes site-dev-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.site-dev-orbit {
+  position: relative;
+  width: 3.4rem;
+  height: 3.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.site-dev-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1.5px solid rgba(198, 40, 40, 0.35);
+  animation: site-dev-spin 2.8s linear infinite;
+}
+
+.site-dev-ring-2 {
+  inset: 0.45rem;
+  border-color: rgba(255, 255, 255, 0.18);
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+.site-dev-core {
+  position: absolute;
+  inset: 1.05rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ef5350, #c62828 55%, #8e1b1b);
+  box-shadow: 0 0 18px rgba(198, 40, 40, 0.55);
+  animation: site-dev-pulse 1.4s ease-in-out infinite;
+}
+
+.site-dev-dot {
+  position: absolute;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+}
+
+.site-dev-dot-a {
+  top: 0.1rem;
+  left: 50%;
+  margin-left: -0.175rem;
+  animation: site-dev-spin 2.8s linear infinite;
+  transform-origin: 0.175rem 1.6rem;
+}
+
+.site-dev-dot-b {
+  bottom: 0.35rem;
+  right: 0.35rem;
+  animation: site-dev-spin 1.8s linear infinite reverse;
+  transform-origin: -0.55rem -0.55rem;
+}
+
+.site-dev-dot-c {
+  bottom: 0.55rem;
+  left: 0.45rem;
+  width: 0.28rem;
+  height: 0.28rem;
+  opacity: 0.75;
+  animation: site-dev-spin 2.2s linear infinite;
+  transform-origin: 0.9rem -0.4rem;
+}
+
+@keyframes site-dev-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes site-dev-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+}
+
+.site-dev-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f3f4f6;
+}
+
+.site-dev-sub {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: rgba(243, 244, 246, 0.68);
+}
+
+.site-dev-bars {
+  display: flex;
+  gap: 0.28rem;
+  margin-top: 0.35rem;
+  height: 0.28rem;
+  align-items: flex-end;
+}
+
+.site-dev-bars span {
+  width: 0.28rem;
+  border-radius: 999px;
+  background: #c62828;
+  animation: site-dev-bar 0.9s ease-in-out infinite;
+}
+
+.site-dev-bars span:nth-child(1) {
+  animation-delay: 0s;
+  height: 0.2rem;
+}
+.site-dev-bars span:nth-child(2) {
+  animation-delay: 0.12s;
+  height: 0.28rem;
+}
+.site-dev-bars span:nth-child(3) {
+  animation-delay: 0.24s;
+  height: 0.16rem;
+}
+.site-dev-bars span:nth-child(4) {
+  animation-delay: 0.36s;
+  height: 0.32rem;
+}
+
+@keyframes site-dev-bar {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .coding-wb-close {
   border-radius: 0.5rem;
   padding: 0.3rem;
@@ -2225,7 +2512,7 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   font-weight: 500;
 }
 
-/* --c-soft = фон панели, не текст — иначе папки «сливаются» */
+/* --c-soft = ??? ??????, ?? ????? ? ????? ????? ??????????? */
 .coding-tree-dir {
   font-weight: 650;
   color: var(--c-text);
@@ -2237,7 +2524,7 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   color: var(--c-text);
 }
 
-/* ——— Xelity FileTree (coding + reusable) ——— */
+/* ??? Xelity FileTree (coding + reusable) ??? */
 .xft {
   position: relative;
   width: 100%;
@@ -2509,7 +2796,7 @@ html[data-theme='light'] .xft-item.is-selected {
   overflow-x: hidden;
 }
 
-/* Custom range — hide native track/thumb visuals, keep hit area */
+/* Custom range ? hide native track/thumb visuals, keep hit area */
 .chat-range {
   margin: 0;
   height: 100%;
@@ -3129,7 +3416,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   color: var(--a-text);
 }
 
-/* Чипы фильтров — читаемо и в light */
+/* ???? ???????? ? ??????? ? ? light */
 .admin-chip {
   border-radius: 0.4rem;
   border: 1px solid var(--a-border);
@@ -3174,7 +3461,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   font-size: 0.875rem;
 }
 
-/* Master–detail панели */
+/* Master?detail ?????? */
 .admin-split {
   display: grid;
   gap: 1rem;
@@ -3254,7 +3541,7 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   }
 }
 
-/* Кодинг: карточки tools + светлая тема */
+/* ??????: ???????? tools + ??????? ???? */
 html[data-theme='light'] .tool-diff-add {
   background: rgba(46, 125, 50, 0.12);
   color: #1b5e20;
@@ -3390,7 +3677,7 @@ html[data-theme='light'] .tool-diff-del {
   background: rgba(26, 20, 20, 0.04);
 }
 
-/* ——— Client update overlay ——— */
+/* ??? Client update overlay ??? */
 .xelity-update-overlay {
   position: fixed;
   inset: 0;
@@ -3455,7 +3742,7 @@ html[data-theme='light'] .xelity-update-card {
   color: var(--c-muted);
 }
 
-/* ——— Maintenance wall ——— */
+/* ??? Maintenance wall ??? */
 .xelity-maintenance {
   min-height: 100vh;
   display: grid;
@@ -3505,7 +3792,7 @@ html[data-theme='light'] .xelity-update-card {
 
 
 
-/* ��� Weather card (Open-Meteo) ��� */
+/* ??? Weather card (Open-Meteo) ??? */
 .weather-tool-wrap {
   border: none !important;
   background: transparent !important;

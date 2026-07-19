@@ -14,10 +14,35 @@ import {
   executeRemoteTool,
   WEB_TOOL_NAMES,
 } from './agentTools';
-import { ensureReactSiteTemplate, runSandboxTool } from './projectSandbox';
+import {
+  commitSandboxBuild,
+  ensureReactSiteTemplate,
+  runSandboxTool,
+} from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
 
 const MAX_TOOL_ROUNDS = 10;
+/** Минимальное время серой «pending»-карточки, чтобы UI успел показать часы / спин */
+const MIN_TOOL_PENDING_MS = 420;
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => window.setTimeout(r, ms));
+}
+
+function maybeCommitCodingBuild(chatId: string, coding: boolean, activities: ToolActivity[]) {
+  if (!coding) return;
+  const wrote = activities.some(
+    (a) =>
+      a.ok &&
+      !a.pending &&
+      (a.kind === 'create' || a.kind === 'edit' || a.kind === 'delete'),
+  );
+  if (!wrote) return;
+  const n = activities.filter(
+    (a) => a.ok && (a.kind === 'create' || a.kind === 'edit' || a.kind === 'delete'),
+  ).length;
+  commitSandboxBuild(chatId, n === 1 ? 'Обновление сайта' : `Правки · ${n} файлов`);
+}
 
 function pendingKindFor(name: string): ToolActivityKind {
   if (name === 'web_search') return 'search';
@@ -274,7 +299,7 @@ async function runWithAgentTools(params: {
       {
         role: 'user',
         content:
-          'В песочнице уже тихо создан стартовый React (Vite) шаблон (package.json, vite.config.js, index.html, src/main.jsx, src/App.jsx, src/styles.css). Не вызывай write_file только чтобы пересоздать шаблон. Используй list_files / read_file / write_file под задачу. Документацию — через web_search / web_fetch.',
+          '[Системно] В проекте уже есть стартовый шаблон сайта (React/Vite: package.json, index.html, src/App.jsx, src/styles.css и др.). Не пересоздавай шаблон с нуля. Правь под задачу. В ответе пользователю — как заказчику сайта, без упоминания инструментов и имён файловых API.',
       },
     ];
   }
@@ -293,6 +318,7 @@ async function runWithAgentTools(params: {
 
     const calls = reply.tool_calls || [];
     if (!calls.length) {
+      maybeCommitCodingBuild(params.chatId, coding, activities);
       return { content: reply.content.trim(), toolActivity: activities };
     }
 
@@ -329,6 +355,7 @@ async function runWithAgentTools(params: {
       }
       activities.push(pending);
       pushAssistant({ content: '', toolActivity: [...activities] });
+      const pendingStarted = Date.now();
 
       let forModel = '';
       let done: ToolActivity;
@@ -371,6 +398,9 @@ async function runWithAgentTools(params: {
         forModel = `Error: tool ${name} unavailable (enable coding mode for file tools)`;
       }
 
+      const wait = MIN_TOOL_PENDING_MS - (Date.now() - pendingStarted);
+      if (wait > 0) await sleep(wait);
+
       const idx = activities.findIndex((a) => a.id === pending.id);
       if (idx >= 0) activities[idx] = done;
       else activities.push(done);
@@ -394,8 +424,9 @@ async function runWithAgentTools(params: {
       ...toolMsgs,
     ];
   }
+  maybeCommitCodingBuild(params.chatId, coding, activities);
   return {
-    content: 'Слишком много шагов tools. Упрости задачу или продолжи в следующем сообщении.',
+    content: 'Слишком много шагов. Упростите задачу или продолжите в следующем сообщении.',
     toolActivity: activities,
   };
 }

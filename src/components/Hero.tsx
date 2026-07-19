@@ -49,7 +49,7 @@ export default function Hero() {
             isLight ? 'text-slate' : 'text-white/70'
           }`}
         >
-          Xlaude Mini и Pro в поколениях K1 и K2 — для задач, где нужен результат, а не представление.
+          Xlaude Mini и Pro (K1/K2), Xelity Search и Weather — чат и API с виртуальными USD.
         </p>
 
         <div className="animate-rise delay-3 mt-7 flex w-full flex-col gap-2.5 sm:mt-10 sm:w-auto sm:flex-row sm:gap-3">

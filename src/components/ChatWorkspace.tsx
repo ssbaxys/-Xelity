@@ -34,6 +34,7 @@ import {
   isChatGenerating,
   subscribeChatStoreUpdates,
 } from '../lib/chatGeneration';
+import { clearSandbox, ensureReactSiteTemplate } from '../lib/projectSandbox';
 import {
   MODELS,
   creditCostForRequest,
@@ -253,6 +254,17 @@ function shouldAutoName(chat: ChatThread) {
   return !chat.manualTitle && isDefaultTitle(chat.title);
 }
 
+/** Новый чат без единого сообщения — можно тихо удалить при уходе */
+function isPrunableEmptyChat(chat: ChatThread | undefined | null) {
+  if (!chat) return false;
+  if (chat.messages.length > 0) return false;
+  if ((chat.draft || '').trim()) return false;
+  if (chat.manualTitle) return false;
+  if (!isDefaultTitle(chat.title)) return false;
+  if (isChatGenerating(chat.id)) return false;
+  return true;
+}
+
 function makeChat(
   _chats: ChatThread[],
   modelId: ModelId = DEFAULT_MODEL_ID,
@@ -404,24 +416,29 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     [],
   );
 
-  /** Переключить чат, сохранив черновик текущего */
+  /** Переключить чат, сохранив черновик текущего; пустой «Новый чат» без слов — удалить */
   const selectChat = useCallback((nextId: string) => {
     const prevId = activeIdRef.current;
     setStore((prev) => {
-      const withDraft =
-        prevId && prevId !== nextId
-          ? {
-              ...prev,
-              chats: prev.chats.map((c) =>
-                c.id === prevId ? { ...c, draft: draftRef.current.slice(0, MAX_CHARS) } : c,
-              ),
-              activeId: nextId,
-            }
-          : { ...prev, activeId: nextId };
-      saveLocalChatStore(withDraft);
+      let chats = prev.chats;
+      if (prevId && prevId !== nextId) {
+        const prevChat = chats.find((c) => c.id === prevId);
+        const draft = draftRef.current.slice(0, MAX_CHARS);
+        const asLeaving: ChatThread | null = prevChat
+          ? { ...prevChat, draft }
+          : null;
+        if (asLeaving && isPrunableEmptyChat(asLeaving)) {
+          clearSandbox(prevId);
+          chats = chats.filter((c) => c.id !== prevId);
+        } else if (prevChat) {
+          chats = chats.map((c) => (c.id === prevId ? { ...c, draft } : c));
+        }
+      }
+      const next = { ...prev, chats, activeId: nextId };
+      saveLocalChatStore(next);
       const u = userRef.current;
-      if (u) void saveUserChatStore(u.uid, withDraft).catch(() => {});
-      return withDraft;
+      if (u) void saveUserChatStore(u.uid, next).catch(() => {});
+      return next;
     });
     if (!window.matchMedia('(min-width: 1024px)').matches) setSidebarOpen(false);
   }, []);
@@ -650,12 +667,20 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       folderId,
       toolFlags,
     );
-    const chatsWithPrevDraft = prevId
-      ? chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c))
-      : chats;
+    let baseChats = chats;
+    if (prevId) {
+      const prevChat = chats.find((c) => c.id === prevId);
+      const leaving = prevChat ? { ...prevChat, draft: savedDraft } : null;
+      if (leaving && isPrunableEmptyChat(leaving)) {
+        clearSandbox(prevId);
+        baseChats = chats.filter((c) => c.id !== prevId);
+      } else {
+        baseChats = chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c));
+      }
+    }
     persist({
       ...store,
-      chats: [chat, ...chatsWithPrevDraft],
+      chats: [chat, ...baseChats],
       activeId: chat.id,
     });
     setDraft('');
@@ -666,6 +691,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   };
 
   const deleteChat = (id: string) => {
+    clearSandbox(id);
     const nextChats = chats.filter((c) => c.id !== id);
     persist({
       ...store,
@@ -747,6 +773,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const setCodingTools = (on: boolean) => {
     if (!active) return;
     setLastCodingTools(on);
+    if (on) ensureReactSiteTemplate(active.id);
     persist({
       ...store,
       updatedAt: Date.now(),
@@ -1393,6 +1420,16 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         Лимиты
                       </button>
                       <Link
+                        to="/account/api"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--c-muted)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
+                      >
+                        <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                          <IconBrain className="h-3.5 w-3.5" />
+                        </span>
+                        API кабинет
+                      </Link>
+                      <Link
                         to="/pricing"
                         onClick={() => setProfileOpen(false)}
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--c-muted)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
@@ -1460,6 +1497,16 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         <IconLimits className="h-3.5 w-3.5" />
                         Лимиты
                       </button>
+                      <Link
+                        to="/account/api"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-[var(--c-muted)] transition hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
+                      >
+                        <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                          <IconBrain className="h-3.5 w-3.5" />
+                        </span>
+                        API кабинет
+                      </Link>
                       <Link
                         to="/pricing"
                         onClick={() => setProfileOpen(false)}
@@ -1949,6 +1996,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
               open={codingDockOpen}
               mobileOpen={codingMobileOpen}
               onMobileClose={() => setCodingMobileOpen(false)}
+              developing={Boolean(active.codingTools) && isChatGenerating(active.id)}
             />
           </div>
         )}

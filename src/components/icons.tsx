@@ -188,6 +188,15 @@ export function IconCheck({ className = 'h-3 w-3' }: IconProps) {
   );
 }
 
+export function IconClock({ className = 'h-3.5 w-3.5' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <circle cx="12" cy="12" r="8.25" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.75V12l2.75 1.75" />
+    </svg>
+  );
+}
+
 export function IconSettings({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>

@@ -22,6 +22,7 @@ import AdminBroadcasts from './pages/admin/AdminBroadcasts';
 import AdminModelPrompts from './pages/admin/AdminModelPrompts';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminTickets from './pages/admin/AdminTickets';
+import ApiCabinetPage from './pages/ApiCabinetPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <BanGuard>
               <Routes>
                 <Route path="chat" element={<ChatPage />} />
+                <Route path="account/api" element={<ApiCabinetPage />} />
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="support" element={<SupportPage />} />
                 <Route path="banned" element={<BannedPage />} />

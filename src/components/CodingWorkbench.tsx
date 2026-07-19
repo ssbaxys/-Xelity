@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
+import { isChatGenerating } from '../lib/chatGeneration';
 import { highlightCode, langFromPath } from '../lib/highlightCode';
 import {
   buildFileTree,
   buildPreviewHtml,
   downloadSandboxZip,
+  getSandboxFilesAt,
+  listSandboxBuilds,
   listSandboxFiles,
-  readSandboxFile,
   subscribeSandbox,
   type FileTreeNode,
+  type SandboxBuild,
 } from '../lib/projectSandbox';
 import { FileTreeFromItems, type FileTreeNodeData } from './FileTree';
 import { IconClose } from './icons';
+import SiteDevelopingOverlay from './SiteDevelopingOverlay';
 
 function usePreviewSrc(html: string | null): string | null {
   const [src, setSrc] = useState<string | null>(null);
@@ -45,6 +49,19 @@ function collectDirPaths(nodes: FileTreeNode[], acc: string[] = []): string[] {
   return acc;
 }
 
+function formatBuildTime(ts: number) {
+  try {
+    return new Date(ts).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
 type Tab = 'files' | 'preview';
 
 type Props = {
@@ -52,6 +69,8 @@ type Props = {
   open?: boolean;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  /** Идёт генерация ответа с кодингом */
+  developing?: boolean;
 };
 
 export default function CodingWorkbench({
@@ -59,26 +78,54 @@ export default function CodingWorkbench({
   open = true,
   mobileOpen,
   onMobileClose,
+  developing = false,
 }: Props) {
   const [tick, setTick] = useState(0);
-  const [tab, setTab] = useState<Tab>('files');
+  const [tab, setTab] = useState<Tab>('preview');
   const [selected, setSelected] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 'latest' = живая рабочая версия; иначе id сборки */
+  const [viewBuildId, setViewBuildId] = useState<string | 'latest'>('latest');
+  const [buildsOpen, setBuildsOpen] = useState(false);
 
   useEffect(() => subscribeSandbox(() => setTick((n) => n + 1)), []);
   useEffect(() => {
     setSelected(null);
-    setTab('files');
+    setTab('preview');
     setError(null);
     setExpandedIds([]);
+    setViewBuildId('latest');
+    setBuildsOpen(false);
   }, [chatId]);
+
+  const builds = useMemo(() => {
+    void tick;
+    return listSandboxBuilds(chatId);
+  }, [chatId, tick]);
+
+  const viewingLatest = viewBuildId === 'latest';
+  const activeBuild: SandboxBuild | null = viewingLatest
+    ? null
+    : builds.find((b) => b.id === viewBuildId) ?? null;
+
+  useEffect(() => {
+    if (developing && viewingLatest) setTab('preview');
+  }, [developing, viewingLatest]);
+
+  // Если выбранная сборка исчезла — вернуться к latest
+  useEffect(() => {
+    if (viewBuildId !== 'latest' && !builds.some((b) => b.id === viewBuildId)) {
+      setViewBuildId('latest');
+    }
+  }, [builds, viewBuildId]);
 
   const files = useMemo(() => {
     void tick;
-    return listSandboxFiles(chatId);
-  }, [chatId, tick]);
+    if (viewingLatest) return listSandboxFiles(chatId);
+    return Object.keys(getSandboxFilesAt(chatId, viewBuildId)).sort();
+  }, [chatId, tick, viewBuildId, viewingLatest]);
 
   const tree = useMemo(() => buildFileTree(files), [files]);
   const items = useMemo(() => toFileTreeItems(tree), [tree]);
@@ -105,29 +152,48 @@ export default function CodingWorkbench({
     if (selected && !files.includes(selected)) setSelected(files[0] ?? null);
   }, [files, selected]);
 
-  const content = selected ? readSandboxFile(chatId, selected) : null;
+  const content = useMemo(() => {
+    void tick;
+    if (!selected) return null;
+    const map = getSandboxFilesAt(chatId, viewBuildId);
+    return map[selected]?.content ?? null;
+  }, [chatId, selected, tick, viewBuildId]);
+
   const highlighted = useMemo(() => {
     if (content == null || !selected) return null;
     return highlightCode(content, langFromPath(selected));
   }, [content, selected]);
+
   const previewHtml = useMemo(() => {
     void tick;
     try {
-      return buildPreviewHtml(chatId);
+      return buildPreviewHtml(chatId, viewBuildId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return `<!DOCTYPE html><html><body style="font:13px sans-serif;padding:16px;color:#c62828"><pre>${msg.replace(/</g, '&lt;')}</pre></body></html>`;
     }
-  }, [chatId, tick]);
+  }, [chatId, tick, viewBuildId]);
   const previewSrc = usePreviewSrc(previewHtml);
 
+  const genNow = developing || isChatGenerating(chatId);
+  const showDevOverlay = genNow && viewingLatest && tab === 'preview';
+  const showBgHint = genNow && !viewingLatest;
+
   const lang = selected ? langFromPath(selected) : undefined;
+
+  const buildLabel = viewingLatest
+    ? builds.length
+      ? `Актуальная · #${builds[0].index}`
+      : 'Актуальная'
+    : activeBuild
+      ? `${activeBuild.label} · #${activeBuild.index}`
+      : 'Сборка';
 
   const panel = (
     <div className="coding-workbench flex h-full min-h-0 flex-col">
       <header className="coding-wb-header">
         <div className="coding-wb-tabs" role="tablist">
-          {(['files', 'preview'] as const).map((id) => (
+          {(['preview', 'files'] as const).map((id) => (
             <button
               key={id}
               type="button"
@@ -141,9 +207,60 @@ export default function CodingWorkbench({
           ))}
         </div>
         <div className="coding-wb-actions">
+          <div className="coding-wb-builds">
+            <button
+              type="button"
+              className={`coding-wb-build-btn ${!viewingLatest ? 'is-historic' : ''}`}
+              onClick={() => setBuildsOpen((v) => !v)}
+              aria-expanded={buildsOpen}
+              title="История сборок"
+            >
+              {buildLabel}
+              <svg className="h-3 w-3 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            {buildsOpen && (
+              <div className="coding-wb-build-menu" role="listbox">
+                <button
+                  type="button"
+                  role="option"
+                  className={`coding-wb-build-item ${viewingLatest ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setViewBuildId('latest');
+                    setBuildsOpen(false);
+                  }}
+                >
+                  <span>Актуальная версия</span>
+                  <span className="coding-wb-build-meta">рабочие файлы</span>
+                </button>
+                {builds.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    role="option"
+                    className={`coding-wb-build-item ${viewBuildId === b.id ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setViewBuildId(b.id);
+                      setBuildsOpen(false);
+                      setTab('preview');
+                    }}
+                  >
+                    <span>
+                      #{b.index} · {b.label}
+                    </span>
+                    <span className="coding-wb-build-meta">{formatBuildTime(b.createdAt)}</span>
+                  </button>
+                ))}
+                {!builds.length && (
+                  <p className="coding-wb-build-empty">Сборки появятся после правок сайта</p>
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="button"
-            disabled={!files.length || busy}
+            disabled={!files.length || busy || !viewingLatest}
             onClick={() => {
               setBusy(true);
               setError(null);
@@ -152,7 +269,7 @@ export default function CodingWorkbench({
                 .finally(() => setBusy(false));
             }}
             className="coding-wb-zip"
-            title="Скачать ZIP"
+            title={viewingLatest ? 'Скачать ZIP актуальной версии' : 'ZIP только для актуальной версии'}
           >
             ZIP
           </button>
@@ -170,29 +287,36 @@ export default function CodingWorkbench({
       </header>
 
       {error && <p className="coding-wb-error">{error}</p>}
+      {showBgHint && (
+        <p className="coding-wb-bg-hint">
+          Сайт обновляется в фоне · вы смотрите прошлую сборку
+        </p>
+      )}
 
       {tab === 'preview' ? (
         <div className="coding-wb-preview min-h-0 flex-1">
           {previewSrc ? (
             <iframe
-              key={previewSrc}
+              key={`${previewSrc}-${viewBuildId}`}
               title="Превью сайта"
-              className="h-full w-full min-h-[280px] border-0 bg-white"
+              className={`h-full w-full min-h-[280px] border-0 bg-white ${showDevOverlay ? 'is-dimmed' : ''}`}
               sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
               src={previewSrc}
             />
           ) : (
             <div className="coding-wb-empty">
               <p>Нет превью</p>
-              <span>Нужен src/App.jsx — включите «Кодинг» и отправьте задачу</span>
+              <span>Включите «Кодинг» — появится шаблон сайта</span>
             </div>
           )}
+          <SiteDevelopingOverlay active={showDevOverlay} background={showBgHint && tab === 'preview'} />
         </div>
       ) : (
         <div className="coding-wb-files min-h-0 flex-1">
           <aside className="coding-wb-sidebar">
             <p className="coding-wb-sidebar-label">
-              Проект{files.length ? ` · ${files.length}` : ''}
+              {viewingLatest ? 'Проект' : `Сборка #${activeBuild?.index ?? '—'}`}
+              {files.length ? ` · ${files.length}` : ''}
             </p>
             {items.length ? (
               <FileTreeFromItems
@@ -214,7 +338,7 @@ export default function CodingWorkbench({
                 truncate
               />
             ) : (
-              <p className="coding-wb-empty-sm">Файлы появятся после первого ответа</p>
+              <p className="coding-wb-empty-sm">Файлы появятся после включения кодинга</p>
             )}
           </aside>
           <section className="coding-wb-editor">
@@ -222,6 +346,7 @@ export default function CodingWorkbench({
               <div className="coding-wb-path">
                 <span className="truncate">{selected}</span>
                 {lang && <span className="coding-wb-lang">{lang}</span>}
+                {!viewingLatest && <span className="coding-wb-lang">read-only</span>}
               </div>
             )}
             <div className="coding-wb-code">

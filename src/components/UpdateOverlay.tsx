@@ -7,6 +7,7 @@ type VersionPayload = {
 
 /**
  * Когда на CDN/VPS выкатили новый билд — показываем «Обновление…» и перезагружаем.
+ * Проверка идёт и в фоне (скрытая вкладка); reload — сразу или при возврате на вкладку.
  */
 export default function UpdateOverlay() {
   const [updating, setUpdating] = useState(false);
@@ -18,9 +19,19 @@ export default function UpdateOverlay() {
 
     let cancelled = false;
     let reloading = false;
+    let pendingReload = false;
+
+    const applyUpdate = () => {
+      if (reloading) return;
+      reloading = true;
+      setUpdating(true);
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 900);
+    };
 
     const check = async () => {
-      if (cancelled || reloading || document.hidden) return;
+      if (cancelled || reloading) return;
       try {
         const res = await fetch(`/version.json?t=${Date.now()}`, {
           cache: 'no-store',
@@ -28,11 +39,11 @@ export default function UpdateOverlay() {
         if (!res.ok) return;
         const data = (await res.json()) as VersionPayload;
         if (!data.buildId || data.buildId === localBuild) return;
-        reloading = true;
-        setUpdating(true);
-        window.setTimeout(() => {
-          window.location.reload();
-        }, 900);
+        if (document.hidden) {
+          pendingReload = true;
+          return;
+        }
+        applyUpdate();
       } catch {
         /* offline — ignore */
       }
@@ -42,7 +53,12 @@ export default function UpdateOverlay() {
     const id = window.setInterval(check, 45_000);
     const onFocus = () => void check();
     const onVis = () => {
-      if (!document.hidden) void check();
+      if (document.hidden) return;
+      if (pendingReload) {
+        applyUpdate();
+        return;
+      }
+      void check();
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVis);

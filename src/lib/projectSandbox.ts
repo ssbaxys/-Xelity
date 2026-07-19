@@ -12,16 +12,27 @@ export type SandboxFile = {
   updatedAt: number;
 };
 
+export type SandboxBuild = {
+  id: string;
+  index: number;
+  label: string;
+  createdAt: number;
+  files: Record<string, SandboxFile>;
+};
+
 export type ChatSandbox = {
   chatId: string;
   files: Record<string, SandboxFile>;
   updatedAt: number;
+  builds?: SandboxBuild[];
+  buildSeq?: number;
 };
 
 const KEY = 'xelity-sandbox-v1';
 const MAX_FILES = 60;
 const MAX_FILE_BYTES = 180_000;
 const MAX_TOTAL_BYTES = 1_200_000;
+const MAX_BUILDS = 24;
 
 type RootStore = Record<string, ChatSandbox>;
 
@@ -110,6 +121,52 @@ export function clearSandbox(chatId: string) {
   const root = readRoot();
   delete root[chatId];
   writeRoot(root);
+}
+
+function cloneFiles(files: Record<string, SandboxFile>): Record<string, SandboxFile> {
+  const out: Record<string, SandboxFile> = {};
+  for (const [k, v] of Object.entries(files)) {
+    out[k] = { path: v.path, content: v.content, updatedAt: v.updatedAt };
+  }
+  return out;
+}
+
+/** Снимок рабочей версии (как коммит). Правки всегда идут в files — сборки только для просмотра. */
+export function commitSandboxBuild(chatId: string, label?: string): SandboxBuild | null {
+  const root = readRoot();
+  const box = root[chatId];
+  if (!box || !Object.keys(box.files).length) return null;
+  const seq = (box.buildSeq || 0) + 1;
+  const build: SandboxBuild = {
+    id: `b${seq}_${Date.now().toString(36)}`,
+    index: seq,
+    label: label?.trim() || `Сборка ${seq}`,
+    createdAt: Date.now(),
+    files: cloneFiles(box.files),
+  };
+  const builds = [...(box.builds || []), build].slice(-MAX_BUILDS);
+  root[chatId] = { ...box, builds, buildSeq: seq, updatedAt: Date.now() };
+  writeRoot(root);
+  return build;
+}
+
+export function listSandboxBuilds(chatId: string): SandboxBuild[] {
+  return [...(getSandbox(chatId).builds || [])].sort((a, b) => b.index - a.index);
+}
+
+export function getSandboxFilesAt(
+  chatId: string,
+  buildId: string | 'latest' = 'latest',
+): Record<string, SandboxFile> {
+  const box = getSandbox(chatId);
+  if (buildId === 'latest' || !buildId) return box.files;
+  const hit = (box.builds || []).find((b) => b.id === buildId);
+  return hit?.files ?? box.files;
+}
+
+export function latestBuildId(chatId: string): string | 'latest' {
+  const builds = listSandboxBuilds(chatId);
+  return builds[0]?.id ?? 'latest';
 }
 
 /** Дерево путей → вложенные папки/файлы */
@@ -216,85 +273,96 @@ createRoot(document.getElementById('root')).render(
   'src/App.jsx': `export default function App() {
   return (
     <div className="page">
+      <div className="template-banner" role="note">
+        Это шаблон сайта — замените тексты, блоки и стиль под свой проект
+      </div>
+
       <header className="header">
-        <div className="brand">NovaSite</div>
+        <div className="brand">SiteName</div>
         <nav className="nav">
-          <a href="#features">Возможности</a>
-          <a href="#about">О нас</a>
-          <a href="#cta">Старт</a>
+          <a href="#about">О проекте</a>
+          <a href="#services">Услуги</a>
+          <a href="#contact">Контакты</a>
         </nav>
+        <a className="btn small" href="#contact">
+          Связаться
+        </a>
       </header>
 
       <main>
         <section className="hero">
-          <p className="eyebrow">Одностраничный сайт</p>
-          <h1>Чистый React-шаблон для быстрого старта</h1>
+          <p className="eyebrow">Шаблон одностраничного сайта</p>
+          <h1>Заголовок вашего сайта</h1>
           <p className="lead">
-            Адаптивная вёрстка, понятная структура и готовые блоки — правьте файлы в панели справа.
+            Это шаблон сайта с типичной структурой: шапка, герой, услуги, о проекте и подвал.
+            Опишите в чате, что нужно — превью обновится автоматически.
           </p>
           <div className="actions">
-            <a className="btn primary" href="#cta">
-              Начать
+            <a className="btn primary" href="#services">
+              Смотреть услуги
             </a>
-            <a className="btn ghost" href="#features">
-              Смотреть блоки
+            <a className="btn ghost" href="#about">
+              Узнать больше
             </a>
           </div>
         </section>
 
-        <section id="features" className="section">
-          <h2>Возможности</h2>
+        <section id="services" className="section">
+          <h2>Услуги</h2>
+          <p className="section-lead">Три карточки-заглушки — замените на реальные предложения.</p>
           <div className="grid">
             <article className="card">
-              <h3>Быстрый старт</h3>
-              <p>Vite + React: привычный стек, удобно развивать локально.</p>
+              <h3>Услуга 1</h3>
+              <p>Краткое описание услуги или преимущества. Это шаблон сайта.</p>
             </article>
             <article className="card">
-              <h3>Адаптив</h3>
-              <p>Базовые стили уже учитывают узкие экраны.</p>
+              <h3>Услуга 2</h3>
+              <p>Краткое описание услуги или преимущества. Это шаблон сайта.</p>
             </article>
             <article className="card">
-              <h3>Превью в чате</h3>
-              <p>Смотрите результат во вкладке «Превью» без сборки на сервере.</p>
+              <h3>Услуга 3</h3>
+              <p>Краткое описание услуги или преимущества. Это шаблон сайта.</p>
             </article>
           </div>
         </section>
 
         <section id="about" className="section muted">
-          <h2>О шаблоне</h2>
+          <h2>О проекте</h2>
           <p>
-            Это стартовая точка. Попросите ИИ добавить форму, галерею, тарифы или анимации — правки
-            появятся в файлах проекта.
+            Здесь обычно рассказывают о компании или продукте. Сейчас это шаблон сайта — попросите
+            изменить тон, добавить фото, форму заявки или тарифы.
           </p>
         </section>
 
-        <section id="cta" className="cta">
-          <h2>Готовы продолжить?</h2>
-          <p>Напишите в чат, что нужно изменить.</p>
+        <section id="contact" className="cta">
+          <h2>Контакты</h2>
+          <p>Email: hello@example.com · Телефон: +7 (000) 000-00-00</p>
           <button
             type="button"
             className="btn primary"
-            onClick={() => alert('Привет! Шаблон работает.')}
+            onClick={() => alert('Это шаблон сайта — кнопка работает.')}
           >
-            Проверить JS
+            Написать нам
           </button>
         </section>
       </main>
 
-      <footer className="footer">© NovaSite · Xelity sandbox</footer>
+      <footer className="footer">
+        © SiteName · Это шаблон сайта · Xelity
+      </footer>
     </div>
   );
 }
 `,
   'src/styles.css': `:root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --text: #eef1f6;
-  --muted: #9aa3b2;
-  --line: #2a3140;
+  --bg: #f6f4f1;
+  --panel: #ffffff;
+  --text: #1a1c1f;
+  --muted: #5c6570;
+  --line: #e2ddd6;
   --accent: #c62828;
-  --accent-soft: rgba(198, 40, 40, 0.16);
-  font-family: "Segoe UI", system-ui, sans-serif;
+  --accent-soft: rgba(198, 40, 40, 0.12);
+  font-family: "Segoe UI", Georgia, system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
@@ -304,50 +372,72 @@ body { margin: 0; }
 a { color: inherit; text-decoration: none; }
 
 .page { min-height: 100vh; }
+.template-banner {
+  background: var(--accent);
+  color: #fff;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 1rem;
+}
 .header {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line);
-  position: sticky; top: 0; background: rgba(15, 17, 21, 0.88); backdrop-filter: blur(10px);
+  gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: rgba(246, 244, 241, 0.92); backdrop-filter: blur(10px);
+  z-index: 2;
 }
-.brand { font-weight: 700; letter-spacing: 0.04em; }
-.nav { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--muted); font-size: 0.92rem; }
+.brand { font-weight: 800; letter-spacing: -0.02em; font-size: 1.15rem; }
+.nav { display: flex; gap: 1.1rem; flex-wrap: wrap; color: var(--muted); font-size: 0.92rem; }
 .nav a:hover { color: var(--text); }
 
-.hero { padding: 4.5rem 1.25rem 3rem; max-width: 720px; }
-.eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.75rem; }
-.hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1.15; margin: 0.4rem 0 0.8rem; }
-.lead { color: var(--muted); font-size: 1.05rem; line-height: 1.6; }
-.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.4rem; }
+.hero {
+  padding: 4.5rem 1.5rem 3.25rem; max-width: 720px;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, var(--accent-soft), transparent 55%),
+    linear-gradient(180deg, #fff 0%, var(--bg) 100%);
+}
+.eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem; font-weight: 700; }
+.hero h1 { font-size: clamp(1.85rem, 4.2vw, 2.85rem); line-height: 1.12; margin: 0.45rem 0 0.85rem; letter-spacing: -0.03em; }
+.lead { color: var(--muted); font-size: 1.05rem; line-height: 1.65; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.45rem; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 0.7rem; padding: 0.7rem 1.1rem; border: 1px solid transparent;
-  font-weight: 600; cursor: pointer;
+  border-radius: 0.55rem; padding: 0.72rem 1.15rem; border: 1px solid transparent;
+  font-weight: 650; cursor: pointer; font-size: 0.95rem;
 }
+.btn.small { padding: 0.45rem 0.85rem; font-size: 0.85rem; background: var(--text); color: #fff; }
 .btn.primary { background: var(--accent); color: #fff; }
-.btn.ghost { border-color: var(--line); background: transparent; color: var(--text); }
-.btn:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: var(--line); background: var(--panel); color: var(--text); }
+.btn:hover { filter: brightness(1.05); }
 
-.section { padding: 2.5rem 1.25rem; max-width: 960px; }
+.section { padding: 2.75rem 1.5rem; max-width: 980px; margin: 0 auto; }
 .section.muted { color: var(--muted); }
-.section h2 { margin: 0 0 1rem; }
-.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.section h2 { margin: 0 0 0.4rem; letter-spacing: -0.02em; }
+.section-lead { margin: 0 0 1.25rem; color: var(--muted); }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; padding: 1.1rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.9rem; padding: 1.2rem;
+  box-shadow: 0 10px 28px rgba(26, 28, 31, 0.04);
 }
-.card h3 { margin: 0 0 0.45rem; font-size: 1rem; }
-.card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 0.92rem; }
+.card h3 { margin: 0 0 0.45rem; font-size: 1.05rem; }
+.card p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 0.92rem; }
 
 .cta {
-  margin: 1rem 1.25rem 3rem; padding: 2rem; border-radius: 1.2rem;
-  background: linear-gradient(160deg, var(--accent-soft), transparent), var(--panel);
-  border: 1px solid var(--line); max-width: 960px;
+  margin: 0.5rem auto 3rem; padding: 2.1rem; border-radius: 1rem;
+  background: var(--panel); border: 1px solid var(--line); max-width: 980px;
 }
-.footer { padding: 1.5rem 1.25rem 2.5rem; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); }
+.cta .btn { margin-top: 1rem; }
+.footer {
+  padding: 1.4rem 1.5rem 2.4rem; color: var(--muted); font-size: 0.85rem;
+  border-top: 1px solid var(--line); text-align: center;
+}
 
-@media (max-width: 640px) {
-  .header { flex-direction: column; align-items: flex-start; }
-  .hero { padding-top: 2.5rem; }
+@media (max-width: 720px) {
+  .header { flex-wrap: wrap; }
+  .nav { width: 100%; order: 3; }
+  .hero { padding-top: 2.6rem; }
 }
 `,
 };
@@ -358,6 +448,7 @@ export function ensureReactSiteTemplate(chatId: string): boolean {
   for (const [path, content] of Object.entries(REACT_TEMPLATE)) {
     writeSandboxFile(chatId, path, content);
   }
+  commitSandboxBuild(chatId, 'Шаблон сайта');
   return true;
 }
 
@@ -404,7 +495,7 @@ export function runSandboxTool(
     const files = listSandboxFiles(chatId);
     return {
       forModel: JSON.stringify({ files }),
-      activity: { id, name, kind: 'list', ok: true, after: files.join('\n') },
+      activity: { id, name, kind: 'list', ok: true, pending: false, after: files.join('\n') },
     };
   }
 
@@ -414,7 +505,7 @@ export function runSandboxTool(
     if (content == null) {
       return {
         forModel: JSON.stringify({ error: 'Файл не найден', path }),
-        activity: { id, name, kind: 'read', path, ok: false, error: 'Файл не найден' },
+        activity: { id, name, kind: 'read', path, ok: false, pending: false, error: 'Файл не найден' },
       };
     }
     const startLine = args.start_line != null ? Number(args.start_line) : undefined;
@@ -434,6 +525,7 @@ export function runSandboxTool(
         kind: 'read',
         path,
         ok: true,
+        pending: false,
         startLine: sliced.startLine,
         endLine: sliced.endLine,
         after: sliced.raw ?? sliced.text,
@@ -455,6 +547,7 @@ export function runSandboxTool(
         kind,
         path,
         ok: res.ok,
+        pending: false,
         error: res.ok ? undefined : res.error,
         before: before ?? '',
         after: content,
@@ -474,6 +567,7 @@ export function runSandboxTool(
         kind: 'delete',
         path,
         ok: res.ok,
+        pending: false,
         error: res.ok ? undefined : res.error,
         before: before ?? '',
         after: '',
@@ -483,7 +577,7 @@ export function runSandboxTool(
 
   return {
     forModel: JSON.stringify({ error: `Неизвестный tool: ${name}` }),
-    activity: { id, name, kind: 'edit', ok: false, error: `Неизвестный tool: ${name}` },
+    activity: { id, name, kind: 'edit', ok: false, pending: false, error: `Неизвестный tool: ${name}` },
   };
 }
 
@@ -493,38 +587,41 @@ export function executeSandboxTool(chatId: string, name: string, argsJson: strin
 }
 
 /** Превью: JSX собирается в родителе (Babel), в iframe — готовый JS + React UMD */
-export function buildPreviewHtml(chatId: string): string | null {
-  const box = getSandbox(chatId);
+export function buildPreviewHtml(
+  chatId: string,
+  buildId: string | 'latest' = 'latest',
+): string | null {
+  const files = getSandboxFilesAt(chatId, buildId);
   const entry =
-    (box.files['src/App.jsx'] && 'src/App.jsx') ||
-    (box.files['src/App.tsx'] && 'src/App.tsx') ||
-    (box.files['src/App.js'] && 'src/App.js') ||
-    (box.files['App.jsx'] && 'App.jsx') ||
+    (files['src/App.jsx'] && 'src/App.jsx') ||
+    (files['src/App.tsx'] && 'src/App.tsx') ||
+    (files['src/App.js'] && 'src/App.js') ||
+    (files['App.jsx'] && 'App.jsx') ||
     null;
 
   const cssParts = [
-    box.files['src/styles.css']?.content,
-    box.files['src/index.css']?.content,
-    box.files['styles.css']?.content,
-    box.files['src/App.css']?.content,
+    files['src/styles.css']?.content,
+    files['src/index.css']?.content,
+    files['styles.css']?.content,
+    files['src/App.css']?.content,
   ].filter(Boolean) as string[];
   const css = cssParts.join('\n');
 
   if (entry) {
     return buildReactPreviewDocument({
       entryPath: entry,
-      files: box.files,
+      files,
       css,
     });
   }
 
   const index =
-    box.files['index.html']?.content ||
-    box.files['Index.html']?.content ||
-    Object.values(box.files).find((f) => f.path.endsWith('.html') && f.path !== 'index.html')
+    files['index.html']?.content ||
+    files['Index.html']?.content ||
+    Object.values(files).find((f) => f.path.endsWith('.html') && f.path !== 'index.html')
       ?.content;
   if (!index) return null;
-  return buildStaticPreviewDocument(index, box.files);
+  return buildStaticPreviewDocument(index, files);
 }
 
 export async function downloadSandboxZip(chatId: string, filename = 'xelity-site.zip') {

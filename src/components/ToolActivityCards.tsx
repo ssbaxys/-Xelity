@@ -3,6 +3,8 @@ import type { ToolActivity } from '../lib/chatStore';
 import { compactDiff, diffLines } from '../lib/lineDiff';
 import {
   IconCheck,
+  IconClock,
+  IconClose,
   IconEye,
   IconFilePlus,
   IconPencil,
@@ -33,8 +35,7 @@ function KindIcon({
     );
   }
   if (kind === 'search') return <IconSearch className={`h-3.5 w-3.5 ${spin}`} />;
-  if (kind === 'fetch') return <IconEye className={`h-3.5 w-3.5 ${spin}`} />;
-  if (kind === 'read' || kind === 'list') {
+  if (kind === 'fetch' || kind === 'read' || kind === 'list') {
     return <IconEye className={`h-3.5 w-3.5 ${spin}`} />;
   }
   if (kind === 'create') return <IconFilePlus className={`h-3.5 w-3.5 ${spin}`} />;
@@ -43,23 +44,44 @@ function KindIcon({
 }
 
 function labelFor(a: ToolActivity): string {
-  if (a.kind === 'weather') return `Погода: ${a.path || '…'}`;
-  if (a.kind === 'search') return `Поиск: ${a.path || '…'}`;
+  if (a.kind === 'weather') return `Погода${a.path ? `: ${a.path}` : ''}`;
+  if (a.kind === 'search') return `Поиск${a.path ? `: ${a.path}` : ''}`;
   if (a.kind === 'fetch') {
-    if (a.links && a.links.length > 1) {
-      return `Чтение ${a.links.length} сайтов`;
-    }
-    return `Чтение сайта: ${a.path || '…'}`;
+    if (a.links && a.links.length > 1) return `Просмотр сайтов · ${a.links.length}`;
+    return `Просмотр сайта${a.path ? `: ${a.path}` : ''}`;
   }
   if (a.kind === 'list') return 'Список файлов';
   if (a.kind === 'read') {
     const range =
       a.startLine && a.endLine ? ` · ${a.startLine}–${a.endLine}` : '';
-    return `Чтение ${a.path || ''}${range}`;
+    return `Просмотр файла${a.path ? ` ${a.path}` : ''}${range}`;
   }
-  if (a.kind === 'create') return `Создание ${a.path || ''}`;
-  if (a.kind === 'delete') return `Удаление ${a.path || ''}`;
-  return `Редактирование ${a.path || ''}`;
+  if (a.kind === 'create') return `Создание файла${a.path ? ` ${a.path}` : ''}`;
+  if (a.kind === 'delete') return `Удаление файла${a.path ? ` ${a.path}` : ''}`;
+  return `Редактирование${a.path ? ` ${a.path}` : ''}`;
+}
+
+/** Справа: часы (pending) · галочка (ok) · крестик (error) — без текста «ок» */
+function StatusIcon({ pending, ok }: { pending?: boolean; ok?: boolean }) {
+  if (pending) {
+    return (
+      <span className="tool-status-pending inline-flex text-[var(--c-faint)]" aria-label="выполняется">
+        <IconClock className="tool-clock-spin h-3.5 w-3.5 shrink-0" />
+      </span>
+    );
+  }
+  if (ok) {
+    return (
+      <span className="tool-status-done inline-flex text-[#81c784]" aria-label="готово">
+        <IconCheck className="tool-check-in h-3.5 w-3.5 shrink-0" />
+      </span>
+    );
+  }
+  return (
+    <span className="tool-status-fail inline-flex text-[#e57373]" aria-label="ошибка">
+      <IconClose className="tool-x-in h-3.5 w-3.5 shrink-0" />
+    </span>
+  );
 }
 
 function DiffView({ activity, ok }: { activity: ToolActivity; ok?: boolean }) {
@@ -149,48 +171,38 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
   return (
     <div className="tool-cards mb-3 space-y-1.5">
       {items.map((a, index) => {
-        if (a.kind === 'weather' && a.weather && a.ok) {
+        if (a.kind === 'weather' && a.weather && a.ok && !a.pending) {
           return (
             <div
               key={a.id}
               className="tool-card weather-tool-wrap"
               style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
             >
-              <WeatherCard weather={a.weather} pending={a.pending} />
-            </div>
-          );
-        }
-
-        if (a.kind === 'weather' && a.pending) {
-          return (
-            <div
-              key={a.id}
-              className="tool-card overflow-hidden rounded-xl border border-[var(--c-border-strong)] bg-[var(--c-soft)]"
-              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
-            >
-              <div className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[var(--c-text)]">
-                <KindIcon kind="weather" pending />
-                <span className="tool-label-shimmer min-w-0 flex-1 truncate font-medium">
-                  {labelFor(a)}…
-                </span>
-                <span className="text-[10px] text-[var(--c-faint)]">работаю</span>
-              </div>
+              <WeatherCard weather={a.weather} pending={false} />
             </div>
           );
         }
 
         const expanded = openId === a.id;
         const expandable =
-          Boolean(a.links?.length) ||
-          a.kind === 'search' ||
-          a.kind === 'fetch' ||
-          a.kind !== 'list' ||
-          Boolean(a.after);
+          !a.pending &&
+          (Boolean(a.links?.length) ||
+            a.kind === 'search' ||
+            a.kind === 'fetch' ||
+            a.kind === 'read' ||
+            a.kind === 'list' ||
+            a.kind === 'create' ||
+            a.kind === 'edit' ||
+            a.kind === 'delete' ||
+            Boolean(a.after) ||
+            Boolean(a.error));
+
         const tone = a.pending
-          ? 'tool-card-pending border-[var(--c-border-strong)] bg-[var(--c-soft)]'
+          ? 'tool-card-pending border-[var(--c-border)] bg-[var(--c-soft)]'
           : a.ok
             ? 'tool-card-ok border-[rgba(46,125,50,0.35)] bg-[rgba(46,125,50,0.08)]'
-            : 'tool-card-err border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.1)]';
+            : 'tool-card-err border-[rgba(198,40,40,0.45)] bg-[rgba(198,40,40,0.12)]';
+
         return (
           <div
             key={a.id}
@@ -199,16 +211,16 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
           >
             <button
               type="button"
-              disabled={!expandable || a.pending}
+              disabled={!expandable}
               onClick={() => setOpenId(expanded ? null : a.id)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-[var(--c-text)] transition-colors duration-200 disabled:cursor-default"
             >
               <span
                 className={`tool-card-icon inline-flex shrink-0 ${
-                  a.ok && !a.pending
-                    ? 'text-[#81c784]'
-                    : a.pending
-                      ? 'text-[var(--c-muted)]'
+                  a.pending
+                    ? 'text-[var(--c-muted)]'
+                    : a.ok
+                      ? 'text-[#81c784]'
                       : 'text-[#e57373]'
                 }`}
               >
@@ -224,23 +236,8 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
                 }`}
               >
                 {labelFor(a)}
-                {a.pending ? '…' : ''}
               </span>
-              {a.pending ? (
-                <span className="tool-status-pending text-[10px] tabular-nums text-[var(--c-faint)]">
-                  работаю
-                </span>
-              ) : a.ok ? (
-                <span
-                  className="tool-status-done inline-flex items-center gap-1 text-[10px] text-[#81c784]"
-                  aria-label="готово"
-                >
-                  <IconCheck className="tool-check-in h-3.5 w-3.5 shrink-0" />
-                  {a.kind === 'search' || a.kind === 'weather' ? null : 'ок'}
-                </span>
-              ) : (
-                <span className="tool-status-fail text-[10px] text-[#e57373]">ошибка</span>
-              )}
+              <StatusIcon pending={a.pending} ok={a.ok} />
             </button>
             <div className={`tool-card-body ${expanded && !a.pending ? 'is-open' : ''}`}>
               <div className="tool-card-body-inner border-t border-[var(--c-border)] bg-[var(--c-panel)]">

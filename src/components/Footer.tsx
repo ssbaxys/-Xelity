@@ -23,7 +23,8 @@ const columns = [
   {
     title: 'Разработчикам',
     links: [
-      { label: 'API', to: '/api', desc: 'Интеграция и квоты' },
+      { label: 'API', to: '/api', desc: 'Chat · Search · Weather' },
+      { label: 'API кабинет', to: '/account/api', desc: 'Ключи и баланс USD' },
       { label: 'Changelog', to: '/changelog', desc: 'История обновлений' },
     ],
   },

@@ -32,9 +32,12 @@ export default function CTA() {
                     <span className="h-2 w-2 animate-pulse rounded-sm bg-signal" />
                     {user.displayName || 'Пользователь'} · подключено
                   </div>
-                  <div className="mt-6">
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                     <Link to="/chat" className="btn-primary">
                       Перейти в чат
+                    </Link>
+                    <Link to="/account/api" className="btn-ghost">
+                      API кабинет
                     </Link>
                   </div>
                 </>

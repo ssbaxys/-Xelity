@@ -54,8 +54,20 @@
         },
         "usage": {
           ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+        },
+        "billing": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+          ".write": false
+        },
+        "apiKeys": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
+          ".write": false
         }
       }
+    },
+    "apiKeyIndex": {
+      ".read": false,
+      ".write": false
     },
     "userChats": {
       ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
