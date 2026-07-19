@@ -11,6 +11,8 @@ import {
   staffBrand,
 } from '../../lib/staff';
 
+const DESKTOP_MQ = '(min-width: 768px)';
+
 export default function AdminLayout() {
   const { user, isStaff, staffRole, loading } = useAuth();
   const { theme, setTheme } = usePrefs();
@@ -31,6 +33,17 @@ export default function AdminLayout() {
   useEffect(() => {
     setNavOpen(false);
   }, [location.pathname]);
+
+  // На ПК гамбургер не нужен — закрываем drawer при расширении окна
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_MQ);
+    const onChange = () => {
+      if (mq.matches) setNavOpen(false);
+    };
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -76,24 +89,21 @@ export default function AdminLayout() {
   return (
     <div className={`${shellClass} min-h-dvh`} style={shellStyle}>
       <header className="admin-header sticky top-0 z-40">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 xl:max-w-7xl">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <NavLink
-              to="/chat"
-              className="hidden shrink-0 text-sm text-[var(--a-muted)] transition hover:text-[var(--a-text)] sm:inline"
-            >
+        <div className="admin-header-inner">
+          <div className="admin-header-brand">
+            <NavLink to="/chat" className="admin-back-chat">
               ← Чат
             </NavLink>
-            <div className="hidden h-4 w-px bg-[var(--a-border)] sm:block" />
+            <div className="admin-header-divider" aria-hidden />
             <div className="min-w-0">
-              <h1 className="truncate text-[13px] font-semibold tracking-[0.06em] text-[var(--a-text)] sm:text-sm sm:tracking-[0.08em]">
+              <h1 className="admin-header-title">
                 XELITY <span className="admin-brand-code">{brand.code}</span>
               </h1>
-              <p className="admin-brand-hint truncate text-[10px] text-[var(--a-faint)]">{brand.hint}</p>
+              <p className="admin-brand-hint truncate">{brand.hint}</p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="admin-header-actions">
             <button
               type="button"
               className="admin-theme-toggle"
@@ -104,8 +114,7 @@ export default function AdminLayout() {
               {isLight ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
             </button>
 
-            {/* Пункты меню — с телефона скрыты; гамбургер только &lt;640px */}
-            <nav className="admin-nav-desktop hidden flex-wrap justify-end gap-1 sm:flex">
+            <nav className="admin-nav-desktop" aria-label="Админ">
               {links.map((l) => (
                 <NavLink
                   key={l.to}
@@ -120,7 +129,7 @@ export default function AdminLayout() {
 
             <button
               type="button"
-              className="admin-nav-burger admin-theme-toggle sm:hidden"
+              className="admin-nav-burger"
               aria-label={navOpen ? 'Закрыть меню' : 'Открыть меню'}
               aria-expanded={navOpen}
               onClick={() => setNavOpen((v) => !v)}
@@ -131,14 +140,11 @@ export default function AdminLayout() {
         </div>
 
         {navOpen && (
-          <div className="admin-nav-mobile border-t border-[var(--a-border)] px-3 pb-3 pt-2 sm:hidden">
-            <NavLink
-              to="/chat"
-              className="mb-2 block rounded-lg px-2.5 py-2 text-sm text-[var(--a-muted)] hover:bg-[var(--a-hover)] hover:text-[var(--a-text)]"
-            >
+          <div className="admin-nav-mobile">
+            <NavLink to="/chat" className="admin-nav-mobile-chat">
               ← В чат
             </NavLink>
-            <nav className="admin-nav-drawer flex flex-col gap-0.5">
+            <nav className="admin-nav-drawer" aria-label="Админ меню">
               {links.map((l) => (
                 <NavLink
                   key={l.to}
@@ -156,7 +162,7 @@ export default function AdminLayout() {
         )}
       </header>
 
-      <main className="admin-main mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 xl:max-w-7xl">
+      <main className="admin-main">
         <div key={location.pathname} className="admin-page min-w-0">
           <Outlet />
         </div>

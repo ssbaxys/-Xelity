@@ -162,6 +162,7 @@ ensure_env() {
 PORT=8088
 AITUNNEL_API_KEY=
 CORS_ORIGIN=https://xelity.ru,https://www.xelity.ru
+WEATHERAPI_KEY=
 EOF
     chmod 600 "${ENV_FILE}"
   fi
@@ -202,6 +203,7 @@ show_status() {
   echo "Каталог:  ${APP_DIR}"
   echo "Порт:     $(get_env PORT)"
   echo "API key:  $(mask_key "$(get_env AITUNNEL_API_KEY)")"
+  echo "Weather:  $(mask_key "$(get_env WEATHERAPI_KEY)")"
   echo "CORS:     $(get_env CORS_ORIGIN)"
   echo -n "Сервис:   "
   if systemctl is-active --quiet "${SERVICE}" 2>/dev/null; then

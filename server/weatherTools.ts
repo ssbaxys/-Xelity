@@ -1,8 +1,6 @@
 /**
- * Погода через Open-Meteo (бесплатно, без ключа, глобально).
- * Геокодинг: нормализация запроса + несколько вариантов + выбор лучшего hit
- * + fallback Nominatim для мелких населённых пунктов РФ.
- * https://open-meteo.com/
+ * Погода: WeatherAPI.com (основной) + Open-Meteo (fallback).
+ * Ключ: WEATHERAPI_KEY в .env (https://www.weatherapi.com/ — free tier).
  */
 
 export type WeatherCurrent = {
@@ -49,15 +47,16 @@ export type WeatherToolResult = {
   weather?: WeatherPayload;
 };
 
-const GEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
-const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+type PlaceAlias = {
+  name: string;
+  admin1?: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+};
 
-/** Ручные алиасы для мест, которые геокодеры часто не находят с опечатками */
-const PLACE_ALIASES: Record<
-  string,
-  { name: string; admin1?: string; country?: string; latitude: number; longitude: number; timezone?: string }
-> = {
+const PLACE_ALIASES: Record<string, PlaceAlias> = {
   'усть-кокса': {
     name: 'Усть-Кокса',
     admin1: 'Республика Алтай',
@@ -162,7 +161,6 @@ const PLACE_ALIASES: Record<
     longitude: 83.7636,
     timezone: 'Asia/Barnaul',
   },
-  // частые опечатки
   баранул: {
     name: 'Барнаул',
     admin1: 'Алтайский край',
@@ -189,20 +187,10 @@ const PLACE_ALIASES: Record<
   },
 };
 
-/** Крупные города для fuzzy-матча опечаток (ключ → алиас) */
-const FUZZY_CITIES: { keys: string[]; place: (typeof PLACE_ALIASES)[string] }[] = [
-  {
-    keys: ['барнаул', 'barnaul'],
-    place: PLACE_ALIASES['барнаул']!,
-  },
-  {
-    keys: ['москва', 'moscow'],
-    place: PLACE_ALIASES['москва']!,
-  },
-  {
-    keys: ['новосибирск', 'novosibirsk'],
-    place: PLACE_ALIASES['новосибирск']!,
-  },
+const FUZZY_CITIES: { keys: string[]; place: PlaceAlias }[] = [
+  { keys: ['барнаул', 'barnaul'], place: PLACE_ALIASES['барнаул']! },
+  { keys: ['москва', 'moscow'], place: PLACE_ALIASES['москва']! },
+  { keys: ['новосибирск', 'novosibirsk'], place: PLACE_ALIASES['новосибирск']! },
   {
     keys: ['санкт петербург', 'петербург', 'питер', 'spb'],
     place: PLACE_ALIASES['петербург']!,
@@ -266,13 +254,64 @@ const FUZZY_CITIES: { keys: string[]; place: (typeof PLACE_ALIASES)[string] }[] 
     keys: ['горно алтайск', 'горноалтайск'],
     place: PLACE_ALIASES['горно-алтайск']!,
   },
-  {
-    keys: ['усть кокса', 'устькокса'],
-    place: PLACE_ALIASES['усть-кокса']!,
-  },
+  { keys: ['усть кокса', 'устькокса'], place: PLACE_ALIASES['усть-кокса']! },
 ];
 
-/** WMO Weather interpretation codes → короткий label (ru) */
+/** WeatherAPI condition.code → WMO-подобный код для иконок карточки */
+function weatherApiToWmo(code: number): number {
+  const map: Record<number, number> = {
+    1000: 0,
+    1003: 2,
+    1006: 3,
+    1009: 3,
+    1030: 45,
+    1063: 61,
+    1066: 71,
+    1069: 66,
+    1072: 56,
+    1087: 95,
+    1114: 71,
+    1117: 75,
+    1135: 45,
+    1147: 48,
+    1150: 51,
+    1153: 51,
+    1168: 56,
+    1171: 57,
+    1180: 61,
+    1183: 61,
+    1186: 63,
+    1189: 63,
+    1192: 65,
+    1195: 65,
+    1198: 66,
+    1201: 67,
+    1204: 66,
+    1207: 67,
+    1210: 71,
+    1213: 71,
+    1216: 73,
+    1219: 73,
+    1222: 75,
+    1225: 75,
+    1237: 75,
+    1240: 80,
+    1243: 81,
+    1246: 82,
+    1249: 80,
+    1252: 82,
+    1255: 85,
+    1258: 86,
+    1261: 85,
+    1264: 86,
+    1273: 95,
+    1276: 96,
+    1279: 95,
+    1282: 96,
+  };
+  return map[code] ?? 2;
+}
+
 export function wmoLabel(code: number): string {
   if (code === 0) return 'Ясно';
   if (code === 1) return 'Преимущественно ясно';
@@ -291,15 +330,22 @@ export function wmoLabel(code: number): string {
   return 'Переменная погода';
 }
 
-async function fetchJson<T>(url: string, timeoutMs = 10_000, headers?: Record<string, string>): Promise<T> {
+async function fetchJson<T>(
+  url: string,
+  timeoutMs = 12_000,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { Accept: 'application/json', ...(headers || {}) },
+      headers: { Accept: 'application/json', ...extraHeaders },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}${body ? `: ${body.slice(0, 120)}` : ''}`);
+    }
     return (await res.json()) as T;
   } finally {
     clearTimeout(t);
@@ -317,44 +363,6 @@ type GeoHit = {
   population?: number;
 };
 
-function stripWeatherNoise(q: string): string {
-  return q
-    .replace(
-      /^(какая|какой|какое|скажи|покажи|дай|узнай|проверь)\s+/giu,
-      '',
-    )
-    .replace(
-      /^(погода|прогноз|weather|forecast|температура)\s+(в|во|на|для|у|около)?\s*/giu,
-      '',
-    )
-    .replace(
-      /\s+(погода|прогноз|weather|сейчас|сегодня|завтра)$/giu,
-      '',
-    )
-    .replace(/^(в|во|на|для|у|около|про)\s+/giu, '')
-    // «лего» / «для» из голосового / опечаток перед названием
-    .replace(/^(лего|дляо|для)\s+/giu, '')
-    .trim();
-}
-
-/** Мягкая нормализация падежей только для последнего слова (коксу→кокса). */
-function softenRussianPlace(q: string): string {
-  const s = q.trim().replace(/ё/g, 'е');
-  const parts = s.split(/(\s+|-)/);
-  if (!parts.length) return s;
-  // последнее «слово» (не разделитель)
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const w = parts[i]!;
-    if (!w || /^[\s-]+$/.test(w)) continue;
-    // …у → …а (Усть-Коксу / коксу)
-    if (/^[А-Яа-яA-Za-z]{3,}у$/iu.test(w)) {
-      parts[i] = `${w.slice(0, -1)}а`;
-    }
-    break;
-  }
-  return parts.join('');
-}
-
 function locationVariants(raw: string): string[] {
   const base = stripWeatherNoise(raw);
   const soft = softenRussianPlace(base);
@@ -365,14 +373,202 @@ function locationVariants(raw: string): string[] {
     soft.replace(/\s+/g, '-'),
     base.replace(/-/g, ' '),
     soft.replace(/-/g, ' '),
-    // добавим регион, если похоже на алтайские «усть-»
     /усть/i.test(base) && !/алтай/i.test(base) ? `${soft} Алтай` : '',
-    /усть/i.test(base) && !/алтай/i.test(base) ? `${soft.replace(/\s+/g, '-')} Республика Алтай` : '',
   ]
     .map((v) => v.trim().replace(/\s+/g, ' '))
     .filter(Boolean);
-
   return [...new Set(variants)].slice(0, 8);
+}
+
+function scoreHit(hit: GeoHit, query: string): number {
+  const q = query.toLowerCase().replace(/ё/g, 'е').replace(/-/g, ' ').trim();
+  const name = (hit.name || '').toLowerCase().replace(/ё/g, 'е').replace(/-/g, ' ');
+  const admin = `${hit.admin1 || ''} ${hit.country || ''}`.toLowerCase();
+  let score = 0;
+  if (name === q) score += 160;
+  else if (name.startsWith(q) || q.startsWith(name)) score += 90;
+  else if (name.includes(q) || q.includes(name)) score += 45;
+  const isRu =
+    hit.country_code === 'RU' || /россия|russia/i.test(hit.country || '');
+  if (isRu) score += 35;
+  if (/алтай/i.test(admin) && /усть|алтай|кой|кокс/i.test(q)) score += 50;
+  if (typeof hit.population === 'number') {
+    score += Math.min(12, Math.log10(hit.population + 10));
+  }
+  if (/[а-яё]/i.test(q) && hit.country_code && hit.country_code !== 'RU') score -= 55;
+  return score;
+}
+
+async function geocodeOpenMeteo(
+  name: string,
+  opts?: { countryCode?: string },
+): Promise<GeoHit[]> {
+  const params: Record<string, string> = {
+    name,
+    count: '12',
+    language: 'ru',
+    format: 'json',
+  };
+  if (opts?.countryCode) params.countryCode = opts.countryCode;
+  const data = await fetchJson<{ results?: GeoHit[] }>(
+    `https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams(params)}`,
+  );
+  return data.results || [];
+}
+
+async function geocodeNominatim(name: string): Promise<GeoHit[]> {
+  const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+    q: name,
+    format: 'jsonv2',
+    addressdetails: '1',
+    limit: '5',
+    'accept-language': 'ru',
+  })}`;
+  try {
+    const data = await fetchJson<
+      {
+        display_name?: string;
+        name?: string;
+        lat?: string;
+        lon?: string;
+        address?: {
+          city?: string;
+          town?: string;
+          village?: string;
+          municipality?: string;
+          state?: string;
+          country?: string;
+          country_code?: string;
+        };
+      }[]
+    >(url, 6_000, { 'User-Agent': 'XelityWeather/1.0 (https://xelity.ru)' });
+    return (data || [])
+      .map((row) => {
+        const addr = row.address || {};
+        const place =
+          row.name ||
+          addr.village ||
+          addr.town ||
+          addr.city ||
+          addr.municipality ||
+          (row.display_name || '').split(',')[0] ||
+          name;
+        const lat = Number(row.lat);
+        const lon = Number(row.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return {
+          name: place.trim(),
+          admin1: addr.state,
+          country: addr.country,
+          country_code: (addr.country_code || '').toUpperCase(),
+          latitude: lat,
+          longitude: lon,
+        } as GeoHit;
+      })
+      .filter(Boolean) as GeoHit[];
+  } catch {
+    return [];
+  }
+}
+
+/** Геокодинг для fallback Open-Meteo (алиас → OM → Nominatim) */
+async function geocode(location: string): Promise<GeoHit | null> {
+  const raw = location.trim().slice(0, 120);
+  if (!raw) return null;
+
+  const alias = aliasLookup(raw);
+  if (alias) {
+    return {
+      name: alias.name,
+      country: alias.country,
+      admin1: alias.admin1,
+      latitude: alias.latitude,
+      longitude: alias.longitude,
+      timezone: alias.timezone,
+      country_code: 'RU',
+    };
+  }
+
+  const variants = locationVariants(raw);
+  let best: GeoHit | null = null;
+  let bestScore = -Infinity;
+  const preferRu = /[а-яё]/i.test(raw);
+
+  for (const v of variants) {
+    const aliasV = aliasLookup(v);
+    if (aliasV) {
+      return {
+        name: aliasV.name,
+        country: aliasV.country,
+        admin1: aliasV.admin1,
+        latitude: aliasV.latitude,
+        longitude: aliasV.longitude,
+        timezone: aliasV.timezone,
+        country_code: 'RU',
+      };
+    }
+    for (const countryCode of preferRu ? ['RU', undefined] : [undefined]) {
+      let hits: GeoHit[] = [];
+      try {
+        hits = await geocodeOpenMeteo(v, { countryCode });
+      } catch {
+        hits = [];
+      }
+      for (const h of hits) {
+        const s = scoreHit(h, v);
+        if (s > bestScore) {
+          bestScore = s;
+          best = h;
+        }
+      }
+      if (best && bestScore >= 140) break;
+    }
+    if (best && bestScore >= 140) break;
+  }
+
+  if (best && bestScore >= 40) return best;
+
+  for (const v of variants.slice(0, 4)) {
+    const hits = await geocodeNominatim(v);
+    for (const h of hits) {
+      const s = scoreHit(h, v) + 5;
+      if (s > bestScore) {
+        bestScore = s;
+        best = h;
+      }
+    }
+    if (best && bestScore >= 60) break;
+  }
+
+  return bestScore >= 30 ? best : null;
+}
+
+function stripWeatherNoise(q: string): string {
+  return q
+    .replace(/^(какая|какой|какое|скажи|покажи|дай|узнай|проверь)\s+/giu, '')
+    .replace(
+      /^(погода|прогноз|weather|forecast|температура)\s+(в|во|на|для|у|около)?\s*/giu,
+      '',
+    )
+    .replace(/\s+(погода|прогноз|weather|сейчас|сегодня|завтра)$/giu, '')
+    .replace(/^(в|во|на|для|у|около|про)\s+/giu, '')
+    .replace(/^(лего|дляо|для)\s+/giu, '')
+    .trim();
+}
+
+function softenRussianPlace(q: string): string {
+  const s = q.trim().replace(/ё/g, 'е');
+  const parts = s.split(/(\s+|-)/);
+  if (!parts.length) return s;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const w = parts[i]!;
+    if (!w || /^[\s-]+$/.test(w)) continue;
+    if (/^[А-Яа-яA-Za-z]{3,}у$/iu.test(w)) {
+      parts[i] = `${w.slice(0, -1)}а`;
+    }
+    break;
+  }
+  return parts.join('');
 }
 
 function placeKey(q: string): string {
@@ -384,7 +580,6 @@ function placeKey(q: string): string {
     .trim();
 }
 
-/** Damerau–Levenshtein (с перестановкой соседних букв: Баранул↔Барнаул) */
 function editDistance(a: string, b: string): number {
   const n = a.length;
   const m = b.length;
@@ -417,7 +612,7 @@ function maxTypoDistance(len: number): number {
   return 3;
 }
 
-function aliasLookup(q: string): GeoHit | null {
+function aliasLookup(q: string): PlaceAlias | null {
   const key = placeKey(q);
   const soft = placeKey(softenRussianPlace(key));
   const hit =
@@ -428,8 +623,7 @@ function aliasLookup(q: string): GeoHit | null {
     PLACE_ALIASES[q.toLowerCase().trim()];
   if (hit) return { ...hit };
 
-  // fuzzy: опечатки вроде «Баранул» → Барнаул
-  const candidates = new Map<string, (typeof PLACE_ALIASES)[string]>();
+  const candidates = new Map<string, PlaceAlias>();
   for (const [k, p] of Object.entries(PLACE_ALIASES)) {
     candidates.set(placeKey(k), p);
     candidates.set(placeKey(p.name), p);
@@ -439,7 +633,7 @@ function aliasLookup(q: string): GeoHit | null {
     candidates.set(placeKey(row.place.name), row.place);
   }
 
-  let best: (typeof PLACE_ALIASES)[string] | null = null;
+  let best: PlaceAlias | null = null;
   let bestDist = Infinity;
   const qLen = Math.max(key.length, soft.length);
   const limit = maxTypoDistance(qLen);
@@ -447,7 +641,6 @@ function aliasLookup(q: string): GeoHit | null {
   for (const [cand, place] of candidates) {
     for (const qv of [key, soft]) {
       if (!qv || qv.length < 3) continue;
-      // слишком разная длина — не город
       if (Math.abs(qv.length - cand.length) > limit) continue;
       const d = editDistance(qv, cand);
       if (d > 0 && d <= limit && d < bestDist) {
@@ -456,199 +649,269 @@ function aliasLookup(q: string): GeoHit | null {
       }
     }
   }
-  if (best && bestDist <= limit) return { ...best };
-  return null;
+  return best && bestDist <= limit ? { ...best } : null;
 }
-
-function scoreHit(hit: GeoHit, query: string): number {
-  const q = query.toLowerCase().replace(/ё/g, 'е').replace(/-/g, ' ').trim();
-  const name = (hit.name || '').toLowerCase().replace(/ё/g, 'е').replace(/-/g, ' ');
-  const admin = `${hit.admin1 || ''} ${hit.country || ''}`.toLowerCase();
-  let score = 0;
-  if (name === q) score += 160;
-  else if (name.startsWith(q) || q.startsWith(name)) score += 90;
-  else if (name.includes(q) || q.includes(name)) score += 45;
-  const qTokens = q.split(/\s+/).filter((t) => t.length > 2);
-  const nameTokens = name.split(/\s+/);
-  for (const t of qTokens) {
-    if (nameTokens.some((n) => n === t)) score += 22;
-    else if (nameTokens.some((n) => n.startsWith(t) || t.startsWith(n))) score += 10;
-  }
-  const isRu =
-    hit.country_code === 'RU' || /россия|russia/i.test(hit.country || '');
-  if (isRu) score += 35;
-  if (/алтай/i.test(admin) && /усть|алтай|кой|кокс/i.test(q)) score += 50;
-  // население — только тай-брейкер, не перебивает точное имя
-  if (typeof hit.population === 'number') {
-    score += Math.min(12, Math.log10(hit.population + 10));
-  }
-  if (/[а-яё]/i.test(q) && hit.country_code && hit.country_code !== 'RU') score -= 55;
-  // штраф за «чужое» короткое совпадение (напр. деревня vs город с другим именем)
-  if (name !== q && q.length >= 4 && !name.includes(q) && !q.includes(name)) {
-    score -= 20;
-  }
-  return score;
-}
-
-async function geocodeOpenMeteo(
-  name: string,
-  opts?: { countryCode?: string },
-): Promise<GeoHit[]> {
-  const params: Record<string, string> = {
-    name,
-    count: '12',
-    language: 'ru',
-    format: 'json',
-  };
-  if (opts?.countryCode) params.countryCode = opts.countryCode;
-  const data = await fetchJson<{ results?: GeoHit[] }>(
-    `${GEO_URL}?${new URLSearchParams(params)}`,
-  );
-  return data.results || [];
-}
-
-async function geocodeNominatim(name: string): Promise<GeoHit[]> {
-  const url = `${NOMINATIM_URL}?${new URLSearchParams({
-    q: name,
-    format: 'jsonv2',
-    addressdetails: '1',
-    limit: '5',
-    'accept-language': 'ru',
-  })}`;
-  try {
-    const data = await fetchJson<
-      {
-        display_name?: string;
-        name?: string;
-        lat?: string;
-        lon?: string;
-        address?: {
-          city?: string;
-          town?: string;
-          village?: string;
-          municipality?: string;
-          state?: string;
-          country?: string;
-          country_code?: string;
-        };
-      }[]
-    >(url, 6_000, {
-      'User-Agent': 'XelityWeather/1.0 (https://xelity.ru)',
-    });
-    return (data || [])
-      .map((row) => {
-        const addr = row.address || {};
-        const place =
-          row.name ||
-          addr.village ||
-          addr.town ||
-          addr.city ||
-          addr.municipality ||
-          (row.display_name || '').split(',')[0] ||
-          name;
-        const lat = Number(row.lat);
-        const lon = Number(row.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-        return {
-          name: place.trim(),
-          admin1: addr.state,
-          country: addr.country,
-          country_code: (addr.country_code || '').toUpperCase(),
-          latitude: lat,
-          longitude: lon,
-        } as GeoHit;
-      })
-      .filter(Boolean) as GeoHit[];
-  } catch {
-    return [];
-  }
-}
-
-async function geocode(location: string): Promise<GeoHit | null> {
-  const raw = location.trim().slice(0, 120);
-  if (!raw) return null;
-
-  const alias = aliasLookup(raw);
-  if (alias) return alias;
-
-  const variants = locationVariants(raw);
-  let best: GeoHit | null = null;
-  let bestScore = -Infinity;
-
-  const preferRu = /[а-яё]/i.test(raw);
-
-  for (const v of variants) {
-    const aliasV = aliasLookup(v);
-    if (aliasV) return aliasV;
-
-    const passCountry: (string | undefined)[] = preferRu
-      ? ['RU', undefined]
-      : [undefined];
-
-    for (const countryCode of passCountry) {
-      let hits: GeoHit[] = [];
-      try {
-        hits = await geocodeOpenMeteo(v, { countryCode });
-      } catch {
-        hits = [];
-      }
-      for (const h of hits) {
-        const s = scoreHit(h, v);
-        if (s > bestScore) {
-          bestScore = s;
-          best = h;
-        }
-      }
-      // точное RU-совпадение — достаточно
-      if (best && bestScore >= 140) break;
-    }
-    if (best && bestScore >= 140) break;
-  }
-
-  if (best && bestScore >= 40) return best;
-
-  // Nominatim fallback для мелких посёлков РФ
-  for (const v of variants.slice(0, 4)) {
-    const hits = await geocodeNominatim(v);
-    for (const h of hits) {
-      const s = scoreHit(h, v) + 5; // небольшой бонус за то, что OM не нашёл
-      if (s > bestScore) {
-        bestScore = s;
-        best = h;
-      }
-    }
-    if (best && bestScore >= 60) break;
-  }
-
-  return bestScore >= 30 ? best : null;
-}
-
-type ForecastResp = {
-  timezone?: string;
-  current?: {
-    time?: string;
-    temperature_2m?: number;
-    relative_humidity_2m?: number;
-    apparent_temperature?: number;
-    precipitation?: number;
-    weather_code?: number;
-    wind_speed_10m?: number;
-    wind_direction_10m?: number;
-    is_day?: number;
-  };
-  daily?: {
-    time?: string[];
-    weather_code?: number[];
-    temperature_2m_max?: number[];
-    temperature_2m_min?: number[];
-    precipitation_sum?: number[];
-    sunrise?: string[];
-    sunset?: string[];
-  };
-};
 
 function round1(n: number) {
   return Math.round(n * 10) / 10;
+}
+
+function weatherApiKey(): string {
+  return (process.env.WEATHERAPI_KEY || process.env.WEATHER_API_KEY || '').trim();
+}
+
+/** "05:30 AM" + date → ISO-like for WeatherCard */
+function astroToIso(date: string, ampm: string | undefined): string | undefined {
+  if (!ampm) return undefined;
+  const m = ampm.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!m) return undefined;
+  let h = Number(m[1]);
+  const min = m[2];
+  const ap = (m[3] || '').toUpperCase();
+  if (ap === 'PM' && h < 12) h += 12;
+  if (ap === 'AM' && h === 12) h = 0;
+  return `${date}T${String(h).padStart(2, '0')}:${min}:00`;
+}
+
+function buildResult(weather: WeatherPayload): WeatherToolResult {
+  const where = [weather.place, weather.admin1, weather.country].filter(Boolean).join(', ');
+  const today = weather.daily[0];
+  const forModel = [
+    `WEATHER for ${where}`,
+    `Coords: ${weather.latitude.toFixed(4)}, ${weather.longitude.toFixed(4)} · TZ: ${weather.timezone}`,
+    `Updated: ${weather.updatedAt}`,
+    `Now (current): ${weather.current.tempC}°C (feels ${weather.current.feelsLikeC}°C), ${weather.current.label}, humidity ${weather.current.humidity}%, wind ${weather.current.windKmh} km/h, precip ${weather.current.precipMm} mm`,
+    today
+      ? `Today range: ${today.tempMinC}…${today.tempMaxC}°C (daytime high ≈ ${today.tempMaxC}°C)`
+      : '',
+    'Daily:',
+    ...weather.daily.map(
+      (d) =>
+        `- ${d.date}: ${d.tempMinC}…${d.tempMaxC}°C, ${d.label}, precip ${d.precipMm} mm`,
+    ),
+    '',
+    'UI shows a weather card. Reply with current temp AND today high/low. Do not invent other temperatures.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    ok: true,
+    forModel,
+    summary: today
+      ? `${where}: сейчас ${weather.current.tempC}°C, сегодня до ${today.tempMaxC}°C`
+      : `${where}: ${weather.current.tempC}°C`,
+    weather,
+  };
+}
+
+type WaForecast = {
+  location?: {
+    name?: string;
+    region?: string;
+    country?: string;
+    lat?: number;
+    lon?: number;
+    tz_id?: string;
+    localtime?: string;
+  };
+  current?: {
+    temp_c?: number;
+    feelslike_c?: number;
+    humidity?: number;
+    wind_kph?: number;
+    wind_degree?: number;
+    precip_mm?: number;
+    is_day?: number;
+    last_updated?: string;
+    condition?: { text?: string; code?: number };
+  };
+  forecast?: {
+    forecastday?: {
+      date?: string;
+      day?: {
+        maxtemp_c?: number;
+        mintemp_c?: number;
+        totalprecip_mm?: number;
+        condition?: { text?: string; code?: number };
+      };
+      astro?: { sunrise?: string; sunset?: string };
+    }[];
+  };
+  error?: { message?: string; code?: number };
+};
+
+async function fetchWeatherApi(
+  q: string,
+  days: number,
+): Promise<WeatherPayload> {
+  const key = weatherApiKey();
+  if (!key) throw new Error('WEATHERAPI_KEY не задан');
+
+  // free: до 3 дней; если ключ платный — до 7
+  const want = Math.min(7, Math.max(1, days));
+  const tryDays = want > 3 ? [want, 3] : [want];
+
+  let lastErr: Error | null = null;
+  for (const d of tryDays) {
+    try {
+      const url = `https://api.weatherapi.com/v1/forecast.json?${new URLSearchParams({
+        key,
+        q,
+        days: String(d),
+        aqi: 'no',
+        alerts: 'no',
+        lang: 'ru',
+      })}`;
+      const data = await fetchJson<WaForecast>(url);
+      if (data.error?.message) throw new Error(data.error.message);
+      const loc = data.location;
+      const cur = data.current;
+      if (!loc || !cur || cur.temp_c == null) throw new Error('пустой ответ WeatherAPI');
+
+      const code = weatherApiToWmo(Number(cur.condition?.code ?? 1000));
+      const label = (cur.condition?.text || '').trim() || wmoLabel(code);
+
+      return {
+        place: loc.name || q,
+        country: loc.country,
+        admin1: loc.region,
+        latitude: Number(loc.lat),
+        longitude: Number(loc.lon),
+        timezone: loc.tz_id || 'auto',
+        updatedAt: cur.last_updated || loc.localtime || new Date().toISOString(),
+        source: 'Xelity Weather',
+        current: {
+          tempC: round1(cur.temp_c),
+          feelsLikeC: round1(cur.feelslike_c ?? cur.temp_c),
+          humidity: Math.round(cur.humidity ?? 0),
+          windKmh: round1(cur.wind_kph ?? 0),
+          windDir: Math.round(cur.wind_degree ?? 0),
+          precipMm: round1(cur.precip_mm ?? 0),
+          code,
+          label,
+          isDay: cur.is_day !== 0,
+        },
+        daily: (data.forecast?.forecastday || []).map((fd) => {
+          const dCode = weatherApiToWmo(Number(fd.day?.condition?.code ?? 1000));
+          const dLabel =
+            (fd.day?.condition?.text || '').trim() || wmoLabel(dCode);
+          const date = fd.date || '';
+          return {
+            date,
+            code: dCode,
+            label: dLabel,
+            tempMaxC: round1(fd.day?.maxtemp_c ?? 0),
+            tempMinC: round1(fd.day?.mintemp_c ?? 0),
+            precipMm: round1(fd.day?.totalprecip_mm ?? 0),
+            sunrise: astroToIso(date, fd.astro?.sunrise),
+            sunset: astroToIso(date, fd.astro?.sunset),
+          };
+        }),
+      };
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastErr || new Error('WeatherAPI failed');
+}
+
+/** Fallback Open-Meteo по координатам */
+async function fetchOpenMeteo(
+  lat: number,
+  lon: number,
+  days: number,
+  meta: { place: string; country?: string; admin1?: string; timezone?: string },
+): Promise<WeatherPayload> {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    timezone: 'auto',
+    temperature_unit: 'celsius',
+    wind_speed_unit: 'kmh',
+    forecast_days: String(Math.min(7, Math.max(1, days))),
+    current: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'apparent_temperature',
+      'precipitation',
+      'weather_code',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'is_day',
+    ].join(','),
+    daily: [
+      'weather_code',
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'precipitation_sum',
+      'sunrise',
+      'sunset',
+    ].join(','),
+  });
+  const fc = await fetchJson<{
+    timezone?: string;
+    current?: {
+      time?: string;
+      temperature_2m?: number;
+      relative_humidity_2m?: number;
+      apparent_temperature?: number;
+      precipitation?: number;
+      weather_code?: number;
+      wind_speed_10m?: number;
+      wind_direction_10m?: number;
+      is_day?: number;
+    };
+    daily?: {
+      time?: string[];
+      weather_code?: number[];
+      temperature_2m_max?: number[];
+      temperature_2m_min?: number[];
+      precipitation_sum?: number[];
+      sunrise?: string[];
+      sunset?: string[];
+    };
+  }>(`https://api.open-meteo.com/v1/forecast?${params}`);
+
+  const cur = fc.current;
+  if (!cur || cur.temperature_2m == null || cur.weather_code == null) {
+    throw new Error('пустой Open-Meteo');
+  }
+  const code = Number(cur.weather_code);
+  return {
+    place: meta.place,
+    country: meta.country,
+    admin1: meta.admin1,
+    latitude: lat,
+    longitude: lon,
+    timezone: fc.timezone || meta.timezone || 'auto',
+    updatedAt: cur.time || new Date().toISOString(),
+    source: 'Xelity Weather',
+    current: {
+      tempC: round1(cur.temperature_2m),
+      feelsLikeC: round1(cur.apparent_temperature ?? cur.temperature_2m),
+      humidity: Math.round(cur.relative_humidity_2m ?? 0),
+      windKmh: round1(cur.wind_speed_10m ?? 0),
+      windDir: Math.round(cur.wind_direction_10m ?? 0),
+      precipMm: round1(cur.precipitation ?? 0),
+      code,
+      label: wmoLabel(code),
+      isDay: cur.is_day !== 0,
+    },
+    daily: (fc.daily?.time || []).map((date, i) => {
+      const dCode = Number(fc.daily?.weather_code?.[i] ?? 0);
+      return {
+        date,
+        code: dCode,
+        label: wmoLabel(dCode),
+        tempMaxC: round1(fc.daily?.temperature_2m_max?.[i] ?? 0),
+        tempMinC: round1(fc.daily?.temperature_2m_min?.[i] ?? 0),
+        precipMm: round1(fc.daily?.precipitation_sum?.[i] ?? 0),
+        sunrise: fc.daily?.sunrise?.[i],
+        sunset: fc.daily?.sunset?.[i],
+      };
+    }),
+  };
 }
 
 export async function executeGetWeather(args: {
@@ -658,39 +921,35 @@ export async function executeGetWeather(args: {
   days?: number;
 }): Promise<WeatherToolResult> {
   try {
+    const days = Math.min(7, Math.max(1, Math.floor(args.days ?? 7)));
     let lat = typeof args.latitude === 'number' ? args.latitude : NaN;
     let lon = typeof args.longitude === 'number' ? args.longitude : NaN;
-    let place = '';
-    let country: string | undefined;
-    let admin1: string | undefined;
-    let tzHint: string | undefined;
+    const locRaw = (args.location || '').trim();
+    const loc = stripWeatherNoise(locRaw) || locRaw;
 
-    const loc = (args.location || '').trim();
+    let queryForApi = '';
+    let hintPlace = '';
+    let hintCountry: string | undefined;
+    let hintAdmin: string | undefined;
+    let hintTz: string | undefined;
 
-    // Если передали и location, и координаты — приоритет у geocode(location),
-    // иначе модель может «залипнуть» на старых координатах (напр. Барнаул).
     if (loc) {
-      const geo = await geocode(loc);
-      if (!geo) {
-        // подсказка по похожему городу (модель не должна врать «нет в базах мира»)
-        const hint = aliasLookup(loc);
-        const hintLine = hint
-          ? ` Похоже на «${hint.name}» — вызови get_weather с location="${hint.name}".`
-          : ' Уточни название или регион (пример: Барнаул, Алтайский край).';
-        return {
-          ok: false,
-          forModel: `get_weather: точное место «${loc}» не найдено.${hintLine} Не утверждай, что города нет в метео-базах мира — чаще это опечатка.`,
-          error: 'Место не найдено',
-        };
+      const alias = aliasLookup(loc);
+      if (alias) {
+        queryForApi = `${alias.latitude},${alias.longitude}`;
+        hintPlace = alias.name;
+        hintCountry = alias.country;
+        hintAdmin = alias.admin1;
+        hintTz = alias.timezone;
+        lat = alias.latitude;
+        lon = alias.longitude;
+      } else {
+        queryForApi = loc;
+        hintPlace = loc;
       }
-      lat = geo.latitude;
-      lon = geo.longitude;
-      place = geo.name;
-      country = geo.country;
-      admin1 = geo.admin1;
-      tzHint = geo.timezone;
     } else if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      place = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+      queryForApi = `${lat},${lon}`;
+      hintPlace = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
     } else {
       return {
         ok: false,
@@ -699,119 +958,63 @@ export async function executeGetWeather(args: {
       };
     }
 
-    const days = Math.min(7, Math.max(1, Math.floor(args.days ?? 7)));
-    const params = new URLSearchParams({
-      latitude: String(lat),
-      longitude: String(lon),
-      timezone: 'auto',
-      temperature_unit: 'celsius',
-      wind_speed_unit: 'kmh',
-      forecast_days: String(days),
-      // best_match ближе к «народной» погоде (как в агрегаторах)
-      models: 'best_match',
-      current: [
-        'temperature_2m',
-        'relative_humidity_2m',
-        'apparent_temperature',
-        'precipitation',
-        'weather_code',
-        'wind_speed_10m',
-        'wind_direction_10m',
-        'is_day',
-      ].join(','),
-      daily: [
-        'weather_code',
-        'temperature_2m_max',
-        'temperature_2m_min',
-        'precipitation_sum',
-        'sunrise',
-        'sunset',
-      ].join(','),
-    });
-
-    let fc: ForecastResp;
-    try {
-      fc = await fetchJson<ForecastResp>(`${FORECAST_URL}?${params}`);
-    } catch {
-      // некоторые зеркала не принимают models=best_match
-      params.delete('models');
-      fc = await fetchJson<ForecastResp>(`${FORECAST_URL}?${params}`);
-    }
-    const cur = fc.current;
-    if (!cur || cur.temperature_2m == null || cur.weather_code == null) {
-      return {
-        ok: false,
-        forModel: 'get_weather: пустой ответ сервиса погоды',
-        error: 'Нет данных',
-      };
+    // 1) WeatherAPI (основной) — сам умеет искать город по имени
+    if (weatherApiKey()) {
+      try {
+        const weather = await fetchWeatherApi(queryForApi, days);
+        if (hintPlace && !/^\d/.test(hintPlace)) {
+          weather.place = hintPlace;
+          if (hintAdmin) weather.admin1 = hintAdmin;
+          if (hintCountry) weather.country = hintCountry;
+        }
+        return buildResult(weather);
+      } catch {
+        // fallback ниже
+      }
     }
 
-    const code = Number(cur.weather_code);
-    const weather: WeatherPayload = {
-      place,
-      country,
-      admin1,
-      latitude: lat,
-      longitude: lon,
-      timezone: fc.timezone || tzHint || 'auto',
-      updatedAt: cur.time || new Date().toISOString(),
-      source: 'Xelity Weather',
-      current: {
-        tempC: round1(cur.temperature_2m),
-        feelsLikeC: round1(cur.apparent_temperature ?? cur.temperature_2m),
-        humidity: Math.round(cur.relative_humidity_2m ?? 0),
-        windKmh: round1(cur.wind_speed_10m ?? 0),
-        windDir: Math.round(cur.wind_direction_10m ?? 0),
-        precipMm: round1(cur.precipitation ?? 0),
-        code,
-        label: wmoLabel(code),
-        isDay: cur.is_day !== 0,
-      },
-      daily: (fc.daily?.time || []).map((date, i) => {
-        const dCode = Number(fc.daily?.weather_code?.[i] ?? 0);
+    // 2) Геокодинг, если координат ещё нет
+    if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && loc) {
+      const geo = await geocode(loc);
+      if (geo) {
+        lat = geo.latitude;
+        lon = geo.longitude;
+        hintPlace = geo.name || hintPlace;
+        hintCountry = geo.country || hintCountry;
+        hintAdmin = geo.admin1 || hintAdmin;
+        hintTz = geo.timezone || hintTz;
+      }
+    }
+
+    // 3) Open-Meteo fallback по координатам
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      try {
+        const weather = await fetchOpenMeteo(lat, lon, days, {
+          place: hintPlace || `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+          country: hintCountry,
+          admin1: hintAdmin,
+          timezone: hintTz,
+        });
+        return buildResult(weather);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'ошибка';
         return {
-          date,
-          code: dCode,
-          label: wmoLabel(dCode),
-          tempMaxC: round1(fc.daily?.temperature_2m_max?.[i] ?? 0),
-          tempMinC: round1(fc.daily?.temperature_2m_min?.[i] ?? 0),
-          precipMm: round1(fc.daily?.precipitation_sum?.[i] ?? 0),
-          sunrise: fc.daily?.sunrise?.[i],
-          sunset: fc.daily?.sunset?.[i],
+          ok: false,
+          forModel: `get_weather failed: ${msg}`,
+          error: msg,
         };
-      }),
-    };
+      }
+    }
 
-    const where = [place, admin1, country].filter(Boolean).join(', ');
-    const today = weather.daily[0];
-    const forModel = [
-      `WEATHER for ${where}`,
-      `Coords: ${lat.toFixed(4)}, ${lon.toFixed(4)} · TZ: ${weather.timezone}`,
-      `Updated: ${weather.updatedAt}`,
-      `Now (current): ${weather.current.tempC}°C (feels ${weather.current.feelsLikeC}°C), ${weather.current.label}, humidity ${weather.current.humidity}%, wind ${weather.current.windKmh} km/h, precip ${weather.current.precipMm} mm`,
-      today
-        ? `Today range: ${today.tempMinC}…${today.tempMaxC}°C (Google/Yandex often show daytime high ≈ ${today.tempMaxC}°C, not "now")`
-        : '',
-      'Daily:',
-      ...weather.daily.map(
-        (d) =>
-          `- ${d.date}: ${d.tempMinC}…${d.tempMaxC}°C, ${d.label}, precip ${d.precipMm} mm`,
-      ),
-      '',
-      'UI already shows an interactive weather card from this tool result.',
-      'In your reply: say BOTH current temp and today high/low. Do not invent other temperatures.',
-      'Note: timezone Asia/Barnaul is Altai region TZ — NOT the city Barnaul.',
-    ]
-      .filter(Boolean)
-      .join('\n');
-
+    const hint = loc ? aliasLookup(loc) : null;
     return {
-      ok: true,
-      forModel,
-      summary: today
-        ? `${where}: сейчас ${weather.current.tempC}°C, сегодня до ${today.tempMaxC}°C`
-        : `${where}: ${weather.current.tempC}°C`,
-      weather,
+      ok: false,
+      forModel: `get_weather: место «${loc || queryForApi}» не найдено.${
+        hint
+          ? ` Похоже на «${hint.name}» — вызови get_weather с location="${hint.name}".`
+          : ' Уточни город или регион (или задай WEATHERAPI_KEY в .env).'
+      }`,
+      error: 'Место не найдено',
     };
   } catch (err) {
     const message =

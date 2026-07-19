@@ -826,13 +826,22 @@ export function profileIsAdmin(profile: UserProfile | null | undefined): boolean
 
 /* ——— Broadcasts ——— */
 
+export type BroadcastKind = 'news' | 'update' | 'alert';
+
 export type Broadcast = {
   id: string;
   title: string;
+  /** Markdown (как в чате) */
   body: string;
   createdAt: number;
   createdBy: string;
   createdByEmail?: string;
+  /** URL баннера (Storage или внешний https) */
+  bannerUrl?: string;
+  kind?: BroadcastKind;
+  /** Подпись над заголовком, по умолчанию «Новости Xelity» */
+  eyebrow?: string;
+  ctaLabel?: string;
 };
 
 export async function createBroadcast(input: {
@@ -840,6 +849,10 @@ export async function createBroadcast(input: {
   body: string;
   createdBy: string;
   createdByEmail?: string;
+  bannerUrl?: string;
+  kind?: BroadcastKind;
+  eyebrow?: string;
+  ctaLabel?: string;
 }): Promise<string> {
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const record: Broadcast = {
@@ -850,6 +863,10 @@ export async function createBroadcast(input: {
     createdBy: input.createdBy,
     createdByEmail: input.createdByEmail,
   };
+  if (input.bannerUrl?.trim()) record.bannerUrl = input.bannerUrl.trim();
+  if (input.kind) record.kind = input.kind;
+  if (input.eyebrow?.trim()) record.eyebrow = input.eyebrow.trim();
+  if (input.ctaLabel?.trim()) record.ctaLabel = input.ctaLabel.trim();
   await set(ref(database, `broadcasts/${id}`), record);
   return id;
 }

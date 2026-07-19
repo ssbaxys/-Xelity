@@ -499,7 +499,7 @@ export default function PricingPage() {
               >
                 Номер карты
                 <div className="relative mt-1">
-                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate transition-transform duration-300">
+                  <span className="pointer-events-none absolute left-2 top-1/2 z-[1] -translate-y-1/2 text-slate transition-transform duration-300">
                     <CardBrandLogo brand={cardBrand} className="h-5 w-8" />
                   </span>
                   <input
@@ -508,7 +508,9 @@ export default function PricingPage() {
                     inputMode="numeric"
                     autoComplete="cc-number"
                     placeholder="2200 0000 0000 0000"
-                    className="w-full rounded-lg border border-line bg-paper py-2 pl-12 pr-3 font-mono text-sm text-ink outline-none transition focus:border-signal"
+                    className={`w-full rounded-lg border border-line bg-paper py-2.5 pr-3 font-mono text-sm text-ink outline-none transition focus:border-signal ${
+                      cardBrand === 'mir' ? 'pl-[5.75rem]' : 'pl-12'
+                    }`}
                   />
                 </div>
                 {cardBrand !== 'unknown' && (

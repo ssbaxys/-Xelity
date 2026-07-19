@@ -43,7 +43,7 @@ export type ToolActivity = {
   pending?: boolean;
   /** результаты web_search — для просмотра ресурсов */
   links?: ToolActivityLink[];
-  /** структурированная погода (Open-Meteo) для WeatherCard */
+  /** структурированная погода для WeatherCard */
   weather?: WeatherPayload;
 };
 

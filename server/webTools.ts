@@ -1,5 +1,5 @@
 /**
- * Агентские web-tools: поиск (SearXNG → fallback), чтение страниц, погода (Open-Meteo).
+ * Агентские web-tools: поиск (SearXNG → fallback), чтение страниц, погода (WeatherAPI → Open-Meteo).
  * Выполняются только на VPS — клиент вызывает /api/tools.
  */
 

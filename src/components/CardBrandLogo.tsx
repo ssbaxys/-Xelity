@@ -4,10 +4,16 @@ import type { CardBrand } from '../lib/cardBrand';
 type Props = {
   brand: CardBrand;
   className?: string;
+  /** Для Мир: sm — таблица, md — поле карты (~2.5×) */
+  size?: 'sm' | 'md';
 };
 
 /** Компактный логотип платёжной системы для поля номера карты */
-export default function CardBrandLogo({ brand, className = 'h-5 w-8' }: Props) {
+export default function CardBrandLogo({
+  brand,
+  className = 'h-5 w-8',
+  size = 'md',
+}: Props) {
   const uid = useId().replace(/:/g, '');
 
   if (brand === 'unknown') {
@@ -53,15 +59,21 @@ export default function CardBrandLogo({ brand, className = 'h-5 w-8' }: Props) {
 
   if (brand === 'mir') {
     const gradId = `mir-grad-${uid}`;
+    const box =
+      size === 'sm'
+        ? 'h-7 w-11 px-1 py-0.5'
+        : 'h-[3.125rem] w-[5rem] px-2 py-1';
+    const logo = size === 'sm' ? 'h-3.5 w-9' : 'h-[1.65rem] w-[4.25rem]';
+    // Белый фон + логотип (~2.5× на md)
     return (
       <span
-        className={`inline-flex items-center justify-center rounded-md bg-white px-1.5 py-0.5 shadow-sm ring-1 ring-black/8 ${className}`}
+        className={`inline-flex shrink-0 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-black/10 ${box}`}
         aria-label="Мир"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 400 120"
-          className="h-full w-full"
+          className={logo}
           aria-hidden
         >
           <linearGradient id={gradId} x1="370" x2="290" gradientUnits="userSpaceOnUse">
