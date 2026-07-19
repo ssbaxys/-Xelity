@@ -35,7 +35,7 @@ function CardSimBlock({ p }: { p: PaymentRecord }) {
   return (
     <div className="mt-3 rounded-lg border border-[var(--a-border-strong)] bg-[var(--a-input)] p-3 font-mono text-[12px] text-[var(--a-strong)]">
       <div className="mb-2 flex items-center gap-2">
-        <CardBrandLogo brand={brand} size="sm" className="h-5 w-8" />
+        <CardBrandLogo brand={brand} className="h-5 w-8" />
         <span className="text-[11px] text-[var(--a-muted)]">{cardBrandLabel(brand)}</span>
         <span className="ml-auto rounded bg-[var(--admin-accent)]/15 px-1.5 py-0.5 text-[10px] text-[var(--a-accent-fg)]">
           симуляция
@@ -171,7 +171,7 @@ export default function AdminPayments() {
                     <td className="px-3 py-2 text-[var(--a-muted)]">{p.email}</td>
                     <td className="px-3 py-2 font-mono text-xs text-[var(--a-strong)]">
                       <div className="mb-1 flex items-center gap-1.5">
-                        <CardBrandLogo brand={brand} size="sm" className="h-4 w-6" />
+                        <CardBrandLogo brand={brand} className="h-4 w-6" />
                         <span className="text-[10px] text-[var(--a-muted)]">{cardBrandLabel(brand)}</span>
                       </div>
                       <div>{formatStoredNumber(p)}</div>
