@@ -1,5 +1,5 @@
 /**
- * Агентские web-tools: поиск (SearXNG) и чтение страниц.
+ * Агентские web-tools: поиск (SearXNG → fallback) и чтение страниц.
  * Выполняются только на VPS — клиент вызывает /api/tools.
  */
 
@@ -39,7 +39,6 @@ function isPrivateHostname(hostname: string): boolean {
   ) {
     return true;
   }
-  // IPv4 private / link-local / metadata
   const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (m) {
     const a = Number(m[1]);
@@ -48,7 +47,7 @@ function isPrivateHostname(hostname: string): boolean {
     if (a === 169 && b === 254) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a === 100 && b >= 64 && b <= 127) return true;
   }
   return false;
 }
@@ -114,6 +113,20 @@ function htmlToText(html: string): { title: string; text: string } {
   return { title, text: parts.slice(0, MAX_TEXT_CHARS) };
 }
 
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -128,99 +141,253 @@ async function fetchWithTimeout(
   }
 }
 
+function errMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof Error)) return fallback;
+  if (err.name === 'AbortError') return 'таймаут';
+  const m = err.message || fallback;
+  if (/fetch failed|econnrefused|enotfound|network/i.test(m)) {
+    return 'нет соединения';
+  }
+  return m;
+}
+
+function packResults(
+  q: string,
+  links: WebToolLink[],
+  source: string,
+): WebToolResult {
+  if (!links.length) {
+    return {
+      ok: true,
+      forModel: `No results for: ${q} (via ${source})`,
+      summary: 'Ничего не найдено',
+      query: q,
+      links: [],
+    };
+  }
+  const forModel = [
+    `Search results for: ${q} (via ${source})`,
+    ...links.map(
+      (r, i) =>
+        `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet || '(no snippet)'}`,
+    ),
+    '',
+    'If you need full page text, call web_fetch on a promising URL.',
+  ].join('\n');
+  return {
+    ok: true,
+    forModel: forModel.slice(0, 40_000),
+    summary: `${links.length} · ${source}`,
+    query: q,
+    links,
+  };
+}
+
+async function searchSearxng(q: string): Promise<WebToolResult | null> {
+  const bases = Array.from(
+    new Set([SEARXNG_URL, 'http://127.0.0.1:8888', 'http://127.0.0.1:8080']),
+  );
+
+  let lastErr = '';
+  for (const base of bases) {
+    try {
+      const url = `${base}/search?${new URLSearchParams({
+        q,
+        format: 'json',
+        language: 'auto',
+      })}`;
+      const res = await fetchWithTimeout(
+        url,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'XelityAgent/1.0',
+          },
+        },
+        SEARCH_TIMEOUT_MS,
+      );
+      if (!res.ok) {
+        lastErr = `HTTP ${res.status}`;
+        continue;
+      }
+      const ctype = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ctype.includes('json')) {
+        lastErr = 'не JSON (format=json выключен?)';
+        continue;
+      }
+      const data = (await res.json()) as {
+        results?: { title?: string; url?: string; content?: string }[];
+      };
+      const links: WebToolLink[] = (data.results || [])
+        .filter((r) => r.url)
+        .slice(0, 8)
+        .map((r) => ({
+          title: (r.title || r.url || '').slice(0, 200),
+          url: String(r.url).slice(0, 500),
+          snippet: (r.content || '').slice(0, 400) || undefined,
+        }));
+      return packResults(q, links, 'SearXNG');
+    } catch (err) {
+      lastErr = errMessage(err, 'ошибка');
+    }
+  }
+  return {
+    ok: false,
+    forModel: `SearXNG unavailable (${lastErr}) at ${SEARXNG_URL}`,
+    error: `SearXNG: ${lastErr}`,
+    query: q,
+  };
+}
+
+/** Fallback без Docker — HTML-выдача DuckDuckGo */
+async function searchDuckDuckGo(q: string): Promise<WebToolResult | null> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?${new URLSearchParams({ q })}`;
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Accept: 'text/html',
+          'User-Agent':
+            'Mozilla/5.0 (compatible; XelityBot/1.0; +https://xelity.ru)',
+        },
+        redirect: 'follow',
+      },
+      SEARCH_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        forModel: `DuckDuckGo HTTP ${res.status}`,
+        error: `DDG HTTP ${res.status}`,
+        query: q,
+      };
+    }
+    const html = await res.text();
+    const links: WebToolLink[] = [];
+    const re =
+      /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) && links.length < 8) {
+      let href = decodeHtmlEntities(m[1]);
+      // DDG sometimes wraps redirects
+      const uddg = href.match(/[?&]uddg=([^&]+)/);
+      if (uddg) {
+        try {
+          href = decodeURIComponent(uddg[1]);
+        } catch {
+          /* keep */
+        }
+      }
+      if (!/^https?:\/\//i.test(href)) continue;
+      const title = decodeHtmlEntities(m[2].replace(/<[^>]+>/g, ''));
+      if (!title) continue;
+      // snippet: nearest result__snippet after this match
+      const after = html.slice(m.index, m.index + 1200);
+      const snipM = after.match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(?:a|td|div)/i);
+      const snippet = snipM
+        ? decodeHtmlEntities(snipM[1].replace(/<[^>]+>/g, '')).slice(0, 400)
+        : undefined;
+      links.push({ title: title.slice(0, 200), url: href.slice(0, 500), snippet });
+    }
+    if (!links.length) {
+      return {
+        ok: false,
+        forModel: 'DuckDuckGo: empty parse',
+        error: 'DDG: пустая выдача',
+        query: q,
+      };
+    }
+    return packResults(q, links, 'DuckDuckGo');
+  } catch (err) {
+    return {
+      ok: false,
+      forModel: `DuckDuckGo failed: ${errMessage(err, 'ошибка')}`,
+      error: `DDG: ${errMessage(err, 'ошибка')}`,
+      query: q,
+    };
+  }
+}
+
+/** Ещё один fallback — Wikipedia OpenSearch */
+async function searchWikipedia(q: string): Promise<WebToolResult | null> {
+  try {
+    const langs = ['ru', 'en'];
+    const links: WebToolLink[] = [];
+    for (const lang of langs) {
+      if (links.length >= 8) break;
+      const url = `https://${lang}.wikipedia.org/w/api.php?${new URLSearchParams({
+        action: 'opensearch',
+        search: q,
+        limit: '5',
+        namespace: '0',
+        format: 'json',
+      })}`;
+      const res = await fetchWithTimeout(
+        url,
+        { headers: { Accept: 'application/json', 'User-Agent': 'XelityAgent/1.0' } },
+        SEARCH_TIMEOUT_MS,
+      );
+      if (!res.ok) continue;
+      const data = (await res.json()) as [string, string[], string[], string[]];
+      const titles = data[1] || [];
+      const descs = data[2] || [];
+      const urls = data[3] || [];
+      for (let i = 0; i < titles.length && links.length < 8; i++) {
+        if (!urls[i]) continue;
+        links.push({
+          title: titles[i].slice(0, 200),
+          url: urls[i].slice(0, 500),
+          snippet: (descs[i] || '').slice(0, 400) || undefined,
+        });
+      }
+    }
+    if (!links.length) {
+      return {
+        ok: false,
+        forModel: 'Wikipedia: no results',
+        error: 'Wikipedia: пусто',
+        query: q,
+      };
+    }
+    return packResults(q, links, 'Wikipedia');
+  } catch (err) {
+    return {
+      ok: false,
+      forModel: `Wikipedia failed: ${errMessage(err, 'ошибка')}`,
+      error: `Wiki: ${errMessage(err, 'ошибка')}`,
+      query: q,
+    };
+  }
+}
+
 export async function executeWebSearch(query: string): Promise<WebToolResult> {
   const q = query.trim().slice(0, 300);
   if (!q) {
     return { ok: false, forModel: 'Error: empty query', error: 'Пустой запрос', query: q };
   }
 
-  try {
-    const url = `${SEARXNG_URL}/search?${new URLSearchParams({
-      q,
-      format: 'json',
-      language: 'auto',
-    })}`;
-    const res = await fetchWithTimeout(
-      url,
-      {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'XelityAgent/1.0',
-        },
-      },
-      SEARCH_TIMEOUT_MS,
-    );
+  const attempts: string[] = [];
 
-    if (!res.ok) {
-      const err = `SearXNG HTTP ${res.status}`;
-      return {
-        ok: false,
-        forModel: `Search failed: ${err}. SearXNG may be starting — retry shortly.`,
-        error: err,
-        query: q,
-      };
-    }
+  const searx = await searchSearxng(q);
+  if (searx?.ok) return searx;
+  if (searx?.error) attempts.push(searx.error);
 
-    const data = (await res.json()) as {
-      results?: { title?: string; url?: string; content?: string; engine?: string }[];
-      number_of_results?: number;
-    };
+  const ddg = await searchDuckDuckGo(q);
+  if (ddg?.ok) return ddg;
+  if (ddg?.error) attempts.push(ddg.error);
 
-    const results = (data.results || []).slice(0, 8).map((r, i) => ({
-      n: i + 1,
-      title: (r.title || '').slice(0, 200),
-      url: (r.url || '').slice(0, 500),
-      snippet: (r.content || '').slice(0, 400),
-      engine: r.engine,
-    }));
+  const wiki = await searchWikipedia(q);
+  if (wiki?.ok) return wiki;
+  if (wiki?.error) attempts.push(wiki.error);
 
-    if (!results.length) {
-      return {
-        ok: true,
-        forModel: `No results for: ${q}`,
-        summary: 'Ничего не найдено',
-        query: q,
-        links: [],
-      };
-    }
-
-    const links = results.map((r) => ({
-      title: r.title || r.url,
-      url: r.url,
-      snippet: r.snippet || undefined,
-    }));
-
-    const forModel = [
-      `Search results for: ${q}`,
-      ...results.map(
-        (r) =>
-          `${r.n}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet || '(no snippet)'}`,
-      ),
-      '',
-      'If you need full page text, call web_fetch on a promising URL.',
-    ].join('\n');
-
-    return {
-      ok: true,
-      forModel: forModel.slice(0, 40_000),
-      summary: `${results.length} результатов`,
-      query: q,
-      links,
-    };
-  } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.name === 'AbortError'
-          ? 'Таймаут SearXNG'
-          : err.message
-        : 'Ошибка поиска';
-    return {
-      ok: false,
-      forModel: `Search failed: ${message}. Is SearXNG running at ${SEARXNG_URL}?`,
-      error: message,
-      query: q,
-    };
-  }
+  const detail = attempts.filter(Boolean).join(' · ') || 'все источники недоступны';
+  return {
+    ok: false,
+    forModel: `Search failed for: ${q}\nSources: ${detail}\nHint: on VPS run: sudo ai-tool searxng`,
+    error: detail.slice(0, 180),
+    query: q,
+  };
 }
 
 export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
@@ -246,7 +413,6 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
       FETCH_TIMEOUT_MS,
     );
 
-    // block redirects to private hosts
     try {
       assertSafePublicUrl(res.url);
     } catch (err) {
@@ -312,12 +478,7 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
       title,
     };
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.name === 'AbortError'
-          ? 'Таймаут загрузки'
-          : err.message
-        : 'Ошибка загрузки';
+    const message = errMessage(err, 'ошибка загрузки');
     return {
       ok: false,
       forModel: `Fetch failed: ${message}`,

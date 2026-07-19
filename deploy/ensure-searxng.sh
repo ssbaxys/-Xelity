@@ -79,17 +79,22 @@ ensure_env
 echo ">> SearXNG: docker compose up -d"
 cd "${SEARX_DIR}"
 compose pull || true
-compose up -d --remove-orphans
+compose up -d --remove-orphans --force-recreate
 
-# быстрый healthcheck
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -fsS "${SEARX_URL}/healthz" >/dev/null 2>&1 \
-    || curl -fsS "${SEARX_URL}/" >/dev/null 2>&1; then
-    echo ">> SearXNG готов: ${SEARX_URL}"
-    exit 0
+# быстрый healthcheck + тест JSON
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -fsS "${SEARX_URL}/" >/dev/null 2>&1; then
+    if curl -fsS "${SEARX_URL}/search?q=xelity&format=json" \
+      -H 'Accept: application/json' 2>/dev/null | grep -q '"results"'; then
+      echo ">> SearXNG готов (JSON): ${SEARX_URL}"
+      exit 0
+    fi
+    echo ">> SearXNG отвечает, ждём JSON… (${i})"
   fi
   sleep 2
 done
 
-echo ">> SearXNG контейнер запущен, health ещё прогревается (${SEARX_URL})"
+echo "!! SearXNG ещё не отдаёт JSON. Логи:"
 compose ps || true
+compose logs --tail=40 || true
+echo "Поиск всё равно работает через DuckDuckGo/Wikipedia fallback в API."

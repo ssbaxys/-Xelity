@@ -329,12 +329,21 @@ async function runWithAgentTools(params: {
           done = activityFromWebTool(pending.id, name, argsJson, remote);
           forModel = remote.content || remote.error || 'empty';
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Ошибка tool';
+          const msg =
+            err && typeof err === 'object' && 'detail' in err && typeof (err as { detail?: string }).detail === 'string'
+              ? (err as { detail: string }).detail
+              : err instanceof Error
+                ? err.message
+                : 'Ошибка tool';
+          const userMsg =
+            err instanceof Error && err.message && !/^fetch failed$/i.test(err.message)
+              ? err.message
+              : 'Поиск временно недоступен. Попробуйте ещё раз через минуту.';
           done = {
             ...pending,
             pending: false,
             ok: false,
-            error: msg,
+            error: userMsg,
             after: msg,
           };
           forModel = `Error: ${msg}`;
