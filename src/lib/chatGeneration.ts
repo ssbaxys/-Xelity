@@ -52,6 +52,7 @@ function pendingKindFor(name: string): ToolActivityKind {
   if (name === 'list_files') return 'list';
   if (name === 'delete_file') return 'delete';
   if (name === 'write_file') return 'edit';
+  if (name === 'check_build') return 'build';
   return 'edit';
 }
 
@@ -299,7 +300,7 @@ async function runWithAgentTools(params: {
       {
         role: 'user',
         content:
-          '[Системно] В проекте уже есть стартовый шаблон сайта (React/Vite: package.json, index.html, src/App.jsx, src/styles.css и др.). Не пересоздавай шаблон с нуля. Правь под задачу. В ответе пользователю — как заказчику сайта, без упоминания инструментов и имён файловых API.',
+          '[Системно] В проекте уже есть стартовый шаблон сайта (React/Vite: package.json, index.html, src/App.jsx, src/styles.css и др.). Не пересоздавай шаблон с нуля. Правь под задачу. После правок вызывай check_build и чини ошибки, пока ok. В ответе пользователю — как заказчику сайта, без упоминания инструментов.',
       },
     ];
   }

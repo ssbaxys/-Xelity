@@ -12,6 +12,7 @@ export type ToolActivityKind =
   | 'create'
   | 'edit'
   | 'delete'
+  | 'build'
   | 'search'
   | 'fetch'
   | 'weather';
@@ -150,6 +151,7 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                             'create',
                             'edit',
                             'delete',
+                            'build',
                             'search',
                             'fetch',
                             'weather',

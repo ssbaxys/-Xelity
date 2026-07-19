@@ -4,6 +4,8 @@ import type { ToolActivity, ToolActivityKind } from './chatStore';
 import {
   buildReactPreviewDocument,
   buildStaticPreviewDocument,
+  checkReactPreviewBuild,
+  type PreviewBuildCheck,
 } from './previewBundle';
 
 export type SandboxFile = {
@@ -575,10 +577,49 @@ export function runSandboxTool(
     };
   }
 
+  if (name === 'check_build') {
+    const report = checkSandboxBuild(chatId);
+    const after = [
+      report.summary,
+      ...report.errors.map((e) => {
+        const where = [e.file, e.line != null ? `L${e.line}` : null].filter(Boolean).join(':');
+        return where ? `• ${where} — ${e.message}` : `• ${e.message}`;
+      }),
+    ].join('\n');
+    return {
+      forModel: JSON.stringify({
+        ok: report.ok,
+        entry: report.entry,
+        mode: report.mode,
+        summary: report.summary,
+        errors: report.errors,
+      }),
+      activity: {
+        id,
+        name,
+        kind: 'build',
+        path: report.entry || undefined,
+        ok: report.ok,
+        pending: false,
+        error: report.ok ? undefined : report.summary,
+        after,
+      },
+    };
+  }
+
   return {
     forModel: JSON.stringify({ error: `Неизвестный tool: ${name}` }),
     activity: { id, name, kind: 'edit', ok: false, pending: false, error: `Неизвестный tool: ${name}` },
   };
+}
+
+/** Та же проверка, что видит превью (Babel / точка входа). */
+export function checkSandboxBuild(
+  chatId: string,
+  buildId: string | 'latest' = 'latest',
+): PreviewBuildCheck {
+  const files = getSandboxFilesAt(chatId, buildId);
+  return checkReactPreviewBuild(files);
 }
 
 /** @deprecated use runSandboxTool */

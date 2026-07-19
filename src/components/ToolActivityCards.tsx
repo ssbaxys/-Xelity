@@ -5,6 +5,7 @@ import {
   IconCheck,
   IconClock,
   IconClose,
+  IconCode,
   IconEye,
   IconFilePlus,
   IconPencil,
@@ -40,6 +41,7 @@ function KindIcon({
   }
   if (kind === 'create') return <IconFilePlus className={`h-3.5 w-3.5 ${spin}`} />;
   if (kind === 'delete') return <IconTrash className={`h-3.5 w-3.5 ${spin}`} />;
+  if (kind === 'build') return <IconCode className={`h-3.5 w-3.5 ${spin}`} />;
   return <IconPencil className={`h-3.5 w-3.5 ${spin}`} />;
 }
 
@@ -51,6 +53,9 @@ function labelFor(a: ToolActivity): string {
     return `Просмотр сайта${a.path ? `: ${a.path}` : ''}`;
   }
   if (a.kind === 'list') return 'Список файлов';
+  if (a.kind === 'build') {
+    return a.path ? `Проверка сборки · ${a.path}` : 'Проверка сборки';
+  }
   if (a.kind === 'read') {
     const range =
       a.startLine && a.endLine ? ` · ${a.startLine}–${a.endLine}` : '';
@@ -121,6 +126,7 @@ function DiffView({ activity, ok }: { activity: ToolActivity; ok?: boolean }) {
   if (
     activity.kind === 'read' ||
     activity.kind === 'list' ||
+    activity.kind === 'build' ||
     activity.kind === 'search' ||
     activity.kind === 'fetch'
   ) {
@@ -191,6 +197,7 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
             a.kind === 'fetch' ||
             a.kind === 'read' ||
             a.kind === 'list' ||
+            a.kind === 'build' ||
             a.kind === 'create' ||
             a.kind === 'edit' ||
             a.kind === 'delete' ||

@@ -4,6 +4,7 @@ import { highlightCode, langFromPath } from '../lib/highlightCode';
 import {
   buildFileTree,
   buildPreviewHtml,
+  checkSandboxBuild,
   downloadSandboxZip,
   getSandboxFilesAt,
   listSandboxBuilds,
@@ -164,6 +165,22 @@ export default function CodingWorkbench({
     return highlightCode(content, langFromPath(selected));
   }, [content, selected]);
 
+  const buildCheck = useMemo(() => {
+    void tick;
+    try {
+      return checkSandboxBuild(chatId, viewBuildId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        ok: false as const,
+        entry: null,
+        mode: 'empty' as const,
+        errors: [{ message: msg }],
+        summary: msg,
+      };
+    }
+  }, [chatId, tick, viewBuildId]);
+
   const previewHtml = useMemo(() => {
     void tick;
     try {
@@ -295,6 +312,34 @@ export default function CodingWorkbench({
 
       {tab === 'preview' ? (
         <div className="coding-wb-preview min-h-0 flex-1">
+          <div
+            className={`coding-wb-build-status ${
+              buildCheck.ok ? 'is-ok' : 'is-err'
+            }`}
+            title={buildCheck.summary}
+          >
+            <span className="coding-wb-build-dot" aria-hidden />
+            <span className="coding-wb-build-status-text">
+              {buildCheck.ok
+                ? buildCheck.mode === 'static'
+                  ? 'Превью · static'
+                  : `Сборка OK${buildCheck.entry ? ` · ${buildCheck.entry}` : ''}`
+                : `Ошибка сборки${
+                    buildCheck.errors[0]?.file
+                      ? ` · ${buildCheck.errors[0].file}${
+                          buildCheck.errors[0].line != null
+                            ? `:${buildCheck.errors[0].line}`
+                            : ''
+                        }`
+                      : ''
+                  }`}
+            </span>
+            {!buildCheck.ok && buildCheck.errors[0]?.message ? (
+              <span className="coding-wb-build-status-msg">
+                {buildCheck.errors[0].message.slice(0, 120)}
+              </span>
+            ) : null}
+          </div>
           {previewSrc ? (
             <iframe
               key={`${previewSrc}-${viewBuildId}`}

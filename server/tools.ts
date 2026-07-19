@@ -81,6 +81,19 @@ export const CODING_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'check_build',
+      description:
+        'Compile/check the site preview the same way the UI does (React/Babel entry src/App.jsx). Returns ok or structured syntax/build errors with file and line. Call after meaningful edits before telling the user the site is ready.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export const WEB_TOOLS = [
@@ -197,21 +210,22 @@ export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный 
 ЗАПРЕЩЕНО: localhost, внутренние IP, не-http(s). При ошибке — скажи честно.`;
 
 export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (сайт в этом чате):
-Внутри у тебя есть инструменты работы с файлами проекта (list_files, read_file, write_file, delete_file) — используй их для любых правок.
+Внутри у тебя есть инструменты: list_files, read_file, write_file, delete_file, check_build.
 В проекте уже может лежать стартовый шаблон сайта (React/Vite). Не пересоздавай шаблон без нужды.
 
 КАК ГОВОРИТЬ С ПОЛЬЗОВАТЕЛЕМ (обязательно):
 - Пользователь — конечный заказчик сайта, не разработчик IDE.
-- НИКОГДА не упоминай инструменты, tools, write_file, read_file, list_files, delete_file, «песочницу», JSON arguments, function calls.
-- Не пиши «я вызвал…», «записал в файл…», «через tool…». Говори по-человечески: «обновил шапку», «добавил блок услуг», «поменял цвета».
+- НИКОГДА не упоминай инструменты, tools, write_file, read_file, list_files, delete_file, check_build, «песочницу», JSON arguments, function calls.
+- Не пиши «я вызвал…», «записал в файл…», «через tool…». Говори по-человечески: «обновил шапку», «добавил блок услуг», «проверил, что сайт собирается».
 - Не вставляй огромные блоки кода в чат — результат виден в превью; в ответе — краткий итог для заказчика.
 
 ВНУТРЕННИЕ ПРАВИЛА (не озвучивать):
 1) Правки сайта — только через инструменты файлов. Не утверждай, что сайт изменён, если запись не выполнена.
 2) Перед правкой существующего файла читай его (можно частями).
 3) Предпочитай React: src/App.jsx, src/styles.css, src/main.jsx.
-4) Компактно, без лишних зависимостей. Документацию — через web_search/web_fetch при необходимости.
-5) Много файлов — несколько записей подряд, затем короткий человеческий итог.`;
+4) После заметных правок вызови check_build. Если ошибки — исправь файлы и проверь снова. Не говори, что «всё готово», пока check_build не ok.
+5) Компактно, без лишних зависимостей. Документацию — через web_search/web_fetch при необходимости.
+6) Много файлов — несколько записей подряд, check_build, затем короткий человеческий итог.`;
 
 export const CODING_TOOL_NAMES = new Set(
   CODING_TOOLS.map((t) => t.function.name),
