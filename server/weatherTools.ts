@@ -162,7 +162,115 @@ const PLACE_ALIASES: Record<
     longitude: 83.7636,
     timezone: 'Asia/Barnaul',
   },
+  // частые опечатки
+  баранул: {
+    name: 'Барнаул',
+    admin1: 'Алтайский край',
+    country: 'Россия',
+    latitude: 53.3606,
+    longitude: 83.7636,
+    timezone: 'Asia/Barnaul',
+  },
+  барналу: {
+    name: 'Барнаул',
+    admin1: 'Алтайский край',
+    country: 'Россия',
+    latitude: 53.3606,
+    longitude: 83.7636,
+    timezone: 'Asia/Barnaul',
+  },
+  барнаула: {
+    name: 'Барнаул',
+    admin1: 'Алтайский край',
+    country: 'Россия',
+    latitude: 53.3606,
+    longitude: 83.7636,
+    timezone: 'Asia/Barnaul',
+  },
 };
+
+/** Крупные города для fuzzy-матча опечаток (ключ → алиас) */
+const FUZZY_CITIES: { keys: string[]; place: (typeof PLACE_ALIASES)[string] }[] = [
+  {
+    keys: ['барнаул', 'barnaul'],
+    place: PLACE_ALIASES['барнаул']!,
+  },
+  {
+    keys: ['москва', 'moscow'],
+    place: PLACE_ALIASES['москва']!,
+  },
+  {
+    keys: ['новосибирск', 'novosibirsk'],
+    place: PLACE_ALIASES['новосибирск']!,
+  },
+  {
+    keys: ['санкт петербург', 'петербург', 'питер', 'spb'],
+    place: PLACE_ALIASES['петербург']!,
+  },
+  {
+    keys: ['екатеринбург', 'екб', 'yekaterinburg'],
+    place: {
+      name: 'Екатеринбург',
+      admin1: 'Свердловская область',
+      country: 'Россия',
+      latitude: 56.8389,
+      longitude: 60.6057,
+      timezone: 'Asia/Yekaterinburg',
+    },
+  },
+  {
+    keys: ['красноярск', 'krasnoyarsk'],
+    place: {
+      name: 'Красноярск',
+      admin1: 'Красноярский край',
+      country: 'Россия',
+      latitude: 56.0153,
+      longitude: 92.8932,
+      timezone: 'Asia/Krasnoyarsk',
+    },
+  },
+  {
+    keys: ['томск', 'tomsk'],
+    place: {
+      name: 'Томск',
+      admin1: 'Томская область',
+      country: 'Россия',
+      latitude: 56.4846,
+      longitude: 84.9476,
+      timezone: 'Asia/Tomsk',
+    },
+  },
+  {
+    keys: ['кемерово', 'kemerovo'],
+    place: {
+      name: 'Кемерово',
+      admin1: 'Кемеровская область',
+      country: 'Россия',
+      latitude: 55.3549,
+      longitude: 86.0873,
+      timezone: 'Asia/Novokuznetsk',
+    },
+  },
+  {
+    keys: ['новокузнецк', 'novokuznetsk'],
+    place: {
+      name: 'Новокузнецк',
+      admin1: 'Кемеровская область',
+      country: 'Россия',
+      latitude: 53.7596,
+      longitude: 87.1216,
+      timezone: 'Asia/Novokuznetsk',
+    },
+  },
+  {
+    keys: ['горно алтайск', 'горноалтайск'],
+    place: PLACE_ALIASES['горно-алтайск']!,
+  },
+  {
+    keys: ['усть кокса', 'устькокса'],
+    place: PLACE_ALIASES['усть-кокса']!,
+  },
+];
 
 /** WMO Weather interpretation codes → короткий label (ru) */
 export function wmoLabel(code: number): string {
@@ -267,22 +375,89 @@ function locationVariants(raw: string): string[] {
   return [...new Set(variants)].slice(0, 8);
 }
 
-function aliasLookup(q: string): GeoHit | null {
-  const key = stripWeatherNoise(q)
+function placeKey(q: string): string {
+  return stripWeatherNoise(q)
     .toLowerCase()
     .replace(/ё/g, 'е')
+    .replace(/-/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const soft = softenRussianPlace(key).toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Damerau–Levenshtein (с перестановкой соседних букв: Баранул↔Барнаул) */
+function editDistance(a: string, b: string): number {
+  const n = a.length;
+  const m = b.length;
+  if (n === 0) return m;
+  if (m === 0) return n;
+  const dp: number[][] = Array.from({ length: n + 1 }, () =>
+    Array.from({ length: m + 1 }, () => 0),
+  );
+  for (let i = 0; i <= n; i++) dp[i]![0] = i;
+  for (let j = 0; j <= m; j++) dp[0]![j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i]![j] = Math.min(
+        dp[i - 1]![j]! + 1,
+        dp[i]![j - 1]! + 1,
+        dp[i - 1]![j - 1]! + cost,
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        dp[i]![j] = Math.min(dp[i]![j]!, dp[i - 2]![j - 2]! + 1);
+      }
+    }
+  }
+  return dp[n]![m]!;
+}
+
+function maxTypoDistance(len: number): number {
+  if (len <= 4) return 1;
+  if (len <= 8) return 2;
+  return 3;
+}
+
+function aliasLookup(q: string): GeoHit | null {
+  const key = placeKey(q);
+  const soft = placeKey(softenRussianPlace(key));
   const hit =
     PLACE_ALIASES[key] ||
     PLACE_ALIASES[soft] ||
     PLACE_ALIASES[key.replace(/\s+/g, '-')] ||
     PLACE_ALIASES[soft.replace(/\s+/g, '-')] ||
-    PLACE_ALIASES[key.replace(/-/g, ' ')] ||
-    PLACE_ALIASES[soft.replace(/-/g, ' ')];
-  if (!hit) return null;
-  return { ...hit };
+    PLACE_ALIASES[q.toLowerCase().trim()];
+  if (hit) return { ...hit };
+
+  // fuzzy: опечатки вроде «Баранул» → Барнаул
+  const candidates = new Map<string, (typeof PLACE_ALIASES)[string]>();
+  for (const [k, p] of Object.entries(PLACE_ALIASES)) {
+    candidates.set(placeKey(k), p);
+    candidates.set(placeKey(p.name), p);
+  }
+  for (const row of FUZZY_CITIES) {
+    for (const k of row.keys) candidates.set(placeKey(k), row.place);
+    candidates.set(placeKey(row.place.name), row.place);
+  }
+
+  let best: (typeof PLACE_ALIASES)[string] | null = null;
+  let bestDist = Infinity;
+  const qLen = Math.max(key.length, soft.length);
+  const limit = maxTypoDistance(qLen);
+
+  for (const [cand, place] of candidates) {
+    for (const qv of [key, soft]) {
+      if (!qv || qv.length < 3) continue;
+      // слишком разная длина — не город
+      if (Math.abs(qv.length - cand.length) > limit) continue;
+      const d = editDistance(qv, cand);
+      if (d > 0 && d <= limit && d < bestDist) {
+        bestDist = d;
+        best = place;
+      }
+    }
+  }
+  if (best && bestDist <= limit) return { ...best };
+  return null;
 }
 
 function scoreHit(hit: GeoHit, query: string): number {
@@ -497,9 +672,14 @@ export async function executeGetWeather(args: {
     if (loc) {
       const geo = await geocode(loc);
       if (!geo) {
+        // подсказка по похожему городу (модель не должна врать «нет в базах мира»)
+        const hint = aliasLookup(loc);
+        const hintLine = hint
+          ? ` Похоже на «${hint.name}» — вызови get_weather с location="${hint.name}".`
+          : ' Уточни название или регион (пример: Барнаул, Алтайский край).';
         return {
           ok: false,
-          forModel: `get_weather: место «${loc}» не найдено. Уточни населённый пункт (например: Усть-Кокса, Республика Алтай).`,
+          forModel: `get_weather: точное место «${loc}» не найдено.${hintLine} Не утверждай, что города нет в метео-базах мира — чаще это опечатка.`,
           error: 'Место не найдено',
         };
       }
