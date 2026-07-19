@@ -24,6 +24,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@babel/standalone": "^8.0.4",
     "clsx": "2.1.1",
     "express": "^5.1.0",
     "firebase": "^12.16.0",

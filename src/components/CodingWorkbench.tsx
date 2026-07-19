@@ -11,6 +11,20 @@ import {
 } from '../lib/projectSandbox';
 import { IconChevronDown, IconChevronRight, IconClose, IconFileCode } from './icons';
 
+function usePreviewSrc(html: string | null): string | null {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!html) {
+      setSrc(null);
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [html]);
+  return src;
+}
+
 type Tab = 'files' | 'preview';
 
 type Props = {
@@ -131,8 +145,14 @@ export default function CodingWorkbench({
   }, [content, selected]);
   const previewHtml = useMemo(() => {
     void tick;
-    return buildPreviewHtml(chatId);
+    try {
+      return buildPreviewHtml(chatId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return `<!DOCTYPE html><html><body style="font:13px sans-serif;padding:16px;color:#c62828"><pre>${msg.replace(/</g, '&lt;')}</pre></body></html>`;
+    }
   }, [chatId, tick]);
+  const previewSrc = usePreviewSrc(previewHtml);
 
   const lang = selected ? langFromPath(selected) : undefined;
 
@@ -186,17 +206,18 @@ export default function CodingWorkbench({
 
       {tab === 'preview' ? (
         <div className="coding-wb-preview min-h-0 flex-1">
-          {previewHtml ? (
+          {previewSrc ? (
             <iframe
+              key={previewSrc}
               title="Превью сайта"
-              className="h-full w-full border-0 bg-white"
+              className="h-full w-full min-h-[280px] border-0 bg-white"
               sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
-              srcDoc={previewHtml}
+              src={previewSrc}
             />
           ) : (
             <div className="coding-wb-empty">
               <p>Нет превью</p>
-              <span>Отправьте сообщение в режиме «Кодинг»</span>
+              <span>Нужен src/App.jsx — включите «Кодинг» и отправьте задачу</span>
             </div>
           )}
         </div>
