@@ -22,6 +22,7 @@ import {
   saveLocalChatStore,
   saveUserChatStore,
   fetchUserChatStore,
+  mergeChatStores,
   type ChatFolder,
   type ChatMessage,
   type ChatModelId,
@@ -256,6 +257,7 @@ function makeChat(
   _chats: ChatThread[],
   modelId: ModelId = DEFAULT_MODEL_ID,
   folderId: string | null = null,
+  tools?: { reasoning?: boolean; codingTools?: boolean },
 ): ChatThread {
   const now = Date.now();
   return {
@@ -268,8 +270,8 @@ function makeChat(
     folderId,
     modelId,
     manualTitle: false,
-    reasoning: false,
-    codingTools: false,
+    reasoning: Boolean(tools?.reasoning),
+    codingTools: Boolean(tools?.codingTools),
     draft: '',
   };
 }
@@ -299,10 +301,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     theme,
     uiScale,
     debug,
+    lastReasoning,
+    lastCodingTools,
     setLanguage,
     setTheme,
     setUiScale,
     setDebug,
+    setLastReasoning,
+    setLastCodingTools,
     t,
   } = usePrefs();
   const [store, setStore] = useState<Store>(() => loadStore());
@@ -360,10 +366,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const persist = useCallback(
     (next: Store) => {
-      setStore(next);
-      saveLocalChatStore(next);
+      const stamped = { ...next, updatedAt: next.updatedAt ?? Date.now() };
+      setStore(stamped);
+      saveLocalChatStore(stamped);
       if (user) {
-        void saveUserChatStore(user.uid, next).catch(() => {
+        void saveUserChatStore(user.uid, stamped).catch(() => {
           /* offline / rules — локальная копия уже сохранена */
         });
       }
@@ -428,15 +435,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
           }
           return;
         }
-        const remoteTs = remote.updatedAt || 0;
-        const localTs = local.updatedAt || 0;
-        const prefer =
-          remote.chats.length >= local.chats.length || remoteTs >= localTs ? remote : local;
-        setStore(prefer);
-        saveLocalChatStore(prefer);
-        if (prefer === local && local.chats.length) {
-          await saveUserChatStore(user.uid, local);
-        }
+        const merged = mergeChatStores(local, remote);
+        setStore(merged);
+        saveLocalChatStore(merged);
+        await saveUserChatStore(user.uid, merged);
       } catch {
         /* keep local */
       }
@@ -628,7 +630,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const createChat = (folderId: string | null = null) => {
     const prevId = activeIdRef.current;
     const savedDraft = draftRef.current.slice(0, MAX_CHARS);
-    const chat = makeChat(chats, active?.modelId ?? DEFAULT_MODEL_ID, folderId);
+    const chat = makeChat(chats, active?.modelId ?? DEFAULT_MODEL_ID, folderId, {
+      reasoning: lastReasoning,
+      codingTools: lastCodingTools,
+    });
     const chatsWithPrevDraft = prevId
       ? chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c))
       : chats;
@@ -713,8 +718,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const setReasoning = (on: boolean) => {
     if (!active) return;
+    setLastReasoning(on);
     persist({
       ...store,
+      updatedAt: Date.now(),
       chats: chats.map((c) =>
         c.id === active.id ? { ...c, reasoning: on, updatedAt: Date.now() } : c,
       ),
@@ -723,8 +730,10 @@ export default function ChatWorkspace({ homeSlot }: Props) {
 
   const setCodingTools = (on: boolean) => {
     if (!active) return;
+    setLastCodingTools(on);
     persist({
       ...store,
+      updatedAt: Date.now(),
       chats: chats.map((c) =>
         c.id === active.id ? { ...c, codingTools: on, updatedAt: Date.now() } : c,
       ),

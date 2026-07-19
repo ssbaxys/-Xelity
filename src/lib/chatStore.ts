@@ -156,6 +156,41 @@ export function normalizeChatStore(raw: unknown): ChatStore {
   };
 }
 
+/** Слияние двух сторов: не теряем codingTools/reasoning при синке с облаком */
+export function mergeChatStores(a: ChatStore, b: ChatStore): ChatStore {
+  const byId = new Map<string, ChatThread>();
+  for (const c of a.chats) byId.set(c.id, c);
+  for (const c of b.chats) {
+    const prev = byId.get(c.id);
+    if (!prev) {
+      byId.set(c.id, c);
+      continue;
+    }
+    const cTs = c.updatedAt || 0;
+    const pTs = prev.updatedAt || 0;
+    const newer = cTs >= pTs ? c : prev;
+    const older = newer === c ? prev : c;
+    // при равном updatedAt не затираем включённые инструменты «пустой» копией
+    const sameTs = cTs === pTs;
+    byId.set(c.id, {
+      ...newer,
+      reasoning: sameTs ? Boolean(c.reasoning || prev.reasoning) : Boolean(newer.reasoning),
+      codingTools: sameTs ? Boolean(c.codingTools || prev.codingTools) : Boolean(newer.codingTools),
+      draft: (newer.draft || older.draft || '').slice(0, 2000),
+      adminSystemPrompt: newer.adminSystemPrompt ?? older.adminSystemPrompt ?? null,
+    });
+  }
+  const aTs = a.updatedAt || 0;
+  const bTs = b.updatedAt || 0;
+  const preferActive = aTs >= bTs ? a : b;
+  return {
+    chats: [...byId.values()].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)),
+    folders: (preferActive.folders?.length ? preferActive.folders : a.folders?.length ? a.folders : b.folders) || [],
+    activeId: preferActive.activeId ?? a.activeId ?? b.activeId ?? null,
+    updatedAt: Math.max(aTs, bTs, Date.now()),
+  };
+}
+
 export function loadLocalChatStore(): ChatStore {
   try {
     const raw = localStorage.getItem(LOCAL_CHAT_KEY);

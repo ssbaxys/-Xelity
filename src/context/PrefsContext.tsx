@@ -18,6 +18,9 @@ type Prefs = {
   uiScale: UiScale;
   /** Показывать технические детали ошибок в чате */
   debug: boolean;
+  /** Последние состояния ИИ-инструментов (для новых чатов) */
+  lastReasoning: boolean;
+  lastCodingTools: boolean;
 };
 
 type PrefsContextValue = Prefs & {
@@ -25,6 +28,8 @@ type PrefsContextValue = Prefs & {
   setTheme: (theme: AppTheme) => void;
   setUiScale: (uiScale: UiScale) => void;
   setDebug: (debug: boolean) => void;
+  setLastReasoning: (on: boolean) => void;
+  setLastCodingTools: (on: boolean) => void;
   t: (key: string) => string;
 };
 
@@ -35,6 +40,8 @@ const DEFAULTS: Prefs = {
   theme: 'dark',
   uiScale: 'md',
   debug: false,
+  lastReasoning: false,
+  lastCodingTools: false,
 };
 
 const DICT: Record<AppLanguage, Record<string, string>> = {
@@ -142,6 +149,8 @@ function loadPrefs(): Prefs {
       theme: parsed.theme === 'light' ? 'light' : 'dark',
       uiScale: parsed.uiScale === 'sm' || parsed.uiScale === 'lg' ? parsed.uiScale : 'md',
       debug: Boolean(parsed.debug),
+      lastReasoning: Boolean(parsed.lastReasoning),
+      lastCodingTools: Boolean(parsed.lastCodingTools),
     };
   } catch {
     return DEFAULTS;
@@ -180,14 +189,31 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     setPrefs((p) => ({ ...p, debug }));
   }, []);
 
+  const setLastReasoning = useCallback((lastReasoning: boolean) => {
+    setPrefs((p) => ({ ...p, lastReasoning }));
+  }, []);
+
+  const setLastCodingTools = useCallback((lastCodingTools: boolean) => {
+    setPrefs((p) => ({ ...p, lastCodingTools }));
+  }, []);
+
   const t = useCallback(
     (key: string) => DICT[prefs.language][key] ?? DICT.ru[key] ?? key,
     [prefs.language],
   );
 
   const value = useMemo(
-    () => ({ ...prefs, setLanguage, setTheme, setUiScale, setDebug, t }),
-    [prefs, setLanguage, setTheme, setUiScale, setDebug, t],
+    () => ({
+      ...prefs,
+      setLanguage,
+      setTheme,
+      setUiScale,
+      setDebug,
+      setLastReasoning,
+      setLastCodingTools,
+      t,
+    }),
+    [prefs, setLanguage, setTheme, setUiScale, setDebug, setLastReasoning, setLastCodingTools, t],
   );
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;

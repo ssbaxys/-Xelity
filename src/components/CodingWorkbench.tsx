@@ -15,7 +15,6 @@ type Tab = 'files' | 'preview';
 
 type Props = {
   chatId: string;
-  /** мобильный оверлей */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 };
@@ -36,7 +35,7 @@ function Tree({
   onSelect: (path: string) => void;
 }) {
   return (
-    <ul className="select-none">
+    <ul className="coding-tree select-none">
       {nodes.map((n) => {
         if (n.kind === 'dir') {
           const open = expanded[n.path] !== false;
@@ -45,15 +44,15 @@ function Tree({
               <button
                 type="button"
                 onClick={() => onToggle(n.path)}
-                className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left text-[12px] text-[var(--c-muted)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]"
-                style={{ paddingLeft: 6 + depth * 12 }}
+                className="coding-tree-item coding-tree-dir"
+                style={{ paddingLeft: 8 + depth * 12 }}
               >
                 {open ? (
-                  <IconChevronDown className="h-3 w-3 shrink-0" />
+                  <IconChevronDown className="h-3 w-3 shrink-0 opacity-70" />
                 ) : (
-                  <IconChevronRight className="h-3 w-3 shrink-0" />
+                  <IconChevronRight className="h-3 w-3 shrink-0 opacity-70" />
                 )}
-                <span className="truncate font-medium">{n.name}</span>
+                <span className="truncate">{n.name}</span>
               </button>
               {open && n.children && (
                 <Tree
@@ -73,14 +72,10 @@ function Tree({
             <button
               type="button"
               onClick={() => onSelect(n.path)}
-              className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] ${
-                selected === n.path
-                  ? 'bg-[var(--x-red-soft,rgba(198,40,40,0.12))] text-[var(--c-text)]'
-                  : 'text-[var(--c-muted)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]'
-              }`}
-              style={{ paddingLeft: 6 + depth * 12 + 14 }}
+              className={`coding-tree-item ${selected === n.path ? 'is-active' : ''}`}
+              style={{ paddingLeft: 8 + depth * 12 + 16 }}
             >
-              <IconFileCode className="h-3 w-3 shrink-0 opacity-70" />
+              <IconFileCode className="h-3 w-3 shrink-0 opacity-60" />
               <span className="truncate">{n.name}</span>
             </button>
           </li>
@@ -133,56 +128,58 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
     return buildPreviewHtml(chatId);
   }, [chatId, tick]);
 
-  const panel = (
-    <div className="flex h-full min-h-0 flex-col border-l border-[var(--c-border)] bg-[var(--c-panel)]">
-      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--c-border)] px-2 py-1.5">
-        {(['files', 'preview'] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition ${
-              tab === id
-                ? 'bg-[var(--x-red-soft,rgba(198,40,40,0.14))] text-[var(--c-text)]'
-                : 'text-[var(--c-muted)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text)]'
-            }`}
-          >
-            {id === 'files' ? 'Файлы' : 'Превью'}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <button
-          type="button"
-          disabled={!files.length || busy}
-          onClick={() => {
-            setBusy(true);
-            setError(null);
-            void downloadSandboxZip(chatId)
-              .catch((e) => setError(e instanceof Error ? e.message : 'ZIP ошибка'))
-              .finally(() => setBusy(false));
-          }}
-          className="rounded-md border border-[var(--c-border)] px-2 py-1 text-[10px] text-[var(--c-muted)] hover:text-[var(--c-text)] disabled:opacity-40"
-        >
-          ZIP
-        </button>
-        {onMobileClose && (
-          <button
-            type="button"
-            onClick={onMobileClose}
-            className="rounded-md p-1 text-[var(--c-faint)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text)] lg:hidden"
-            aria-label="Закрыть"
-          >
-            <IconClose className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+  const lang = selected ? langFromPath(selected) : undefined;
 
-      {error && (
-        <p className="border-b border-[var(--c-border)] px-3 py-1.5 text-[11px] text-[#e57373]">{error}</p>
-      )}
+  const panel = (
+    <div className="coding-workbench flex h-full min-h-0 flex-col">
+      <header className="coding-wb-header">
+        <div className="coding-wb-tabs" role="tablist">
+          {(['files', 'preview'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`coding-wb-tab ${tab === id ? 'is-active' : ''}`}
+            >
+              {id === 'files' ? 'Файлы' : 'Превью'}
+            </button>
+          ))}
+        </div>
+        <div className="coding-wb-actions">
+          <button
+            type="button"
+            disabled={!files.length || busy}
+            onClick={() => {
+              setBusy(true);
+              setError(null);
+              void downloadSandboxZip(chatId)
+                .catch((e) => setError(e instanceof Error ? e.message : 'ZIP ошибка'))
+                .finally(() => setBusy(false));
+            }}
+            className="coding-wb-zip"
+            title="Скачать ZIP"
+          >
+            ZIP
+          </button>
+          {onMobileClose && (
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="coding-wb-close lg:hidden"
+              aria-label="Закрыть"
+            >
+              <IconClose className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {error && <p className="coding-wb-error">{error}</p>}
 
       {tab === 'preview' ? (
-        <div className="min-h-0 flex-1 bg-white">
+        <div className="coding-wb-preview min-h-0 flex-1">
           {previewHtml ? (
             <iframe
               title="Превью сайта"
@@ -191,14 +188,18 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
               srcDoc={previewHtml}
             />
           ) : (
-            <p className="p-6 text-center text-[13px] text-[var(--c-faint)]">
-              Нет файлов для превью. Отправьте сообщение в режиме «Кодинг».
-            </p>
+            <div className="coding-wb-empty">
+              <p>Нет превью</p>
+              <span>Отправьте сообщение в режиме «Кодинг»</span>
+            </div>
           )}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] sm:grid-rows-1 sm:grid-cols-[minmax(140px,38%)_1fr]">
-          <div className="min-h-0 overflow-y-auto border-b border-[var(--c-border)] p-1.5 sm:border-b-0 sm:border-r">
+        <div className="coding-wb-files min-h-0 flex-1">
+          <aside className="coding-wb-sidebar">
+            <p className="coding-wb-sidebar-label">
+              Проект{files.length ? ` · ${files.length}` : ''}
+            </p>
             {tree.length ? (
               <Tree
                 nodes={tree}
@@ -214,26 +215,29 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
                 onSelect={setSelected}
               />
             ) : (
-              <p className="px-2 py-6 text-center text-[11px] text-[var(--c-faint)]">
-                Файлы появятся после первого сообщения в режиме «Кодинг»
-              </p>
+              <p className="coding-wb-empty-sm">Файлы появятся после первого ответа</p>
             )}
-          </div>
-          <div className="min-h-0 overflow-auto p-3">
-            {selected && highlighted != null ? (
-              <pre className="m-0 font-mono text-[11px] leading-relaxed">
-                <code
-                  className="coding-hljs hljs"
-                  data-lang={langFromPath(selected)}
-                  dangerouslySetInnerHTML={{ __html: highlighted }}
-                />
-              </pre>
-            ) : (
-              <p className="font-mono text-[11px] text-[var(--c-faint)]">
-                {files.length ? 'Выберите файл' : 'Пусто'}
-              </p>
+          </aside>
+          <section className="coding-wb-editor">
+            {selected && (
+              <div className="coding-wb-path">
+                <span className="truncate">{selected}</span>
+                {lang && <span className="coding-wb-lang">{lang}</span>}
+              </div>
             )}
-          </div>
+            <div className="coding-wb-code">
+              {selected && highlighted != null ? (
+                <pre className="m-0">
+                  <code
+                    className="coding-hljs hljs"
+                    dangerouslySetInnerHTML={{ __html: highlighted }}
+                  />
+                </pre>
+              ) : (
+                <p className="coding-wb-empty-sm">{files.length ? 'Выберите файл' : 'Пусто'}</p>
+              )}
+            </div>
+          </section>
         </div>
       )}
     </div>
@@ -241,14 +245,9 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
 
   return (
     <>
-      {/* desktop dock */}
-      <aside className="hidden min-h-0 w-[min(42vw,440px)] shrink-0 lg:flex lg:flex-col">{panel}</aside>
-
-      {/* mobile overlay */}
+      <aside className="coding-wb-dock hidden min-h-0 shrink-0 lg:flex lg:flex-col">{panel}</aside>
       {mobileOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-[var(--c-panel)] lg:hidden">
-          {panel}
-        </div>
+        <div className="fixed inset-0 z-[60] flex flex-col bg-[var(--c-panel)] lg:hidden">{panel}</div>
       )}
     </>
   );
