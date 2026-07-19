@@ -145,6 +145,7 @@ cat > "${APP_DIR}/.env" <<EOF
 PORT=${PORT_VAL}
 AITUNNEL_API_KEY=${API_KEY}
 CORS_ORIGIN=${CORS_VAL}
+SEARXNG_URL=http://127.0.0.1:8888
 EOF
 chmod 600 "${APP_DIR}/.env"
 
@@ -155,11 +156,15 @@ install -m 644 "${APP_DIR}/deploy/xelity.service" /etc/systemd/system/xelity.ser
 install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.service" /etc/systemd/system/xelity-autoupdate.service
 install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
 install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
+chmod +x "${APP_DIR}/deploy/ensure-searxng.sh" 2>/dev/null || true
 
 # firewall if ufw active
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi 'Status: active'; then
   ufw allow "${PORT_VAL}/tcp" comment 'xelity' || true
 fi
+
+echo ">> SearXNG (поиск для ИИ)"
+bash "${APP_DIR}/deploy/ensure-searxng.sh" || echo "!! SearXNG не поднялся — позже: sudo bash ${APP_DIR}/deploy/ensure-searxng.sh"
 
 systemctl daemon-reload
 systemctl enable xelity
@@ -177,6 +182,7 @@ echo
 echo " Меню настроек:  sudo ai-tool"
 echo " Статус:         sudo ai-tool status"
 echo " Автообновление: sudo ai-tool autoupdate status"
+echo " SearXNG:        sudo ai-tool searxng"
 echo " Порт API:       ${PORT_VAL}"
 echo " Render env:     VITE_API_BASE_URL=http://IP_VPS:${PORT_VAL}"
 echo "══════════════════════════════════════"

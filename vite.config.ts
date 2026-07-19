@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import tailwindcss from '@tailwindcss/vite';
@@ -5,9 +6,16 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { aitunnelChatPlugin } from './vite.aitunnel-plugin';
+import { xelityVersionPlugin } from './vite.version-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'),
+) as { xelity?: { client?: string } };
+const clientVer = pkg.xelity?.client || '0.0.0';
+const buildId = `${clientVer}+${Date.now()}`;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -19,6 +27,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      xelityVersionPlugin({ buildId, client: clientVer }),
       ...(useSingleFile ? [viteSingleFile()] : []),
       aitunnelChatPlugin(apiKey),
     ],

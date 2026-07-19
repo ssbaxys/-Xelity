@@ -257,7 +257,7 @@ function makeChat(
   _chats: ChatThread[],
   modelId: ModelId = DEFAULT_MODEL_ID,
   folderId: string | null = null,
-  tools?: { reasoning?: boolean; codingTools?: boolean },
+  tools?: { reasoning?: boolean; codingTools?: boolean; webTools?: boolean },
 ): ChatThread {
   const now = Date.now();
   return {
@@ -272,6 +272,7 @@ function makeChat(
     manualTitle: false,
     reasoning: Boolean(tools?.reasoning),
     codingTools: Boolean(tools?.codingTools),
+    webTools: tools?.webTools !== false,
     draft: '',
   };
 }
@@ -303,12 +304,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     debug,
     lastReasoning,
     lastCodingTools,
+    lastWebTools,
     setLanguage,
     setTheme,
     setUiScale,
     setDebug,
     setLastReasoning,
     setLastCodingTools,
+    setLastWebTools,
     t,
   } = usePrefs();
   const [store, setStore] = useState<Store>(() => loadStore());
@@ -337,6 +340,8 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [codingMobileOpen, setCodingMobileOpen] = useState(false);
+  const [codingDockMounted, setCodingDockMounted] = useState(false);
+  const [codingDockOpen, setCodingDockOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [limitHint, setLimitHint] = useState<string | null>(null);
   const [usageToday, setUsageToday] = useState(0);
@@ -633,6 +638,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     const chat = makeChat(chats, active?.modelId ?? DEFAULT_MODEL_ID, folderId, {
       reasoning: lastReasoning,
       codingTools: lastCodingTools,
+      webTools: lastWebTools,
     });
     const chatsWithPrevDraft = prevId
       ? chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c))
@@ -739,6 +745,18 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       ),
     });
     if (!on) setCodingMobileOpen(false);
+  };
+
+  const setWebTools = (on: boolean) => {
+    if (!active) return;
+    setLastWebTools(on);
+    persist({
+      ...store,
+      updatedAt: Date.now(),
+      chats: chats.map((c) =>
+        c.id === active.id ? { ...c, webTools: on, updatedAt: Date.now() } : c,
+      ),
+    });
   };
 
   const onDragStart = (e: DragEvent, id: string) => {
@@ -850,6 +868,21 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     setSending(isChatGenerating(active?.id));
   }, [active?.id, store.chats]);
 
+  useEffect(() => {
+    if (active?.codingTools) {
+      setCodingDockMounted(true);
+      const id = requestAnimationFrame(() => setCodingDockOpen(true));
+      return () => cancelAnimationFrame(id);
+    }
+    setCodingDockOpen(false);
+    const t = window.setTimeout(() => setCodingDockMounted(false), 420);
+    return () => window.clearTimeout(t);
+  }, [active?.codingTools]);
+
+  useEffect(() => {
+    if (!active?.codingTools) setCodingMobileOpen(false);
+  }, [active?.codingTools]);
+
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text || sending || !active || text.length > MAX_CHARS) return;
@@ -922,6 +955,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       systemExtra: active.adminSystemPrompt,
       reasoning: Boolean(active.reasoning),
       codingTools: Boolean(active.codingTools),
+      webTools: active.webTools !== false,
     }).finally(() => {
       setSending(isChatGenerating(chatId));
       if (user) {
@@ -1836,49 +1870,39 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                       </div>
                       <button
                         type="button"
+                        onClick={() => setWebTools(active.webTools === false)}
+                        data-on={active.webTools !== false ? 'true' : 'false'}
+                        className="chat-tool-toggle"
+                        aria-label="Сеть"
+                        aria-pressed={active.webTools !== false}
+                        title="Поиск в интернете (SearXNG) и чтение сайтов"
+                      >
+                        <IconSearch className="h-3.5 w-3.5 shrink-0" />
+                        <span className="chat-tool-toggle-label">Сеть</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setReasoning(!active.reasoning)}
-                        className={`inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md border text-[11px] font-medium transition-all duration-300 ease-out ${
-                          active.reasoning
-                            ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] px-2 text-[var(--c-text)]'
-                            : 'w-7 border-[var(--c-border)] bg-[var(--c-soft)] px-0 text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)]'
-                        }`}
+                        data-on={active.reasoning ? 'true' : 'false'}
+                        className="chat-tool-toggle"
                         aria-label="Рассуждения"
                         aria-pressed={Boolean(active.reasoning)}
                         title="Сначала мысли, потом ответ"
                       >
-                        <IconBrain className="h-3.5 w-3.5 shrink-0 translate-x-0" />
-                        <span
-                          className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                            active.reasoning
-                              ? 'max-w-[6.5rem] opacity-100'
-                              : 'max-w-0 opacity-0'
-                          }`}
-                        >
-                          Рассуждения
-                        </span>
+                        <IconBrain className="h-3.5 w-3.5 shrink-0" />
+                        <span className="chat-tool-toggle-label">Рассуждения</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setCodingTools(!active.codingTools)}
-                        className={`inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md border text-[11px] font-medium transition-all duration-300 ease-out ${
-                          active.codingTools
-                            ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] px-2 text-[var(--c-text)]'
-                            : 'w-7 border-[var(--c-border)] bg-[var(--c-soft)] px-0 text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)]'
-                        }`}
+                        data-on={active.codingTools ? 'true' : 'false'}
+                        className="chat-tool-toggle"
                         aria-label="Кодинг"
                         aria-pressed={Boolean(active.codingTools)}
                         title="React-проект справа: tools + превью"
                       >
                         <IconCode className="h-3.5 w-3.5 shrink-0" />
-                        <span
-                          className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
-                            active.codingTools
-                              ? 'max-w-[4.5rem] opacity-100'
-                              : 'max-w-0 opacity-0'
-                          }`}
-                        >
-                          Кодинг
-                        </span>
+                        <span className="chat-tool-toggle-label">Кодинг</span>
                       </button>
                       <span
                         className={`text-[11px] tabular-nums transition-colors ${
@@ -1905,12 +1929,18 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         )}
         </div>
 
-        {active?.codingTools && (
-          <CodingWorkbench
-            chatId={active.id}
-            mobileOpen={codingMobileOpen}
-            onMobileClose={() => setCodingMobileOpen(false)}
-          />
+        {codingDockMounted && active && (
+          <div
+            className={`coding-dock-shell ${codingDockOpen ? 'is-open' : ''}`}
+            aria-hidden={!codingDockOpen}
+          >
+            <CodingWorkbench
+              chatId={active.id}
+              open={codingDockOpen}
+              mobileOpen={codingMobileOpen}
+              onMobileClose={() => setCodingMobileOpen(false)}
+            />
+          </div>
         )}
       </section>
 

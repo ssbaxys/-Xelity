@@ -1201,4 +1201,70 @@ export async function saveModelSystemPrompt(input: {
   await set(ref(database, `config/modelPrompts/${modelId}`), record);
 }
 
+/* ——— Maintenance / техработы ——— */
+
+export type MaintenanceState = {
+  enabled: boolean;
+  reason: string;
+  /** unix ms; null + permanent = пока не снимут */
+  until: number | null;
+  permanent: boolean;
+  updatedAt: number;
+  updatedBy?: string;
+  updatedByEmail?: string;
+};
+
+export function isMaintenanceActive(m: MaintenanceState | null | undefined): boolean {
+  if (!m?.enabled) return false;
+  if (m.permanent) return true;
+  if (m.until == null) return true;
+  return Date.now() < m.until;
+}
+
+export function watchMaintenance(
+  cb: (state: MaintenanceState | null) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onValue(
+    ref(database, 'config/maintenance'),
+    (snap) => {
+      if (!snap.exists()) {
+        cb(null);
+        return;
+      }
+      const row = snap.val() as Partial<MaintenanceState>;
+      cb({
+        enabled: Boolean(row.enabled),
+        reason: typeof row.reason === 'string' ? row.reason : '',
+        until: typeof row.until === 'number' ? row.until : null,
+        permanent: Boolean(row.permanent),
+        updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+        updatedBy: row.updatedBy,
+        updatedByEmail: row.updatedByEmail,
+      });
+    },
+    (err) => onError?.(err),
+  );
+}
+
+export async function saveMaintenance(input: {
+  enabled: boolean;
+  reason: string;
+  until: number | null;
+  permanent: boolean;
+  updatedBy: string;
+  updatedByEmail?: string;
+}): Promise<void> {
+  const record: MaintenanceState = {
+    enabled: Boolean(input.enabled),
+    reason: input.reason.trim().slice(0, 2000),
+    until: input.permanent ? null : input.until,
+    permanent: Boolean(input.permanent),
+    updatedAt: Date.now(),
+    updatedBy: input.updatedBy,
+  };
+  if (input.updatedByEmail) record.updatedByEmail = input.updatedByEmail;
+  await set(ref(database, 'config/maintenance'), record);
+}
+
 export { push, ref, get, set, update };

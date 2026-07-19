@@ -3,11 +3,17 @@ import { getModel, normalizeModelId } from '../src/lib/models';
 import {
   assertCanGenerate,
   chargeAfterSuccess,
+  getMaintenanceBlock,
   getModelSystemPrompt,
   maxTokensFor,
 } from './firebaseAdmin';
 import { AITUNNEL_MODEL_ID, buildSystemPrompt, type ReasoningPhase } from './prompts';
-import { CODING_SYSTEM_EXTRA, CODING_TOOLS, type ToolCallFn } from './tools';
+import {
+  CODING_SYSTEM_EXTRA,
+  WEB_SYSTEM_EXTRA,
+  buildToolList,
+  type ToolCallFn,
+} from './tools';
 
 export type ChatBodyMessage = {
   role: string;
@@ -28,6 +34,8 @@ export type ChatBody = {
   reasoning?: boolean;
   /** включить coding tools песочницы */
   codingTools?: boolean;
+  /** веб-поиск / чтение сайтов (по умолчанию вкл) */
+  webTools?: boolean;
   /** не списывать кредиты (промежуточный tool-раунд) */
   skipCharge?: boolean;
 };
@@ -107,7 +115,7 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown) 
   res.end(JSON.stringify(payload));
 }
 
-function normalizeHistory(messages: ChatBodyMessage[] | undefined, codingTools: boolean) {
+function normalizeHistory(messages: ChatBodyMessage[] | undefined, allowTools: boolean) {
   const raw = messages ?? [];
   const mapped = raw
     .filter((m) => m && typeof m === 'object')
@@ -118,7 +126,7 @@ function normalizeHistory(messages: ChatBodyMessage[] | undefined, codingTools: 
           role,
           content: typeof m.content === 'string' ? m.content.slice(0, 12000) : m.content ?? '',
         };
-        if (codingTools && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+        if (allowTools && Array.isArray(m.tool_calls) && m.tool_calls.length) {
           out.tool_calls = m.tool_calls.slice(0, 8).map((tc) => ({
             id: String(tc.id || '').slice(0, 80),
             type: 'function',
@@ -130,7 +138,7 @@ function normalizeHistory(messages: ChatBodyMessage[] | undefined, codingTools: 
         }
         return out;
       }
-      if (codingTools && role === 'tool') {
+      if (allowTools && role === 'tool') {
         return {
           role: 'tool',
           tool_call_id: String(m.tool_call_id || '').slice(0, 80),
@@ -187,7 +195,14 @@ export async function handleChat(
     const modelId = normalizeModelId(body.modelId);
     const model = getModel(modelId);
     const codingTools = body.codingTools === true;
-    const history = normalizeHistory(body.messages, codingTools);
+    const webTools = body.webTools !== false;
+    const phase =
+      body.reasoningPhase === 'think' || body.reasoningPhase === 'answer'
+        ? body.reasoningPhase
+        : undefined;
+    /** web/coding tools; на шаге think выключены */
+    const allowTools = phase !== 'think' && (webTools || codingTools);
+    const history = normalizeHistory(body.messages, allowTools);
 
     if (!history.length) {
       sendJson(res, 400, { error: 'Нет сообщений' });
@@ -195,11 +210,17 @@ export async function handleChat(
     }
 
     // Шаг think / промежуточные tool-раунды не списываем отдельно
-    const chargeNow =
-      body.reasoningPhase !== 'think' && body.skipCharge !== true;
+    const chargeNow = phase !== 'think' && body.skipCharge !== true;
+
+    const idToken = bearerToken(req);
+    const maint = await getMaintenanceBlock({ idToken });
+    if (maint.blocked) {
+      sendJson(res, 503, { error: maint.reason || 'Технические работы' });
+      return;
+    }
 
     const gateResult = await assertCanGenerate({
-      idToken: bearerToken(req),
+      idToken,
       ip,
       modelId,
       reasoning: body.reasoning === true,
@@ -221,10 +242,6 @@ export async function handleChat(
     const maxTokens = maxTokensFor(gate, model.defaultMaxTokens);
     const systemExtra =
       typeof body.systemExtra === 'string' ? body.systemExtra.trim().slice(0, 2000) : '';
-    const phase =
-      body.reasoningPhase === 'think' || body.reasoningPhase === 'answer'
-        ? body.reasoningPhase
-        : undefined;
     const modelSystemExtra = await getModelSystemPrompt(modelId);
 
     const systemContent = buildSystemPrompt(modelId, systemExtra || null, {
@@ -232,6 +249,8 @@ export async function handleChat(
       modelSystemExtra: modelSystemExtra || null,
       codingTools,
       codingExtra: codingTools ? CODING_SYSTEM_EXTRA : null,
+      webTools: allowTools && webTools,
+      webExtra: allowTools && webTools ? WEB_SYSTEM_EXTRA : null,
     });
 
     const upstreamBody: Record<string, unknown> = {
@@ -241,8 +260,8 @@ export async function handleChat(
       messages: [{ role: 'system', content: systemContent }, ...history],
     };
 
-    if (codingTools && phase !== 'think') {
-      upstreamBody.tools = CODING_TOOLS;
+    if (allowTools) {
+      upstreamBody.tools = buildToolList({ codingTools, webTools });
       upstreamBody.tool_choice = 'auto';
     }
 

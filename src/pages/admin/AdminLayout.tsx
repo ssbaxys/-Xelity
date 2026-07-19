@@ -58,7 +58,7 @@ export default function AdminLayout() {
   }
 
   if (!user || !isStaff) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/chat" replace />;
   }
 
   if (!pathAllowed(location.pathname, staffRole)) {
@@ -78,10 +78,10 @@ export default function AdminLayout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 xl:max-w-7xl">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <NavLink
-              to="/"
+              to="/chat"
               className="hidden shrink-0 text-sm text-[var(--a-muted)] transition hover:text-[var(--a-text)] sm:inline"
             >
-              ← Сайт
+              ← Чат
             </NavLink>
             <div className="hidden h-4 w-px bg-[var(--a-border)] sm:block" />
             <div className="min-w-0">
@@ -103,7 +103,8 @@ export default function AdminLayout() {
               {isLight ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
             </button>
 
-            <nav className="hidden flex-wrap justify-end gap-1 md:flex">
+            {/* Пункты меню — с телефона скрыты; гамбургер только &lt;640px */}
+            <nav className="admin-nav-desktop hidden flex-wrap justify-end gap-1 sm:flex">
               {links.map((l) => (
                 <NavLink
                   key={l.to}
@@ -118,7 +119,7 @@ export default function AdminLayout() {
 
             <button
               type="button"
-              className="admin-theme-toggle md:hidden"
+              className="admin-nav-burger admin-theme-toggle sm:hidden"
               aria-label={navOpen ? 'Закрыть меню' : 'Открыть меню'}
               aria-expanded={navOpen}
               onClick={() => setNavOpen((v) => !v)}
@@ -129,12 +130,12 @@ export default function AdminLayout() {
         </div>
 
         {navOpen && (
-          <div className="border-t border-[var(--a-border)] px-3 pb-3 pt-2 md:hidden">
+          <div className="admin-nav-mobile border-t border-[var(--a-border)] px-3 pb-3 pt-2 sm:hidden">
             <NavLink
-              to="/"
+              to="/chat"
               className="mb-2 block rounded-lg px-2.5 py-2 text-sm text-[var(--a-muted)] hover:bg-[var(--a-hover)] hover:text-[var(--a-text)]"
             >
-              ← На сайт
+              ← В чат
             </NavLink>
             <nav className="admin-nav-drawer flex flex-col gap-0.5">
               {links.map((l) => (

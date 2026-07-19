@@ -301,3 +301,76 @@ export async function getModelSystemPrompt(modelId: string): Promise<string> {
     return cached?.text ?? '';
   }
 }
+
+type MaintenanceRow = {
+  enabled?: boolean;
+  reason?: string;
+  until?: number | null;
+  permanent?: boolean;
+};
+
+let maintenanceCache: { at: number; row: MaintenanceRow | null } = {
+  at: 0,
+  row: null,
+};
+
+function maintenanceActive(row: MaintenanceRow | null): boolean {
+  if (!row?.enabled) return false;
+  if (row.permanent) return true;
+  if (row.until == null) return true;
+  return Date.now() < row.until;
+}
+
+/** Блокировка чата при техработах (staff пропускаем). */
+export async function getMaintenanceBlock(opts: {
+  idToken: string | null;
+}): Promise<{ blocked: boolean; reason: string }> {
+  if (!initFirebaseAdmin()) {
+    return { blocked: false, reason: '' };
+  }
+
+  try {
+    if (Date.now() - maintenanceCache.at > 10_000) {
+      const snap = await getDatabase().ref('config/maintenance').get();
+      maintenanceCache = {
+        at: Date.now(),
+        row: snap.exists() ? (snap.val() as MaintenanceRow) : null,
+      };
+    }
+    const row = maintenanceCache.row;
+    if (!maintenanceActive(row)) {
+      return { blocked: false, reason: '' };
+    }
+
+    if (opts.idToken) {
+      try {
+        const verified = await getAuth().verifyIdToken(opts.idToken);
+        const userSnap = await getDatabase().ref(`users/${verified.uid}`).get();
+        const user = (userSnap.val() || {}) as UserRow;
+        const role = user.staffRole;
+        if (
+          role === 'helper' ||
+          role === 'moderator' ||
+          role === 'admin' ||
+          role === 'owner' ||
+          user.isAdmin === true ||
+          user.admin === true
+        ) {
+          return { blocked: false, reason: '' };
+        }
+      } catch {
+        /* treat as guest */
+      }
+    }
+
+    return {
+      blocked: true,
+      reason:
+        (typeof row?.reason === 'string' && row.reason.trim()) ||
+        'Технические работы. Скоро вернёмся.',
+    };
+  } catch (err) {
+    console.warn('getMaintenanceBlock failed', err);
+    return { blocked: false, reason: '' };
+  }
+}

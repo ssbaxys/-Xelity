@@ -348,25 +348,13 @@ a { color: inherit; text-decoration: none; }
 `,
 };
 
-/** Создаёт React-шаблон, если песочница пуста. Возвращает карточки «создание». */
-export function ensureReactSiteTemplate(chatId: string): ToolActivity[] {
-  if (listSandboxFiles(chatId).length) return [];
-  const activities: ToolActivity[] = [];
-  let i = 0;
+/** Создаёт React-шаблон тихо (без карточек в чате), если песочница пуста. */
+export function ensureReactSiteTemplate(chatId: string): boolean {
+  if (listSandboxFiles(chatId).length) return false;
   for (const [path, content] of Object.entries(REACT_TEMPLATE)) {
-    const res = writeSandboxFile(chatId, path, content);
-    activities.push({
-      id: `seed-${i++}-${path}`,
-      name: 'write_file',
-      kind: 'create',
-      path,
-      ok: res.ok,
-      error: res.ok ? undefined : res.error,
-      before: '',
-      after: content,
-    });
+    writeSandboxFile(chatId, path, content);
   }
-  return activities;
+  return true;
 }
 
 function sliceLines(content: string, startLine?: number, endLine?: number) {
@@ -504,45 +492,150 @@ function escapeScript(src: string) {
   return src.replace(/<\/script/gi, '<\\/script');
 }
 
-/** Превью: React (CDN+Babel) или статический HTML */
+function resolveSandboxModule(
+  fromPath: string,
+  spec: string,
+  files: Record<string, { content: string }>,
+): string | null {
+  if (!spec.startsWith('.')) return null;
+  const fromDir = fromPath.includes('/') ? fromPath.replace(/\/[^/]+$/, '') : '';
+  const joined = normalizePath(
+    `${fromDir ? `${fromDir}/` : ''}${spec}`.replace(/\/\.\//g, '/'),
+  );
+  // collapse ..
+  const parts = joined.split('/');
+  const stack: string[] = [];
+  for (const p of parts) {
+    if (!p || p === '.') continue;
+    if (p === '..') stack.pop();
+    else stack.push(p);
+  }
+  const base = stack.join('/');
+  const candidates = [
+    base,
+    `${base}.jsx`,
+    `${base}.js`,
+    `${base}.tsx`,
+    `${base}.ts`,
+    `${base}/index.jsx`,
+    `${base}/index.js`,
+  ];
+  for (const c of candidates) {
+    if (files[c]) return c;
+  }
+  return null;
+}
+
+/** Собирает локальные модули в один Babel-скрипт (без Vite). */
+function bundleReactPreview(
+  entryPath: string,
+  files: Record<string, { content: string }>,
+): string {
+  const visited = new Set<string>();
+  const chunks: string[] = [];
+
+  const walk = (path: string) => {
+    const norm = normalizePath(path);
+    if (visited.has(norm) || !files[norm]) return;
+    visited.add(norm);
+
+    let src = files[norm].content.replace(/\r\n/g, '\n');
+
+    // relative imports first
+    const importRe =
+      /^\s*import\s+(?:([\w*{}\s,]+)\s+from\s+)?['"](\.[^'"]+)['"]\s*;?\s*$/gm;
+    let m: RegExpExecArray | null;
+    const locals: { names: string; modPath: string }[] = [];
+    while ((m = importRe.exec(src))) {
+      const names = (m[1] || '').trim();
+      const mod = resolveSandboxModule(norm, m[2], files);
+      if (mod) {
+        locals.push({ names, modPath: mod });
+        walk(mod);
+      }
+    }
+
+    src = src
+      .replace(/^\s*import\s+.+?;?\s*$/gm, '')
+      .replace(/^\s*export\s+\{[^}]*\}\s*;?\s*$/gm, '')
+      .replace(/export\s+default\s+function\s+(\w+)/g, 'function $1')
+      .replace(/export\s+default\s+class\s+(\w+)/g, 'class $1')
+      .replace(/export\s+default\s+/g, `const __default_${visited.size}_ = `)
+      .replace(/export\s+(async\s+)?function\s+/g, '$1function ')
+      .replace(/export\s+(const|let|var|class)\s+/g, '$1 ');
+
+    // map default export name for App entry
+    if (norm === normalizePath(entryPath) || /\/App\.(jsx|tsx|js|ts)$/.test(norm)) {
+      if (!/function App\b|const App\s*=|class App\b/.test(src)) {
+        const def = src.match(/const __default_\d+_ = (.+)/);
+        if (def) src += `\nconst App = ${def[1].includes('=>') || def[1].startsWith('function') ? def[1] : `__default_${visited.size}_`};`;
+      }
+    }
+
+    chunks.push(`/* ${norm} */\n${src}`);
+    void locals;
+  };
+
+  walk(entryPath);
+
+  let body = chunks.join('\n\n');
+  if (!/function App\b|const App\s*=|class App\b/.test(body)) {
+    body += `\nfunction App(){ return React.createElement('div', null, 'App не найден — экспортируйте default App'); }`;
+  }
+  return body;
+}
+
+/** Превью: React (CDN+Babel, мультифайл) или статический HTML */
 export function buildPreviewHtml(chatId: string): string | null {
   const box = getSandbox(chatId);
-  const app =
-    box.files['src/App.jsx']?.content ||
-    box.files['src/App.tsx']?.content ||
-    box.files['src/App.js']?.content;
-  const css =
-    box.files['src/styles.css']?.content ||
-    box.files['src/index.css']?.content ||
-    box.files['styles.css']?.content ||
-    '';
+  const entry =
+    (box.files['src/App.jsx'] && 'src/App.jsx') ||
+    (box.files['src/App.tsx'] && 'src/App.tsx') ||
+    (box.files['src/App.js'] && 'src/App.js') ||
+    (box.files['App.jsx'] && 'App.jsx') ||
+    null;
 
-  if (app) {
-    // убираем import/export для Babel UMD
-    let body = app
-      .replace(/^import\s+.+?;?\s*$/gm, '')
-      .replace(/export\s+default\s+function\s+App/, 'function App')
-      .replace(/export\s+default\s+/, 'const App = ');
-    if (!/function App|const App\s*=/.test(body)) {
-      body = `function App() {\n  return (<div>${escapeScript(app.slice(0, 2000))}</div>);\n}`;
-    }
+  const cssParts = [
+    box.files['src/styles.css']?.content,
+    box.files['src/index.css']?.content,
+    box.files['styles.css']?.content,
+    box.files['src/App.css']?.content,
+  ].filter(Boolean) as string[];
+  const css = cssParts.join('\n');
+
+  if (entry) {
+    const body = bundleReactPreview(entry, box.files);
     return `<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Preview</title>
-<style>${escapeScript(css)}</style>
-<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"><\/script>
-<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+<style>
+html,body,#root{margin:0;min-height:100%;}
+${escapeScript(css)}
+</style>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"><\/script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.10/babel.min.js"><\/script>
 </head>
 <body>
 <div id="root"></div>
+<script>
+window.addEventListener('error', function(e){
+  var el = document.getElementById('root');
+  if (el && !el.dataset.err) {
+    el.dataset.err = '1';
+    el.innerHTML = '<pre style="padding:16px;color:#e57373;white-space:pre-wrap;font:12px/1.45 ui-monospace,monospace">' +
+      String((e.error && e.error.message) || e.message || 'Preview error').replace(/</g,'&lt;') + '</pre>';
+  }
+});
+<\/script>
 <script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React;
 ${escapeScript(body)}
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+const __root = ReactDOM.createRoot(document.getElementById('root'));
+__root.render(React.createElement(typeof App !== 'undefined' ? App : function(){ return React.createElement('div', null, 'No App'); }));
 <\/script>
 </body>
 </html>`;
@@ -562,9 +655,15 @@ root.render(React.createElement(App));
     if (!fileCss) return full;
     return `<style data-src="${p}">\n${fileCss}\n</style>`;
   });
+  // Vite entry → подсказка; если есть App — выше уже React-путь
+  html = html.replace(
+    /<script([^>]*)type=["']module["']([^>]*)src=["']([^"']+)["']([^>]*)><\/script>/gi,
+    (_full, _a, _b, src: string) =>
+      `<!-- Vite module ${src} — откройте вкладку Превью: нужен src/App.jsx -->`,
+  );
   html = html.replace(
     /<script([^>]*)src=["']([^"']+\.jsx?)["']([^>]*)><\/script>/gi,
-    () => '<!-- module preview via React CDN when App.jsx exists -->',
+    () => '<!-- jsx preview via React CDN when App.jsx exists -->',
   );
   html = html.replace(
     /<script([^>]*)src=["']([^"']+\.js)["']([^>]*)><\/script>/gi,

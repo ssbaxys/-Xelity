@@ -1,0 +1,28 @@
+# Xelity SearXNG — JSON API для web_search
+use_default_settings: true
+
+general:
+  instance_name: "Xelity SearXNG"
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "auto"
+  formats:
+    - html
+    - json
+
+server:
+  # перезаписывается deploy/ensure-searxng.sh при первом запуске
+  secret_key: "xelity-change-me-on-install"
+  limiter: false
+  image_proxy: false
+  method: "GET"
+
+ui:
+  static_use_hash: true
+
+# меньше шума в логах
+outgoing:
+  request_timeout: 6.0

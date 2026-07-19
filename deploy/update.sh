@@ -45,9 +45,22 @@ ensure_cli_and_timer() {
   fi
 }
 
+ensure_searxng() {
+  if [[ -f "${APP_DIR}/deploy/ensure-searxng.sh" ]]; then
+    echo ">> SearXNG"
+    bash "${APP_DIR}/deploy/ensure-searxng.sh" || echo "!! SearXNG: не удалось поднять (web_search может не работать)"
+  fi
+}
+
 if [[ "${OLD_HEAD}" == "${NEW_HEAD}" ]]; then
   echo "Уже актуально (${OLD_HEAD:0:7}). Нечего обновлять."
   ensure_cli_and_timer
+  ensure_searxng
+  if [[ -f /var/lock/xelity-restart-after-searxng ]]; then
+    rm -f /var/lock/xelity-restart-after-searxng
+    echo ">> systemctl restart xelity (новый SEARXNG_URL)"
+    systemctl restart xelity || true
+  fi
   exit 0
 fi
 
@@ -96,6 +109,11 @@ if path_match '^deploy/(xelity\.service|xelity-autoupdate\.(service|timer))$'; t
   need_unit=1
 fi
 
+need_searxng=0
+if path_match '^deploy/(searxng/|ensure-searxng\.sh)'; then
+  need_searxng=1
+fi
+
 # если dist нет — обязательно собрать
 if [[ ! -f "${APP_DIR}/dist/index.html" ]]; then
   need_build=1
@@ -114,6 +132,7 @@ echo "  build:      $([[ ${need_build} -eq 1 ]] && echo да || echo пропу�
 echo "  ai-tool:    $([[ ${need_cli} -eq 1 ]] && echo да || echo пропуск)"
 echo "  systemd:    $([[ ${need_unit} -eq 1 ]] && echo да || echo пропуск)"
 echo "  restart:    $([[ ${need_restart} -eq 1 ]] && echo да || echo пропуск)"
+echo "  searxng:    да (проверить/поднять)"
 echo
 
 if [[ ${need_npm} -eq 1 ]]; then
@@ -141,6 +160,13 @@ fi
 ensure_cli_and_timer
 if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
   systemctl restart xelity-autoupdate.timer || true
+fi
+
+# SearXNG — всегда следим, чтобы web_search работал после обновлений
+ensure_searxng
+if [[ ${need_searxng} -eq 1 || -f /var/lock/xelity-restart-after-searxng ]]; then
+  need_restart=1
+  rm -f /var/lock/xelity-restart-after-searxng
 fi
 
 chown -R www-data:www-data "${APP_DIR}"

@@ -15,6 +15,7 @@ type Tab = 'files' | 'preview';
 
 type Props = {
   chatId: string;
+  open?: boolean;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 };
@@ -85,7 +86,12 @@ function Tree({
   );
 }
 
-export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: Props) {
+export default function CodingWorkbench({
+  chatId,
+  open = true,
+  mobileOpen,
+  onMobileClose,
+}: Props) {
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>('files');
   const [selected, setSelected] = useState<string | null>(null);
@@ -183,8 +189,8 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
           {previewHtml ? (
             <iframe
               title="Превью сайта"
-              className="h-full w-full border-0"
-              sandbox="allow-scripts allow-forms allow-modals"
+              className="h-full w-full border-0 bg-white"
+              sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"
               srcDoc={previewHtml}
             />
           ) : (
@@ -245,9 +251,15 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
 
   return (
     <>
-      <aside className="coding-wb-dock hidden min-h-0 shrink-0 lg:flex lg:flex-col">{panel}</aside>
+      <aside
+        className={`coding-wb-dock hidden min-h-0 shrink-0 lg:flex lg:flex-col ${open ? 'is-visible' : ''}`}
+      >
+        {panel}
+      </aside>
       {mobileOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-[var(--c-panel)] lg:hidden">{panel}</div>
+        <div className="coding-wb-mobile ui-backdrop fixed inset-0 z-[60] flex flex-col bg-[var(--c-panel)] lg:hidden">
+          <div className="coding-wb-mobile-sheet flex min-h-0 flex-1 flex-col">{panel}</div>
+        </div>
       )}
     </>
   );

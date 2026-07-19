@@ -5,13 +5,27 @@ import { normalizeModelId, type ChatModelId } from './models';
 export type { ChatModelId } from './models';
 export type ChatRole = 'user' | 'assistant';
 
-export type ToolActivityKind = 'list' | 'read' | 'create' | 'edit' | 'delete';
+export type ToolActivityKind =
+  | 'list'
+  | 'read'
+  | 'create'
+  | 'edit'
+  | 'delete'
+  | 'search'
+  | 'fetch';
 
-/** Карточка tool-шага в ответе (кодинг) */
+export type ToolActivityLink = {
+  title: string;
+  url: string;
+  snippet?: string;
+};
+
+/** Карточка tool-шага в ответе (кодинг / web) */
 export type ToolActivity = {
   id: string;
   name: string;
   kind: ToolActivityKind;
+  /** путь файла, URL или поисковый запрос */
   path?: string;
   ok: boolean;
   error?: string;
@@ -22,6 +36,8 @@ export type ToolActivity = {
   /** содержимое после записи / фрагмент чтения */
   after?: string;
   pending?: boolean;
+  /** результаты web_search — для просмотра ресурсов */
+  links?: ToolActivityLink[];
 };
 
 export type ChatMessage = {
@@ -70,6 +86,8 @@ export type ChatThread = {
   reasoning?: boolean;
   /** Режим кодинга — tools песочницы сайта */
   codingTools?: boolean;
+  /** Веб-поиск / чтение сайтов (по умолчанию вкл) */
+  webTools?: boolean;
   /** Черновик поля ввода — свой для каждого чата */
   draft?: string;
 };
@@ -119,9 +137,17 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                       .map((t) => ({
                         id: String(t.id || ''),
                         name: String(t.name || ''),
-                        kind: (['list', 'read', 'create', 'edit', 'delete'] as const).includes(
-                          t.kind as ToolActivityKind,
-                        )
+                        kind: (
+                          [
+                            'list',
+                            'read',
+                            'create',
+                            'edit',
+                            'delete',
+                            'search',
+                            'fetch',
+                          ] as const
+                        ).includes(t.kind as ToolActivityKind)
                           ? (t.kind as ToolActivityKind)
                           : 'edit',
                         path: typeof t.path === 'string' ? t.path : undefined,
@@ -132,6 +158,19 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                         before: typeof t.before === 'string' ? t.before.slice(0, 80_000) : undefined,
                         after: typeof t.after === 'string' ? t.after.slice(0, 80_000) : undefined,
                         pending: Boolean(t.pending),
+                        links: Array.isArray(t.links)
+                          ? t.links
+                              .filter((l) => l && typeof l === 'object' && typeof l.url === 'string')
+                              .slice(0, 12)
+                              .map((l) => ({
+                                title: String(l.title || l.url).slice(0, 200),
+                                url: String(l.url).slice(0, 500),
+                                snippet:
+                                  typeof l.snippet === 'string'
+                                    ? l.snippet.slice(0, 400)
+                                    : undefined,
+                              }))
+                          : undefined,
                       }))
                       .filter((t) => t.id && t.name)
                   : undefined,
@@ -147,6 +186,7 @@ export function normalizeChatStore(raw: unknown): ChatStore {
             typeof c.adminSystemPrompt === 'string' ? c.adminSystemPrompt : c.adminSystemPrompt ?? null,
           reasoning: Boolean(c.reasoning),
           codingTools: Boolean(c.codingTools),
+          webTools: c.webTools !== false,
           draft: typeof c.draft === 'string' ? c.draft.slice(0, 2000) : '',
         }))
       : [],
@@ -176,6 +216,9 @@ export function mergeChatStores(a: ChatStore, b: ChatStore): ChatStore {
       ...newer,
       reasoning: sameTs ? Boolean(c.reasoning || prev.reasoning) : Boolean(newer.reasoning),
       codingTools: sameTs ? Boolean(c.codingTools || prev.codingTools) : Boolean(newer.codingTools),
+      webTools: sameTs
+        ? c.webTools !== false || prev.webTools !== false
+        : newer.webTools !== false,
       draft: (newer.draft || older.draft || '').slice(0, 2000),
       adminSystemPrompt: newer.adminSystemPrompt ?? older.adminSystemPrompt ?? null,
     });

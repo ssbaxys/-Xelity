@@ -125,6 +125,10 @@
       "modelPrompts": {
         ".read": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
         ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+      },
+      "maintenance": {
+        ".read": true,
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
       }
     }
   }

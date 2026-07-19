@@ -41,6 +41,7 @@ export async function requestXlaudeReply(params: {
   reasoningPhase?: ReasoningPhase;
   reasoning?: boolean;
   codingTools?: boolean;
+  webTools?: boolean;
   skipCharge?: boolean;
 }): Promise<{ content: string; tool_calls?: ToolCall[]; usage?: ChatUsageInfo }> {
   const modelId = normalizeModelId(params.modelId);
@@ -72,6 +73,7 @@ export async function requestXlaudeReply(params: {
         reasoningPhase: params.reasoningPhase,
         reasoning: params.reasoning === true,
         codingTools: params.codingTools === true,
+        webTools: params.webTools !== false,
         skipCharge: params.skipCharge === true,
       }),
     });

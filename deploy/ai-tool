@@ -413,6 +413,7 @@ menu() {
     echo " 11) Включить HTTPS (api.xelity.ru) — нужно для сайта на https"
     echo " 12) Firebase Admin (service account) — доверие серверу, не клиенту"
     echo " 13) Автообновление с GitHub (вкл/выкл)"
+    echo " 14) SearXNG (поиск для ИИ) — поднять/статус"
     echo "  0) Выход"
     echo
     choice=$(ask "Выбор: ")
@@ -430,6 +431,7 @@ menu() {
       11) need_root; bash "${APP_DIR}/deploy/setup-https.sh" ;;
       12) install_firebase_sa ;;
       13) toggle_autoupdate ;;
+      14) need_root; bash "${APP_DIR}/deploy/ensure-searxng.sh"; docker ps --filter name=xelity-searxng || true ;;
       0|q|Q) exit 0 ;;
       *) c_warn "Неизвестный пункт" ;;
     esac
@@ -467,8 +469,13 @@ case "${cmd}" in
     esac
     ;;
   menu) menu ;;
+  searxng)
+    need_root
+    bash "${APP_DIR}/deploy/ensure-searxng.sh"
+    docker ps --filter name=xelity-searxng || true
+    ;;
   *)
-    echo "Usage: ai-tool [status|check|start|stop|restart|update|autoupdate|menu]"
+    echo "Usage: ai-tool [status|check|start|stop|restart|update|autoupdate|searxng|menu]"
     exit 1
     ;;
 esac

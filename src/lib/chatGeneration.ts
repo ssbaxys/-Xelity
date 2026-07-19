@@ -6,12 +6,28 @@ import {
   type ChatModelId,
   type ChatStore,
   type ToolActivity,
+  type ToolActivityKind,
 } from './chatStore';
 import { formatChatFailure } from './chatApiError';
+import {
+  activityFromWebTool,
+  executeRemoteTool,
+  WEB_TOOL_NAMES,
+} from './agentTools';
 import { ensureReactSiteTemplate, runSandboxTool } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
 
-const MAX_TOOL_ROUNDS = 8;
+const MAX_TOOL_ROUNDS = 10;
+
+function pendingKindFor(name: string): ToolActivityKind {
+  if (name === 'web_search') return 'search';
+  if (name === 'web_fetch') return 'fetch';
+  if (name === 'read_file') return 'read';
+  if (name === 'list_files') return 'list';
+  if (name === 'delete_file') return 'delete';
+  if (name === 'write_file') return 'edit';
+  return 'edit';
+}
 
 const PENDING_KEY = 'xelity-chat-pending-v1';
 const EVENT = 'xelity:chat-store-updated';
@@ -181,9 +197,10 @@ export type GenerateParams = {
   systemExtra?: string | null;
   reasoning?: boolean;
   codingTools?: boolean;
+  webTools?: boolean;
 };
 
-async function runWithCodingTools(params: {
+async function runWithAgentTools(params: {
   chatId: string;
   modelId: ChatModelId;
   messages: ChatApiMessage[];
@@ -191,6 +208,8 @@ async function runWithCodingTools(params: {
   systemExtra?: string | null;
   reasoning?: boolean;
   reasoningPhase?: 'think' | 'answer';
+  codingTools?: boolean;
+  webTools?: boolean;
   assistantId: string;
   createdAt: number;
   firebaseUid?: string | null;
@@ -199,7 +218,24 @@ async function runWithCodingTools(params: {
   seedReasoningMs?: number | null;
   thinkingPhase?: ChatMessage['thinkingPhase'];
 }): Promise<{ content: string; toolActivity: ToolActivity[] }> {
-  const activities: ToolActivity[] = ensureReactSiteTemplate(params.chatId);
+  const coding = params.codingTools === true;
+  const web = params.webTools !== false;
+  const seeded = coding ? ensureReactSiteTemplate(params.chatId) : false;
+  const activities: ToolActivity[] = [];
+
+  if (!coding && !web) {
+    const reply = await requestXlaudeReply({
+      modelId: params.modelId,
+      messages: params.messages,
+      maxTokens: params.maxTokens,
+      systemExtra: params.systemExtra,
+      reasoning: params.reasoning,
+      reasoningPhase: params.reasoningPhase,
+      codingTools: false,
+      webTools: false,
+    });
+    return { content: reply.content.trim(), toolActivity: [] };
+  }
 
   const pushAssistant = (partial: Partial<ChatMessage>) => {
     persistStore(
@@ -222,22 +258,14 @@ async function runWithCodingTools(params: {
     );
   };
 
-  if (activities.length) {
-    pushAssistant({
-      content: '',
-      toolActivity: activities,
-      thinkingPhase: params.thinkingPhase ?? 'answering',
-    });
-  }
-
   let messages = [...params.messages];
-  if (activities.length) {
+  if (coding && seeded) {
     messages = [
       ...messages,
       {
         role: 'user',
         content:
-          'В песочнице уже создан стартовый React (Vite) шаблон (package.json, vite.config.js, index.html, src/main.jsx, src/App.jsx, src/styles.css). Используй tools: list_files / read_file / write_file. Не дублируй шаблон с нуля — правь нужные файлы под запрос.',
+          'В песочнице уже тихо создан стартовый React (Vite) шаблон (package.json, vite.config.js, index.html, src/main.jsx, src/App.jsx, src/styles.css). Не вызывай write_file только чтобы пересоздать шаблон. Используй list_files / read_file / write_file под задачу. Документацию — через web_search / web_fetch.',
       },
     ];
   }
@@ -250,7 +278,8 @@ async function runWithCodingTools(params: {
       systemExtra: params.systemExtra,
       reasoning: params.reasoning,
       reasoningPhase: params.reasoningPhase,
-      codingTools: true,
+      codingTools: coding,
+      webTools: web,
     });
 
     const calls = reply.tool_calls || [];
@@ -260,38 +289,72 @@ async function runWithCodingTools(params: {
 
     const toolMsgs: ChatApiMessage[] = [];
     for (const tc of calls as ToolCall[]) {
+      const name = tc.function.name;
+      const argsJson = tc.function.arguments || '{}';
       const pending: ToolActivity = {
         id: tc.id || `p-${activities.length}`,
-        name: tc.function.name,
-        kind: tc.function.name === 'read_file' ? 'read' : tc.function.name === 'list_files' ? 'list' : 'edit',
+        name,
+        kind: pendingKindFor(name),
         pending: true,
         ok: false,
       };
       try {
-        const args = JSON.parse(tc.function.arguments || '{}') as { path?: string };
+        const args = JSON.parse(argsJson) as {
+          path?: string;
+          query?: string;
+          url?: string;
+        };
         if (args.path) pending.path = String(args.path);
+        else if (args.query) pending.path = String(args.query);
+        else if (args.url) pending.path = String(args.url);
       } catch {
         /* ignore */
       }
       activities.push(pending);
       pushAssistant({ content: '', toolActivity: [...activities] });
 
-      const run = runSandboxTool(
-        params.chatId,
-        tc.function.name,
-        tc.function.arguments || '{}',
-        tc.id,
-      );
+      let forModel = '';
+      let done: ToolActivity;
+      if (WEB_TOOL_NAMES.has(name)) {
+        try {
+          const remote = await executeRemoteTool(name, argsJson);
+          done = activityFromWebTool(pending.id, name, argsJson, remote);
+          forModel = remote.content || remote.error || 'empty';
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Ошибка tool';
+          done = {
+            ...pending,
+            pending: false,
+            ok: false,
+            error: msg,
+            after: msg,
+          };
+          forModel = `Error: ${msg}`;
+        }
+      } else if (coding) {
+        const run = runSandboxTool(params.chatId, name, argsJson, tc.id);
+        done = run.activity;
+        forModel = run.forModel;
+      } else {
+        done = {
+          ...pending,
+          pending: false,
+          ok: false,
+          error: 'Tool недоступен в этом режиме',
+        };
+        forModel = `Error: tool ${name} unavailable (enable coding mode for file tools)`;
+      }
+
       const idx = activities.findIndex((a) => a.id === pending.id);
-      if (idx >= 0) activities[idx] = run.activity;
-      else activities.push(run.activity);
+      if (idx >= 0) activities[idx] = done;
+      else activities.push(done);
       pushAssistant({ content: '', toolActivity: [...activities] });
 
       toolMsgs.push({
         role: 'tool',
         tool_call_id: tc.id,
-        name: tc.function.name,
-        content: run.forModel,
+        name,
+        content: forModel,
       });
     }
 
@@ -391,39 +454,26 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           },
         ];
 
-        let answerContent = '';
-        let toolActivity: ToolActivity[] | undefined;
-        if (params.codingTools) {
-          const coded = await runWithCodingTools({
-            chatId: params.chatId,
-            modelId: params.modelId,
-            messages: answerMessages,
-            maxTokens: params.maxTokens,
-            systemExtra: params.systemExtra,
-            reasoning: true,
-            reasoningPhase: 'answer',
-            assistantId,
-            createdAt: thinkStarted,
-            firebaseUid: params.firebaseUid,
-            titleIfNotManual: params.titleIfNotManual,
-            seedThoughts: thoughts,
-            seedReasoningMs: reasoningMs,
-            thinkingPhase: 'answering',
-          });
-          answerContent = coded.content;
-          toolActivity = coded.toolActivity;
-        } else {
-          answerContent = (
-            await requestXlaudeReply({
-              modelId: params.modelId,
-              messages: answerMessages,
-              maxTokens: params.maxTokens,
-              systemExtra: params.systemExtra,
-              reasoningPhase: 'answer',
-              reasoning: true,
-            })
-          ).content.trim();
-        }
+        const coded = await runWithAgentTools({
+          chatId: params.chatId,
+          modelId: params.modelId,
+          messages: answerMessages,
+          maxTokens: params.maxTokens,
+          systemExtra: params.systemExtra,
+          reasoning: true,
+          reasoningPhase: 'answer',
+          codingTools: params.codingTools,
+          webTools: params.webTools,
+          assistantId,
+          createdAt: thinkStarted,
+          firebaseUid: params.firebaseUid,
+          titleIfNotManual: params.titleIfNotManual,
+          seedThoughts: thoughts,
+          seedReasoningMs: reasoningMs,
+          thinkingPhase: 'answering',
+        });
+        const answerContent = coded.content;
+        const toolActivity = coded.toolActivity.length ? coded.toolActivity : undefined;
 
         persistStore(
           upsertAssistantInStore(
@@ -464,35 +514,23 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         params.firebaseUid,
       );
 
-      let replyContent = '';
-      let toolActivity: ToolActivity[] | undefined;
-      if (params.codingTools) {
-        const coded = await runWithCodingTools({
-          chatId: params.chatId,
-          modelId: params.modelId,
-          messages: params.messages,
-          maxTokens: params.maxTokens,
-          systemExtra: params.systemExtra,
-          reasoning: false,
-          assistantId,
-          createdAt: waitStarted,
-          firebaseUid: params.firebaseUid,
-          titleIfNotManual: params.titleIfNotManual,
-          thinkingPhase: 'answering',
-        });
-        replyContent = coded.content;
-        toolActivity = coded.toolActivity;
-      } else {
-        replyContent = (
-          await requestXlaudeReply({
-            modelId: params.modelId,
-            messages: params.messages,
-            maxTokens: params.maxTokens,
-            systemExtra: params.systemExtra,
-            reasoning: false,
-          })
-        ).content;
-      }
+      const coded = await runWithAgentTools({
+        chatId: params.chatId,
+        modelId: params.modelId,
+        messages: params.messages,
+        maxTokens: params.maxTokens,
+        systemExtra: params.systemExtra,
+        reasoning: false,
+        codingTools: params.codingTools,
+        webTools: params.webTools,
+        assistantId,
+        createdAt: waitStarted,
+        firebaseUid: params.firebaseUid,
+        titleIfNotManual: params.titleIfNotManual,
+        thinkingPhase: 'answering',
+      });
+      const replyContent = coded.content;
+      const toolActivity = coded.toolActivity.length ? coded.toolActivity : undefined;
 
       persistStore(
         upsertAssistantInStore(

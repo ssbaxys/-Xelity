@@ -16,6 +16,7 @@ export type StaffPermission =
   | 'payments'
   | 'broadcasts'
   | 'prompts'
+  | 'maintenance'
   | 'credits.bypass';
 
 export type StaffBrand = {
@@ -61,6 +62,7 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
     'payments',
     'broadcasts',
     'prompts',
+    'maintenance',
     'credits.bypass',
   ],
   owner: [
@@ -77,6 +79,7 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
     'payments',
     'broadcasts',
     'prompts',
+    'maintenance',
     'credits.bypass',
   ],
 };
@@ -203,6 +206,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { to: '/admin/payments', label: 'Платежи', perm: 'payments' },
   { to: '/admin/broadcasts', label: 'Broadcasts', perm: 'broadcasts' },
   { to: '/admin/prompts', label: 'Промпты', perm: 'prompts' },
+  { to: '/admin/maintenance', label: 'Техработы', perm: 'maintenance' },
 ];
 
 export function navForRole(role: StaffRole | null): AdminNavItem[] {

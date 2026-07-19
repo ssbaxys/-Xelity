@@ -21,6 +21,7 @@ type Prefs = {
   /** Последние состояния ИИ-инструментов (для новых чатов) */
   lastReasoning: boolean;
   lastCodingTools: boolean;
+  lastWebTools: boolean;
 };
 
 type PrefsContextValue = Prefs & {
@@ -30,6 +31,7 @@ type PrefsContextValue = Prefs & {
   setDebug: (debug: boolean) => void;
   setLastReasoning: (on: boolean) => void;
   setLastCodingTools: (on: boolean) => void;
+  setLastWebTools: (on: boolean) => void;
   t: (key: string) => string;
 };
 
@@ -42,6 +44,7 @@ const DEFAULTS: Prefs = {
   debug: false,
   lastReasoning: false,
   lastCodingTools: false,
+  lastWebTools: true,
 };
 
 const DICT: Record<AppLanguage, Record<string, string>> = {
@@ -151,6 +154,7 @@ function loadPrefs(): Prefs {
       debug: Boolean(parsed.debug),
       lastReasoning: Boolean(parsed.lastReasoning),
       lastCodingTools: Boolean(parsed.lastCodingTools),
+      lastWebTools: parsed.lastWebTools !== false,
     };
   } catch {
     return DEFAULTS;
@@ -197,6 +201,10 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     setPrefs((p) => ({ ...p, lastCodingTools }));
   }, []);
 
+  const setLastWebTools = useCallback((lastWebTools: boolean) => {
+    setPrefs((p) => ({ ...p, lastWebTools }));
+  }, []);
+
   const t = useCallback(
     (key: string) => DICT[prefs.language][key] ?? DICT.ru[key] ?? key,
     [prefs.language],
@@ -211,9 +219,20 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
       setDebug,
       setLastReasoning,
       setLastCodingTools,
+      setLastWebTools,
       t,
     }),
-    [prefs, setLanguage, setTheme, setUiScale, setDebug, setLastReasoning, setLastCodingTools, t],
+    [
+      prefs,
+      setLanguage,
+      setTheme,
+      setUiScale,
+      setDebug,
+      setLastReasoning,
+      setLastCodingTools,
+      setLastWebTools,
+      t,
+    ],
   );
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
