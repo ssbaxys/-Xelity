@@ -94,14 +94,14 @@ export default function BannedPage() {
         </div>
 
         {sent && (
-          <p className="mt-4 rounded-lg border border-[#2a3c2a] bg-[#121a12] px-3 py-2 text-sm text-[#81c784]">
+          <p className="mt-4 rounded-lg border border-[color-mix(in_srgb,#43a047_40%,var(--c-border))] bg-[color-mix(in_srgb,#43a047_12%,var(--c-soft))] px-3 py-2 text-sm text-[color-mix(in_srgb,#2e7d32_45%,var(--c-text))]">
             Апелляция отправлена. Мы рассмотрим её в ближайшее время.
           </p>
         )}
 
         {appealOpen ? (
           <form onSubmit={onAppeal} className="mt-5 space-y-3">
-            <label className="block text-[11px] uppercase tracking-wider text-[#6e5555]">
+            <label className="block text-[11px] uppercase tracking-wider text-[var(--c-faint)]">
               Текст апелляции
               <textarea
                 value={body}
@@ -154,7 +154,7 @@ export default function BannedPage() {
         <button
           type="button"
           onClick={() => void logout()}
-          className="mt-4 w-full text-center text-xs text-[#6e5555] hover:text-[#9a8585]"
+          className="mt-4 w-full text-center text-xs text-[var(--c-faint)] hover:text-[var(--c-muted)]"
         >
           Выйти из аккаунта
         </button>

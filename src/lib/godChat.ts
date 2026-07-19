@@ -207,6 +207,21 @@ export async function clearGodHold(uid: string, chatId: string): Promise<void> {
   });
 }
 
+/** Сбросить перехват / очередь: не перехватывать, убрать залипшую «Очередь» */
+export async function resetGodIntercept(uid: string, chatId: string): Promise<void> {
+  const prev = await fetchGodChatControl(uid, chatId);
+  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
+    ...prev,
+    interceptUntil: null,
+    interceptDecision: 'skip',
+    heldAssistantId: null,
+    pendingJobId: null,
+    queueActive: false,
+    queueReason: null,
+    updatedAt: Date.now(),
+  });
+}
+
 /** Ждать решения Owner или таймаута. Возвращает takeover | skip */
 export async function waitForInterceptDecision(
   uid: string,

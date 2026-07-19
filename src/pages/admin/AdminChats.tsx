@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   adminAppendAssistantMessage,
   adminAppendUserMessage,
+  adminClearServerLoadPlaceholders,
   adminDeleteMessage,
   adminEditMessage,
   adminSetChatSystemPrompt,
@@ -17,8 +18,8 @@ import {
 import {
   clearGodHold,
   GOD_MODE_OPTIONS,
+  resetGodIntercept,
   setGodChatMode,
-  setGodSystemPrompt,
   setInterceptDecision,
   toggleGodPrank,
   watchGodChatControl,
@@ -82,7 +83,7 @@ export default function AdminChats() {
   const [error, setError] = useState<string | null>(null);
   const [interceptLeft, setInterceptLeft] = useState(0);
   const [threadPrompt, setThreadPrompt] = useState('');
-  const [godPrompt, setGodPrompt] = useState('');
+  const [pranksOpen, setPranksOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -114,17 +115,16 @@ export default function AdminChats() {
       setGodControl(null);
       return;
     }
-    return watchGodChatControl(selectedUid, threadId, (c) => {
-      setGodControl(c);
-      setGodPrompt(c.godSystemPrompt || '');
-    });
+    return watchGodChatControl(selectedUid, threadId, setGodControl);
   }, [godMode, selectedUid, threadId]);
 
   useEffect(() => {
     if (!threadId || !store) return;
     const t = store.chats.find((c) => c.id === threadId);
     setThreadPrompt(t?.adminSystemPrompt || '');
-  }, [threadId, store]);
+    // только при открытии чата — не затирать набор при live-синке
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate prompt on thread open
+  }, [threadId, selectedUid, Boolean(store)]);
 
   useEffect(() => {
     if (!godControl?.interceptUntil) {
@@ -254,32 +254,39 @@ export default function AdminChats() {
     }
   };
 
-  const onSend = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!godMode || !selectedUid || !thread || !draft.trim()) return;
+  const onSend = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!godMode || !selectedUid || !threadId || !draft.trim() || busy) return;
     setBusy(true);
     setError(null);
     try {
       const content = draft.trim();
+      const chatId = thread?.id || threadId;
       const asAdmin = sendAs === 'admin' || godControl?.mode === 'admin';
+      let nextStore: ChatStore;
       if (sendAs === 'user') {
-        await adminAppendUserMessage({
+        nextStore = await adminAppendUserMessage({
           uid: selectedUid,
-          chatId: thread.id,
+          chatId,
           content,
         });
       } else {
-        await adminAppendAssistantMessage({
+        nextStore = await adminAppendAssistantMessage({
           uid: selectedUid,
-          chatId: thread.id,
+          chatId,
           content,
           replaceMessageId: godControl?.heldAssistantId || null,
           asAdmin,
         });
-        await clearGodHold(selectedUid, thread.id);
+        try {
+          await clearGodHold(selectedUid, chatId);
+        } catch {
+          /* сообщение уже записано */
+        }
       }
+      setStore(nextStore);
       setDraft('');
-      setGenHint(null);
+      setGenHint('Отправлено');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка отправки');
     } finally {
@@ -287,16 +294,32 @@ export default function AdminChats() {
     }
   };
 
-  const savePrompts = async () => {
+  const savePrompt = async () => {
     if (!selectedUid || !threadId) return;
     setBusy(true);
     setError(null);
     try {
-      await adminSetChatSystemPrompt(selectedUid, threadId, threadPrompt);
-      await setGodSystemPrompt(selectedUid, threadId, godPrompt);
-      setGenHint('Промпты сохранены');
+      const next = await adminSetChatSystemPrompt(selectedUid, threadId, threadPrompt);
+      setStore(next);
+      setGenHint('Промпт сохранён');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка сохранения промптов');
+      setError(e instanceof Error ? e.message : 'Ошибка сохранения промпта');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onResetQueue = async () => {
+    if (!selectedUid || !threadId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await resetGodIntercept(selectedUid, threadId);
+      const next = await adminClearServerLoadPlaceholders(selectedUid, threadId);
+      setStore(next);
+      setGenHint('Перехват и очередь сброшены');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось сбросить');
     } finally {
       setBusy(false);
     }
@@ -632,67 +655,68 @@ export default function AdminChats() {
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[var(--a-strong)]">Промпт чата</span>
-                  <textarea
-                    value={threadPrompt}
-                    onChange={(e) => setThreadPrompt(e.target.value)}
-                    rows={3}
-                    placeholder="Скрытый system prompt этого чата…"
-                    className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2.5 py-1.5 text-[12px] text-[var(--a-text)] outline-none"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-[var(--a-strong)]">Промпт поверх (владелец)</span>
-                  <textarea
-                    value={godPrompt}
-                    onChange={(e) => setGodPrompt(e.target.value)}
-                    rows={3}
-                    placeholder="Приоритетная инструкция поверх остальных…"
-                    className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2.5 py-1.5 text-[12px] text-[var(--a-text)] outline-none"
-                  />
-                </label>
-              </div>
+              <label className="block">
+                <span className="text-[var(--a-strong)]">Промпт чата</span>
+                <textarea
+                  value={threadPrompt}
+                  onChange={(e) => setThreadPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="Скрытый system prompt этого чата…"
+                  className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2.5 py-1.5 text-[12px] text-[var(--a-text)] outline-none"
+                />
+              </label>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void savePrompts()}
+                onClick={() => void savePrompt()}
                 className="rounded-lg border border-[var(--a-border)] px-3 py-1.5 text-[11px] font-medium hover:bg-[var(--a-hover)] disabled:opacity-40"
               >
-                Сохранить промпты
+                Сохранить промпт
               </button>
 
               <div>
-                <p className="mb-1.5 font-medium text-[var(--a-strong)]">
-                  Троллинг · {godControl?.pranks?.length || 0}/22
-                </p>
-                <div className="grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
-                  {GOD_PRANKS.map((p) => {
-                    const on = Boolean(godControl?.pranks?.includes(p.id));
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        disabled={busy}
-                        title={p.hint}
-                        onClick={() =>
-                          void toggleGodPrank(selectedUid, threadId, p.id).catch((e) =>
-                            setError(e instanceof Error ? e.message : 'Ошибка'),
-                          )
-                        }
-                        className={`rounded-lg border px-2 py-1.5 text-left text-[11px] transition ${
-                          on
-                            ? 'border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
-                            : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
-                        }`}
-                      >
-                        <span className="font-medium">{p.label}</span>
-                        <span className="mt-0.5 block text-[10px] opacity-70">{p.hint}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPranksOpen((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--a-border)] px-2.5 py-1.5 text-left hover:bg-[var(--a-hover)]"
+                >
+                  <span className="font-medium text-[var(--a-strong)]">
+                    Троллинг · {godControl?.pranks?.length || 0}/22
+                  </span>
+                  <IconChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-[var(--a-faint)] transition ${
+                      pranksOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {pranksOpen && (
+                  <div className="mt-1.5 grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
+                    {GOD_PRANKS.map((p) => {
+                      const on = Boolean(godControl?.pranks?.includes(p.id));
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={busy}
+                          title={p.hint}
+                          onClick={() =>
+                            void toggleGodPrank(selectedUid, threadId, p.id).catch((e) =>
+                              setError(e instanceof Error ? e.message : 'Ошибка'),
+                            )
+                          }
+                          className={`rounded-lg border px-2 py-1.5 text-left text-[11px] transition ${
+                            on
+                              ? 'border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
+                              : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
+                          }`}
+                        >
+                          <span className="font-medium">{p.label}</span>
+                          <span className="mt-0.5 block text-[10px] opacity-70">{p.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {godControl?.mode === 'auto_manual' &&
@@ -714,14 +738,29 @@ export default function AdminChats() {
                       onClick={() => void onIntercept('skip')}
                       className="rounded-md border border-[var(--a-border)] px-2.5 py-1 text-[11px]"
                     >
-                      Пропустить → ИИ
+                      Не перехватывать → ИИ
                     </button>
                   </div>
                 )}
-              {godControl?.queueActive && (
-                <p className="text-[var(--a-accent-fg)]">
-                  Очередь активна — пользователь ждёт ответа
-                </p>
+
+              {(godControl?.queueActive ||
+                Boolean(godControl?.heldAssistantId) ||
+                (godControl?.mode === 'auto_manual' && interceptLeft > 0)) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {godControl?.queueActive && (
+                    <p className="text-[var(--a-accent-fg)]">
+                      Очередь активна — пользователь ждёт ответа
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onResetQueue()}
+                    className="rounded-md border border-[var(--a-border)] px-2.5 py-1 text-[11px] font-medium hover:bg-[var(--a-hover)] disabled:opacity-40"
+                  >
+                    Сбросить перехват / очередь
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -863,7 +902,15 @@ export default function AdminChats() {
           </div>
 
           {godMode && (
-            <form onSubmit={(e) => void onSend(e)} className="admin-panel space-y-2 p-3">
+            <form
+              onSubmit={(e) => void onSend(e)}
+              className="admin-panel shrink-0 space-y-2 p-3"
+            >
+              {error && (
+                <p className="rounded-lg border border-[var(--a-danger-border)] bg-[var(--a-danger-soft)] px-2.5 py-1.5 text-[12px] text-[var(--a-danger)]">
+                  {error}
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <AdminSelect
                   value={sendAs}
@@ -892,16 +939,28 @@ export default function AdminChats() {
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                rows={4}
+                rows={3}
                 placeholder="Ответ… можно подкрутить после генерации в черновик"
-                className="w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
+                className="w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm text-[var(--a-text)] outline-none focus:border-[var(--admin-accent)]/50"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    void onSend();
+                  }
+                }}
               />
               <button
                 type="submit"
                 disabled={busy || !draft.trim()}
+                onClick={(e) => {
+                  // запасной путь, если submit формы перехватывается
+                  if (busy || !draft.trim()) return;
+                  e.preventDefault();
+                  void onSend();
+                }}
                 className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >
-                Отправить
+                {busy ? 'Отправка…' : 'Отправить'}
               </button>
             </form>
           )}

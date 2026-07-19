@@ -468,6 +468,31 @@ export function searchChatEvidence(store: ChatStore, query: string): ChatEvidenc
   return hits.sort((a, b) => b.createdAt - a.createdAt);
 }
 
+/** Убрать пустые плейсхолдеры intercept/queue из чата */
+export async function adminClearServerLoadPlaceholders(
+  uid: string,
+  chatId: string,
+): Promise<ChatStore> {
+  const current = (await fetchUserChatStore(uid)) ?? emptyChatStore();
+  const now = Date.now();
+  const chats = current.chats.map((c) => {
+    if (c.id !== chatId) return c;
+    const messages = c.messages.filter(
+      (m) =>
+        !(
+          m.role === 'assistant' &&
+          !m.content?.trim() &&
+          (m.serverLoad === 'queue' || m.serverLoad === 'intercept')
+        ),
+    );
+    if (messages.length === c.messages.length) return c;
+    return { ...c, messages, updatedAt: now };
+  });
+  const next: ChatStore = { ...current, chats, updatedAt: now };
+  await saveUserChatStore(uid, next);
+  return next;
+}
+
 export async function adminSetChatSystemPrompt(
   uid: string,
   chatId: string,

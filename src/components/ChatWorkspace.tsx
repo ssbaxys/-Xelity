@@ -1875,11 +1875,15 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                   </Link>
                 </div>
               )}
-              {godControl?.queueActive && (
-                <div className="mx-auto mb-2 max-w-[720px]">
-                  <ServerLoadCard kind="queue" />
-                </div>
-              )}
+              {/* очередь только над полем, если в ленте ещё нет такой же карточки */}
+              {godControl?.queueActive &&
+                !active.messages.some(
+                  (m) => m.role === 'assistant' && m.serverLoad === 'queue' && !m.content?.trim(),
+                ) && (
+                  <div className="mx-auto mb-2 max-w-[720px]">
+                    <ServerLoadCard kind="queue" />
+                  </div>
+                )}
               <form onSubmit={onSubmit} className="mx-auto max-w-[720px]">
                 <div className="chat-composer rounded-2xl border border-[var(--c-border-strong)] bg-[var(--c-elev)]">
                   <textarea
