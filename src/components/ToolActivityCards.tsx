@@ -3,11 +3,20 @@ import type { ToolActivity } from '../lib/chatStore';
 import { compactDiff, diffLines } from '../lib/lineDiff';
 import { IconCheck, IconEye, IconFilePlus, IconPencil, IconTrash } from './icons';
 
-function KindIcon({ kind }: { kind: ToolActivity['kind'] }) {
-  if (kind === 'read' || kind === 'list') return <IconEye className="h-3.5 w-3.5" />;
-  if (kind === 'create') return <IconFilePlus className="h-3.5 w-3.5" />;
-  if (kind === 'delete') return <IconTrash className="h-3.5 w-3.5" />;
-  return <IconPencil className="h-3.5 w-3.5" />;
+function KindIcon({
+  kind,
+  pending,
+}: {
+  kind: ToolActivity['kind'];
+  pending?: boolean;
+}) {
+  const spin = pending ? 'tool-icon-spin' : '';
+  if (kind === 'read' || kind === 'list') {
+    return <IconEye className={`h-3.5 w-3.5 ${spin}`} />;
+  }
+  if (kind === 'create') return <IconFilePlus className={`h-3.5 w-3.5 ${spin}`} />;
+  if (kind === 'delete') return <IconTrash className={`h-3.5 w-3.5 ${spin}`} />;
+  return <IconPencil className={`h-3.5 w-3.5 ${spin}`} />;
 }
 
 function labelFor(a: ToolActivity): string {
@@ -71,7 +80,7 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
         const expanded = openId === a.id;
         const expandable = a.kind !== 'list' || Boolean(a.after);
         const tone = a.pending
-          ? 'border-[var(--c-border)] bg-[var(--c-soft)]'
+          ? 'tool-card-pending border-[var(--c-border-strong)] bg-[var(--c-soft)]'
           : a.ok
             ? 'border-[rgba(46,125,50,0.35)] bg-[rgba(46,125,50,0.08)]'
             : 'border-[rgba(198,40,40,0.4)] bg-[rgba(198,40,40,0.1)]';
@@ -79,23 +88,37 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
           <div key={a.id} className={`overflow-hidden rounded-xl border ${tone}`}>
             <button
               type="button"
-              disabled={!expandable}
+              disabled={!expandable || a.pending}
               onClick={() => setOpenId(expanded ? null : a.id)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-[var(--c-text)] disabled:cursor-default"
             >
-              <span className={a.ok ? 'text-[#81c784]' : a.pending ? 'text-[var(--c-faint)]' : 'text-[#e57373]'}>
-                <KindIcon kind={a.kind} />
+              <span
+                className={`inline-flex shrink-0 ${
+                  a.ok
+                    ? 'text-[#81c784]'
+                    : a.pending
+                      ? 'text-[var(--c-muted)]'
+                      : 'text-[#e57373]'
+                }`}
+              >
+                <KindIcon kind={a.kind} pending={a.pending} />
               </span>
-              <span className="min-w-0 flex-1 truncate font-medium">{labelFor(a)}</span>
+              <span
+                className={`min-w-0 flex-1 truncate font-medium ${
+                  a.pending ? 'tool-label-pending' : ''
+                }`}
+              >
+                {labelFor(a)}
+              </span>
               {a.pending ? (
-                <span className="text-[10px] text-[var(--c-faint)]">…</span>
+                <span className="text-[10px] tabular-nums text-[var(--c-faint)]">…</span>
               ) : a.ok ? (
-                <IconCheck className="h-3.5 w-3.5 shrink-0 text-[#81c784]" />
+                <IconCheck className="tool-check-in h-3.5 w-3.5 shrink-0 text-[#81c784]" />
               ) : (
                 <span className="text-[10px] text-[#e57373]">ошибка</span>
               )}
             </button>
-            {expanded && (
+            {expanded && !a.pending && (
               <div className="border-t border-[var(--c-border)] bg-[var(--c-panel)]">
                 {a.error ? (
                   <p className="px-3 py-2 text-[11px] text-[#e57373]">{a.error}</p>

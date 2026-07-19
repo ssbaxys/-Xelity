@@ -59,7 +59,7 @@ export default function BlurMarkdown({
   );
 }
 
-/** Мысли: сразу весь текст, только blur → sharp */
+/** Мысли: сразу весь текст, blur → sharp (как у ответа) */
 export function BlurText({
   text,
   animate = true,
@@ -69,22 +69,30 @@ export function BlurText({
   animate?: boolean;
   className?: string;
 }) {
-  const [clear, setClear] = useState(!animate);
+  // всегда стартуем с blur при анимации, иначе transition не виден
+  const [clear, setClear] = useState(false);
 
   useEffect(() => {
-    if (!animate) {
+    if (!animate || !text.trim()) {
       setClear(true);
       return;
     }
     setClear(false);
-    const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setClear(true));
+    let clearTimer: number | undefined;
+    const start = window.requestAnimationFrame(() => {
+      // кадр с blur, затем снимаем — CSS transition отрабатывает
+      clearTimer = window.setTimeout(() => setClear(true), 40);
     });
-    return () => window.cancelAnimationFrame(id);
+    return () => {
+      window.cancelAnimationFrame(start);
+      if (clearTimer) window.clearTimeout(clearTimer);
+    };
   }, [text, animate]);
 
   return (
-    <p className={`answer-blur whitespace-pre-wrap break-words ${clear ? 'is-clear' : ''} ${className}`}>
+    <p
+      className={`answer-blur thought-blur whitespace-pre-wrap break-words ${clear ? 'is-clear' : ''} ${className}`}
+    >
       {text}
     </p>
   );

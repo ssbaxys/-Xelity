@@ -1506,9 +1506,119 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   will-change: filter, opacity;
 }
 
+.answer-blur.thought-blur {
+  filter: blur(12px);
+  opacity: 0.28;
+  transition:
+    filter 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .answer-blur.is-clear {
   filter: blur(0);
   opacity: 1;
+}
+
+.thought-appear {
+  animation: thought-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes thought-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thought-placeholder {
+  animation: thinking-pulse 1.4s ease-in-out infinite;
+}
+
+/* Кодинг: иконка крутится → замедляется → пауза → снова */
+.tool-icon-spin {
+  display: inline-block;
+  transform-origin: 50% 55%;
+  animation: tool-icon-cycle 2.6s cubic-bezier(0.33, 0.1, 0.25, 1) infinite;
+  will-change: transform, filter, opacity;
+}
+
+@keyframes tool-icon-cycle {
+  0% {
+    transform: rotate(0deg) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+  35% {
+    transform: rotate(320deg) scale(1.05);
+    filter: blur(1.6px);
+    opacity: 0.72;
+  }
+  55% {
+    transform: rotate(400deg) scale(1.02);
+    filter: blur(0.8px);
+    opacity: 0.85;
+  }
+  72% {
+    transform: rotate(420deg) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+  88%,
+  100% {
+    transform: rotate(420deg) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+.tool-card-pending {
+  animation: tool-card-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes tool-card-pulse {
+  0%,
+  100% {
+    border-color: var(--c-border-strong);
+  }
+  50% {
+    border-color: color-mix(in srgb, #c62828 45%, var(--c-border));
+  }
+}
+
+.tool-label-pending {
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+.tool-check-in {
+  animation: tool-check-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes tool-check-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-icon-spin,
+  .tool-card-pending,
+  .tool-label-pending,
+  .thought-appear,
+  .thought-placeholder {
+    animation: none !important;
+  }
+  .tool-icon-spin {
+    filter: none !important;
+  }
 }
 
 .assistant-answer-wrap {

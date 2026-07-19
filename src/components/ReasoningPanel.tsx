@@ -80,9 +80,11 @@ export default function ReasoningPanel({
         <div className="reasoning-collapse-inner">
           <div className="mt-1.5 border-l border-[var(--c-border)] pl-3 text-[12.5px] leading-relaxed text-[var(--c-faint)]">
             {hasText ? (
-              <div key={thoughtKey}>
-                <BlurText text={reasoning || ''} animate={animateThoughts && live} />
+              <div key={thoughtKey} className="thought-appear">
+                <BlurText text={reasoning || ''} animate={animateThoughts} />
               </div>
+            ) : live ? (
+              <p className="thought-placeholder text-[12px] text-[var(--c-faint)]">Собираю мысли…</p>
             ) : null}
           </div>
         </div>
