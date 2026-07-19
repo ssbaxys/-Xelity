@@ -411,12 +411,6 @@ export default function AdminUsers() {
                           />
                         </div>
                       )}
-                      <Link
-                        to={`/admin/users/${u.uid}`}
-                        className="rounded-md border border-[var(--a-border)] px-2 py-1 text-[11px] text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
-                      >
-                        Карточка
-                      </Link>
                     </div>
                   </td>
                 </tr>
