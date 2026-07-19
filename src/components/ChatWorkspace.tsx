@@ -11,12 +11,12 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useAuth } from '../context/AuthContext';
 import { usePrefs, type AppLanguage, type AppTheme, type UiScale } from '../context/PrefsContext';
 import { getPlan } from '../lib/plans';
 import LimitsModal from './LimitsModal';
+import ChatMarkdown from './ChatMarkdown';
+import CodingPanel from './CodingPanel';
 import {
   loadLocalChatStore,
   saveLocalChatStore,
@@ -50,6 +50,7 @@ import {
   IconAdmin,
   IconBrain,
   IconChat,
+  IconCode,
   IconCheck,
   IconEmpty,
   IconChevronDown,
@@ -268,6 +269,7 @@ function makeChat(
     modelId,
     manualTitle: false,
     reasoning: false,
+    codingTools: false,
     draft: '',
   };
 }
@@ -280,14 +282,6 @@ function nextFolderTitle(existing: ChatFolder[]): string {
   let n = 1;
   while (taken.has(`${base}(${n})`)) n += 1;
   return `${base}(${n})`;
-}
-
-function MarkdownBody({ content }: { content: string }) {
-  return (
-    <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[15px] leading-[1.65] text-[var(--c-text)]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
-  );
 }
 
 type Props = {
@@ -334,6 +328,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [codingPanelOpen, setCodingPanelOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [limitHint, setLimitHint] = useState<string | null>(null);
   const [usageToday, setUsageToday] = useState(0);
@@ -724,6 +719,17 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     });
   };
 
+  const setCodingTools = (on: boolean) => {
+    if (!active) return;
+    persist({
+      ...store,
+      chats: chats.map((c) =>
+        c.id === active.id ? { ...c, codingTools: on, updatedAt: Date.now() } : c,
+      ),
+    });
+    if (on) setCodingPanelOpen(true);
+  };
+
   const onDragStart = (e: DragEvent, id: string) => {
     setDragId(id);
     e.dataTransfer.setData('text/plain', id);
@@ -904,6 +910,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       promptText: text,
       systemExtra: active.adminSystemPrompt,
       reasoning: Boolean(active.reasoning),
+      codingTools: Boolean(active.codingTools),
     }).finally(() => {
       setSending(isChatGenerating(chatId));
       if (user) {
@@ -1662,8 +1669,8 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         }`}
                       >
                         {msg.role === 'user' ? (
-                          <div className="anim-msg chat-md max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-[var(--c-soft)] px-3.5 py-2.5 text-[15px] leading-relaxed break-words text-[var(--c-text)] [&_pre]:text-[13px]">
-                            <MarkdownBody content={msg.content} />
+                          <div className="anim-msg max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-[var(--c-soft)] px-3.5 py-2.5 text-[15px] leading-relaxed break-words text-[var(--c-text)] [&_pre]:text-[13px]">
+                            <ChatMarkdown content={msg.content} className="chat-md--bubble" />
                           </div>
                         ) : (
                           <div className="anim-msg min-w-0">
@@ -1794,6 +1801,47 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                           Рассуждения
                         </span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !active.codingTools;
+                          setCodingTools(next);
+                          if (!next) setCodingPanelOpen(false);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (active.codingTools) setCodingPanelOpen(true);
+                        }}
+                        className={`inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md border text-[11px] font-medium transition-all duration-300 ease-out ${
+                          active.codingTools
+                            ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] px-2 text-[var(--c-text)]'
+                            : 'w-7 border-[var(--c-border)] bg-[var(--c-soft)] px-0 text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)]'
+                        }`}
+                        aria-label="Кодинг"
+                        aria-pressed={Boolean(active.codingTools)}
+                        title="Песочница сайта: ИИ пишет HTML/CSS/JS (ПКМ — панель файлов)"
+                      >
+                        <IconCode className="h-3.5 w-3.5 shrink-0" />
+                        <span
+                          className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                            active.codingTools
+                              ? 'max-w-[4.5rem] opacity-100'
+                              : 'max-w-0 opacity-0'
+                          }`}
+                        >
+                          Кодинг
+                        </span>
+                      </button>
+                      {active.codingTools && (
+                        <button
+                          type="button"
+                          onClick={() => setCodingPanelOpen(true)}
+                          className="hidden h-7 items-center rounded-md border border-[var(--c-border)] px-2 text-[11px] text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)] sm:inline-flex"
+                          title="Файлы и превью"
+                        >
+                          Файлы
+                        </button>
+                      )}
                       <span
                         className={`text-[11px] tabular-nums transition-colors ${
                           draft.length > 1800 ? 'text-[#e57373]' : 'text-[var(--c-faint)]'
@@ -1833,6 +1881,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         modelId={active?.modelId ?? DEFAULT_MODEL_ID}
         reasoning={Boolean(active?.reasoning)}
       />
+
+      {active && (
+        <CodingPanel
+          chatId={active.id}
+          open={codingPanelOpen && Boolean(active.codingTools)}
+          onClose={() => setCodingPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

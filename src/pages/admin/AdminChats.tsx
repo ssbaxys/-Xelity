@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getPlan } from '../../lib/plans';
@@ -15,16 +13,13 @@ import {
 import { modelLabel, normalizeModelId } from '../../lib/models';
 import { watchAllUsers, type UserProfile } from '../../lib/rtdb';
 import { requestXlaudeReply } from '../../lib/xlaude';
+import ChatMarkdown from '../../components/ChatMarkdown';
 import { IconBrain, IconChevronDown } from '../../components/icons';
 import AdminSelect from './AdminSelect';
 import AdminCheckbox from './AdminCheckbox';
 
 function MarkdownBody({ content }: { content: string }) {
-  return (
-    <div className="chat-md min-w-0 max-w-full overflow-x-auto text-[13px] leading-[1.6] text-[var(--a-strong)]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
-  );
+  return <ChatMarkdown content={content} className="text-[13px] leading-[1.6] text-[var(--a-strong)]" />;
 }
 
 type SendAs = 'user' | 'model';

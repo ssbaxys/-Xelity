@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import ChatMarkdown from './ChatMarkdown';
 
 type Props = {
   content: string;
@@ -9,16 +8,6 @@ type Props = {
   className?: string;
   onDone?: () => void;
 };
-
-function MarkdownBody({ content, className = '' }: { content: string; className?: string }) {
-  return (
-    <div
-      className={`chat-md min-w-0 max-w-full overflow-x-auto text-[15px] leading-[1.65] text-[var(--c-text)] ${className}`}
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
-  );
-}
 
 /**
  * Полный markdown сразу (форматирование не ждёт конца анимации) + blur → читаемый текст.
@@ -46,7 +35,6 @@ export default function BlurMarkdown({
     setClear(false);
     let doneTimer: number | undefined;
     const start = window.requestAnimationFrame(() => {
-      // следующий кадр — запускаем переход blur → sharp
       window.requestAnimationFrame(() => setClear(true));
       doneTimer = window.setTimeout(() => {
         if (!doneOnce.current) {
@@ -66,7 +54,7 @@ export default function BlurMarkdown({
 
   return (
     <div className={`answer-blur ${clear ? 'is-clear' : ''} ${className}`}>
-      <MarkdownBody content={content} />
+      <ChatMarkdown content={content} />
     </div>
   );
 }

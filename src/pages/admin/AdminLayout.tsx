@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, type CSSProperties } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { IconMoon, IconSun } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
+import { usePrefs } from '../../context/PrefsContext';
 import { setPageMeta } from '../../lib/seo';
 import {
   defaultAdminPath,
@@ -10,22 +11,13 @@ import {
   staffBrand,
 } from '../../lib/staff';
 
-const APPEARANCE_KEY = 'xelity-admin-appearance';
-
-function readAppearance(): 'dark' | 'light' {
-  try {
-    return localStorage.getItem(APPEARANCE_KEY) === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
-
 export default function AdminLayout() {
   const { user, isStaff, staffRole, loading } = useAuth();
+  const { theme, setTheme } = usePrefs();
   const location = useLocation();
   const brand = staffBrand(staffRole);
   const links = useMemo(() => navForRole(staffRole), [staffRole]);
-  const [appearance, setAppearance] = useState<'dark' | 'light'>(readAppearance);
+  const isLight = theme === 'light';
 
   useEffect(() => {
     setPageMeta({
@@ -35,16 +27,8 @@ export default function AdminLayout() {
     });
   }, [location.pathname, brand.code]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(APPEARANCE_KEY, appearance);
-    } catch {
-      /* ignore */
-    }
-  }, [appearance]);
-
   const shellClass = `admin-shell admin-theme-${brand.theme} admin-scroll ${
-    appearance === 'light' ? 'is-light' : ''
+    isLight ? 'is-light' : ''
   }`;
 
   // только accent — soft задаётся CSS (.admin-theme-* / .is-light)
@@ -99,11 +83,11 @@ export default function AdminLayout() {
             <button
               type="button"
               className="admin-theme-toggle"
-              aria-label={appearance === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-              title={appearance === 'light' ? 'Тёмная тема' : 'Светлая тема'}
-              onClick={() => setAppearance((a) => (a === 'light' ? 'dark' : 'light'))}
+              aria-label={isLight ? 'Тёмная тема' : 'Светлая тема'}
+              title={isLight ? 'Тёмная тема' : 'Светлая тема'}
+              onClick={() => setTheme(isLight ? 'dark' : 'light')}
             >
-              {appearance === 'light' ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
+              {isLight ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
             </button>
             <nav className="flex flex-wrap gap-1">
               {links.map((l) => (

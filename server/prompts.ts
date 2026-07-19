@@ -24,7 +24,7 @@ const SHARED_RULES = `Общие правила (для всех моделей 
 1. Отвечай по существу. Не начинай с представления, слогана или «как модель…».
 2. Не вставляй историю создания, дату релиза и «канон» без прямого вопроса об этом.
 3. Никогда не называй себя Gemma, Google, ChatGPT, Claude, GPT, DeepSeek, Llama или другой чужой моделью — ты модель линейки Xlaude продукта Xelity. Не перечисляй чужие бренды в ответе и не строй сценарий «сначала отрицать X, потом представиться как Y» — просто отвечай от лица своей модели Xlaude.
-4. Не выдумывай доступ к интернету, файлам пользователя или действиям вне чата, если их реально нет.
+4. Не выдумывай доступ к интернету, файлам пользователя или действиям вне чата, если их реально нет. Если в режиме кодинга тебе дали tools песочницы — пользуйся только ими.
 5. Пиши на языке пользователя.
 6. Форматирование: Markdown по умолчанию (##, списки, **жирный**, \`код\`, fenced-блоки). Короткие ответы можно без разметки.
 7. ЗАПРЕЩЕНО говорить пользователю, что ты «ограничена», «притуплена», «урезана», «слабее другой модели», «специально упрощена» или что у тебя снижены способности. Если сравнивают модели — описывай позиционирование продукта (Mini / Pro / поколение K1–K2), не внутренние лимиты.`;
@@ -216,6 +216,9 @@ export function buildSystemPrompt(
     reasoningPhase?: ReasoningPhase;
     /** глобальный промпт модели из админки (все чаты этой модели) */
     modelSystemExtra?: string | null;
+    /** режим coding sandbox — tools для файлов сайта */
+    codingTools?: boolean;
+    codingExtra?: string | null;
   },
 ): string {
   const id = normalizeModelId(modelId);
@@ -232,7 +235,11 @@ export function buildSystemPrompt(
   if (opts?.reasoningPhase === 'answer') {
     base = `${base}\n\n---\n${REASONING_ANSWER_PROMPT}`;
   }
-  return appendExtras(base, { modelSystemExtra, chatExtra: extra });
+  let out = appendExtras(base, { modelSystemExtra, chatExtra: extra });
+  if (opts?.codingTools && opts.codingExtra) {
+    out = `${out}\n\n---\n${opts.codingExtra}`;
+  }
+  return out;
 }
 
 export function buildAdminToolSystemPrompt(

@@ -10,9 +10,18 @@ export { isUiModelId, normalizeModelId, getModel } from './models';
 
 export type ReasoningPhase = 'think' | 'answer';
 
+export type ToolCall = {
+  id: string;
+  type?: string;
+  function: { name: string; arguments: string };
+};
+
 export type ChatApiMessage = {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  tool_call_id?: string;
+  name?: string;
+  tool_calls?: ToolCall[];
 };
 
 export type ChatUsageInfo = {
@@ -30,7 +39,9 @@ export async function requestXlaudeReply(params: {
   systemExtra?: string | null;
   reasoningPhase?: ReasoningPhase;
   reasoning?: boolean;
-}): Promise<{ content: string; usage?: ChatUsageInfo }> {
+  codingTools?: boolean;
+  skipCharge?: boolean;
+}): Promise<{ content: string; tool_calls?: ToolCall[]; usage?: ChatUsageInfo }> {
   const modelId = normalizeModelId(params.modelId);
   const apiBase =
     (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '';
@@ -53,16 +64,18 @@ export async function requestXlaudeReply(params: {
     body: JSON.stringify({
       modelId,
       messages: params.messages,
-      // maxTokens игнорируется сервером по тарифу — поле оставлено для совместимости
       maxTokens: params.maxTokens ?? getModel(modelId).defaultMaxTokens,
       systemExtra: params.systemExtra ? String(params.systemExtra).slice(0, 2000) : undefined,
       reasoningPhase: params.reasoningPhase,
       reasoning: params.reasoning === true,
+      codingTools: params.codingTools === true,
+      skipCharge: params.skipCharge === true,
     }),
   });
 
   const data = (await res.json().catch(() => ({}))) as {
     content?: string;
+    tool_calls?: ToolCall[];
     error?: string;
     usage?: ChatUsageInfo;
   };
@@ -71,7 +84,8 @@ export async function requestXlaudeReply(params: {
     throw new Error(data.error || `Ошибка API (${res.status})`);
   }
 
-  const content = data.content?.trim();
-  if (!content) throw new Error('Пустой ответ модели');
-  return { content, usage: data.usage };
+  const toolCalls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
+  const content = (data.content || '').trim();
+  if (!content && !toolCalls.length) throw new Error('Пустой ответ модели');
+  return { content, tool_calls: toolCalls.length ? toolCalls : undefined, usage: data.usage };
 }

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePrefs } from '../context/PrefsContext';
 import AuthModal, { type AuthMode } from './AuthModal';
+import { IconMoon, IconSun } from './icons';
 
 const linkDefs = [
   { key: 'nav.chat', to: '/chat', hint: 'Диалоги с Xlaude' },
@@ -15,7 +16,7 @@ const linkDefs = [
 
 export default function Navbar() {
   const { user, loading, logout } = useAuth();
-  const { t, theme } = usePrefs();
+  const { t, theme, setTheme } = usePrefs();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -23,6 +24,8 @@ export default function Navbar() {
   const [authMode, setAuthMode] = useState<AuthMode>('register');
   const onHome = location.pathname === '/';
   const isLight = theme === 'light';
+  const toggleTheme = () => setTheme(isLight ? 'dark' : 'light');
+  const themeLabel = isLight ? t('nav.theme.toDark') : t('nav.theme.toLight');
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -118,6 +121,19 @@ export default function Navbar() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={themeLabel}
+              title={themeLabel}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-md border transition ${
+                solid
+                  ? 'border-line bg-mist text-slate hover:text-ink hover:border-ink/20'
+                  : 'border-white/15 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {isLight ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
+            </button>
             {loading ? (
               <div className="h-9 w-28 animate-pulse rounded-md bg-white/10" />
             ) : user ? (
@@ -175,21 +191,34 @@ export default function Navbar() {
             )}
           </div>
 
-          <button
-            type="button"
-            className={`relative z-[56] flex h-11 w-11 items-center justify-center rounded-xl transition md:hidden ${
-              solid || open ? 'bg-mist text-ink' : 'bg-white/10 text-white'
-            }`}
-            onClick={() => setOpen((v) => !v)}
-            aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
-            aria-expanded={open}
-          >
-            <span className="nav-burger" data-open={open ? '1' : '0'}>
-              <span />
-              <span />
-              <span />
-            </span>
-          </button>
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={themeLabel}
+              title={themeLabel}
+              className={`relative z-[56] inline-flex h-11 w-11 items-center justify-center rounded-xl transition ${
+                solid || open ? 'bg-mist text-ink' : 'bg-white/10 text-white'
+              }`}
+            >
+              {isLight ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              className={`relative z-[56] flex h-11 w-11 items-center justify-center rounded-xl transition ${
+                solid || open ? 'bg-mist text-ink' : 'bg-white/10 text-white'
+              }`}
+              onClick={() => setOpen((v) => !v)}
+              aria-label={open ? 'Закрыть меню' : 'Открыть меню'}
+              aria-expanded={open}
+            >
+              <span className="nav-burger" data-open={open ? '1' : '0'}>
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
+          </div>
         </nav>
       </header>
 

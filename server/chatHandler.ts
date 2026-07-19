@@ -7,16 +7,29 @@ import {
   maxTokensFor,
 } from './firebaseAdmin';
 import { AITUNNEL_MODEL_ID, buildSystemPrompt, type ReasoningPhase } from './prompts';
+import { CODING_SYSTEM_EXTRA, CODING_TOOLS, type ToolCallFn } from './tools';
+
+export type ChatBodyMessage = {
+  role: string;
+  content?: string | null;
+  tool_call_id?: string;
+  name?: string;
+  tool_calls?: ToolCallFn[];
+};
 
 export type ChatBody = {
   modelId?: string;
-  messages?: { role: string; content: string }[];
+  messages?: ChatBodyMessage[];
   maxTokens?: number;
   systemExtra?: string;
   systemOverride?: string;
   reasoningPhase?: ReasoningPhase;
   /** клиент сообщает режим рассуждений — стоимость считает сервер */
   reasoning?: boolean;
+  /** включить coding tools песочницы */
+  codingTools?: boolean;
+  /** не списывать кредиты (промежуточный tool-раунд) */
+  skipCharge?: boolean;
 };
 
 const rateBucket = new Map<string, { count: number; resetAt: number }>();
@@ -51,7 +64,7 @@ function readJsonBody(req: IncomingMessage): Promise<ChatBody> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    const MAX = 512_000;
+    const MAX = 1_200_000;
     req.on('data', (c) => {
       const buf = Buffer.isBuffer(c) ? c : Buffer.from(c);
       size += buf.length;
@@ -92,6 +105,44 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown) 
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(payload));
+}
+
+function normalizeHistory(messages: ChatBodyMessage[] | undefined, codingTools: boolean) {
+  const raw = messages ?? [];
+  const mapped = raw
+    .filter((m) => m && typeof m === 'object')
+    .map((m) => {
+      const role = m.role;
+      if (role === 'user' || role === 'assistant') {
+        const out: Record<string, unknown> = {
+          role,
+          content: typeof m.content === 'string' ? m.content.slice(0, 12000) : m.content ?? '',
+        };
+        if (codingTools && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+          out.tool_calls = m.tool_calls.slice(0, 8).map((tc) => ({
+            id: String(tc.id || '').slice(0, 80),
+            type: 'function',
+            function: {
+              name: String(tc.function?.name || '').slice(0, 64),
+              arguments: String(tc.function?.arguments || '').slice(0, 100_000),
+            },
+          }));
+        }
+        return out;
+      }
+      if (codingTools && role === 'tool') {
+        return {
+          role: 'tool',
+          tool_call_id: String(m.tool_call_id || '').slice(0, 80),
+          name: m.name ? String(m.name).slice(0, 64) : undefined,
+          content: typeof m.content === 'string' ? m.content.slice(0, 80_000) : '',
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as Record<string, unknown>[];
+
+  return mapped.slice(-36);
 }
 
 export async function handleChat(
@@ -135,28 +186,17 @@ export async function handleChat(
 
     const modelId = normalizeModelId(body.modelId);
     const model = getModel(modelId);
-    const history = (body.messages ?? [])
-      .filter(
-        (m) =>
-          m &&
-          typeof m.content === 'string' &&
-          (m.role === 'user' || m.role === 'assistant'),
-      )
-      .slice(-24)
-      .map((m) => ({ role: m.role, content: m.content.slice(0, 8000) }));
+    const codingTools = body.codingTools === true;
+    const history = normalizeHistory(body.messages, codingTools);
 
     if (!history.length) {
       sendJson(res, 400, { error: 'Нет сообщений' });
       return;
     }
 
-    const reasoning =
-      body.reasoning === true ||
-      body.reasoningPhase === 'think' ||
-      body.reasoningPhase === 'answer';
-
-    // Шаг think не списываем отдельно — списываем один раз на answer / обычный ответ
-    const chargeNow = body.reasoningPhase !== 'think';
+    // Шаг think / промежуточные tool-раунды не списываем отдельно
+    const chargeNow =
+      body.reasoningPhase !== 'think' && body.skipCharge !== true;
 
     const gateResult = await assertCanGenerate({
       idToken: bearerToken(req),
@@ -171,7 +211,6 @@ export async function handleChat(
     }
 
     const { gate } = gateResult;
-    // Админ не тратит кредиты; гости и юзеры — да
     const shouldCharge = chargeNow && !gate.isAdmin;
 
     if (shouldCharge && gate.limit != null && gate.used + gate.cost > gate.limit) {
@@ -191,7 +230,21 @@ export async function handleChat(
     const systemContent = buildSystemPrompt(modelId, systemExtra || null, {
       reasoningPhase: phase,
       modelSystemExtra: modelSystemExtra || null,
+      codingTools,
+      codingExtra: codingTools ? CODING_SYSTEM_EXTRA : null,
     });
+
+    const upstreamBody: Record<string, unknown> = {
+      model: AITUNNEL_MODEL_ID,
+      max_tokens: maxTokens,
+      temperature: model.temperature,
+      messages: [{ role: 'system', content: systemContent }, ...history],
+    };
+
+    if (codingTools && phase !== 'think') {
+      upstreamBody.tools = CODING_TOOLS;
+      upstreamBody.tool_choice = 'auto';
+    }
 
     const upstream = await fetch('https://api.aitunnel.ru/v1/chat/completions', {
       method: 'POST',
@@ -199,16 +252,17 @@ export async function handleChat(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: AITUNNEL_MODEL_ID,
-        max_tokens: maxTokens,
-        temperature: model.temperature,
-        messages: [{ role: 'system', content: systemContent }, ...history],
-      }),
+      body: JSON.stringify(upstreamBody),
     });
 
     const data = (await upstream.json().catch(() => null)) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: {
+        message?: {
+          content?: string | null;
+          tool_calls?: ToolCallFn[];
+        };
+        finish_reason?: string;
+      }[];
       error?: { message?: string } | string;
     } | null;
 
@@ -221,25 +275,33 @@ export async function handleChat(
       return;
     }
 
-    const content = data?.choices?.[0]?.message?.content?.trim();
-    if (!content) {
+    const message = data?.choices?.[0]?.message;
+    const toolCalls = Array.isArray(message?.tool_calls)
+      ? message!.tool_calls!.slice(0, 8)
+      : [];
+    const content = (message?.content || '').trim();
+
+    if (!content && !toolCalls.length) {
       sendJson(res, 502, { error: 'Пустой ответ от AITUNNEL' });
       return;
     }
 
+    // Списываем только финальный текстовый ответ без tool_calls
+    const chargeThisRound = shouldCharge && toolCalls.length === 0;
     let usage = { used: gate.used, limit: gate.limit };
-    if (shouldCharge) {
-      const tokensApprox = Math.ceil(content.length / 4);
+    if (chargeThisRound) {
+      const tokensApprox = Math.ceil((content || '').length / 4);
       usage = await chargeAfterSuccess(gate, tokensApprox, ip);
     }
 
     sendJson(res, 200, {
-      content,
+      content: content || '',
+      tool_calls: toolCalls.length ? toolCalls : undefined,
       modelId,
       usage: {
         used: usage.used,
         limit: usage.limit,
-        cost: shouldCharge ? gate.cost : 0,
+        cost: chargeThisRound ? gate.cost : 0,
         planId: gate.planId,
       },
     });

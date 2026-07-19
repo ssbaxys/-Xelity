@@ -6,7 +6,10 @@ import {
   type ChatModelId,
   type ChatStore,
 } from './chatStore';
-import { requestXlaudeReply, type ChatApiMessage } from './xlaude';
+import { executeSandboxTool } from './projectSandbox';
+import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
+
+const MAX_TOOL_ROUNDS = 6;
 
 const PENDING_KEY = 'xelity-chat-pending-v1';
 const EVENT = 'xelity:chat-store-updated';
@@ -175,7 +178,53 @@ export type GenerateParams = {
   promptText?: string;
   systemExtra?: string | null;
   reasoning?: boolean;
+  codingTools?: boolean;
 };
+
+async function runWithCodingTools(params: {
+  chatId: string;
+  modelId: ChatModelId;
+  messages: ChatApiMessage[];
+  maxTokens: number;
+  systemExtra?: string | null;
+  reasoning?: boolean;
+  reasoningPhase?: 'think' | 'answer';
+}): Promise<string> {
+  let messages = [...params.messages];
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const reply = await requestXlaudeReply({
+      modelId: params.modelId,
+      messages,
+      maxTokens: params.maxTokens,
+      systemExtra: params.systemExtra,
+      reasoning: params.reasoning,
+      reasoningPhase: params.reasoningPhase,
+      codingTools: true,
+      // сервер списывает кредиты только когда нет tool_calls
+    });
+
+    const calls = reply.tool_calls || [];
+    if (!calls.length) {
+      return reply.content.trim();
+    }
+
+    messages = [
+      ...messages,
+      {
+        role: 'assistant',
+        content: reply.content || '',
+        tool_calls: calls,
+      },
+      ...calls.map((tc: ToolCall) => ({
+        role: 'tool' as const,
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: executeSandboxTool(params.chatId, tc.function.name, tc.function.arguments || '{}'),
+      })),
+    ];
+  }
+  return 'Слишком много шагов tools. Упрости задачу или продолжи в следующем сообщении.';
+}
 
 export function generateAssistantInBackground(params: GenerateParams): Promise<void> {
   const existing = inflight.get(params.chatId);
@@ -244,25 +293,39 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           params.firebaseUid,
         );
 
-        const answerRes = await requestXlaudeReply({
-          modelId: params.modelId,
-          messages: [
-            ...params.messages,
-            {
-              role: 'assistant',
-              content: `[Внутренние заметки — не показывать как ответ]\n${thoughts}`,
-            },
-            {
-              role: 'user',
-              content:
-                'Перечитай внутренние заметки и мой запрос. Напиши только итоговый ответ в чат — без заметок и без заголовка «Рассуждения».',
-            },
-          ],
-          maxTokens: params.maxTokens,
-          systemExtra: params.systemExtra,
-          reasoningPhase: 'answer',
-          reasoning: true,
-        });
+        const answerMessages: ChatApiMessage[] = [
+          ...params.messages,
+          {
+            role: 'assistant',
+            content: `[Внутренние заметки — не показывать как ответ]\n${thoughts}`,
+          },
+          {
+            role: 'user',
+            content:
+              'Перечитай внутренние заметки и мой запрос. Напиши только итоговый ответ в чат — без заметок и без заголовка «Рассуждения».',
+          },
+        ];
+
+        const answerContent = params.codingTools
+          ? await runWithCodingTools({
+              chatId: params.chatId,
+              modelId: params.modelId,
+              messages: answerMessages,
+              maxTokens: params.maxTokens,
+              systemExtra: params.systemExtra,
+              reasoning: true,
+              reasoningPhase: 'answer',
+            })
+          : (
+              await requestXlaudeReply({
+                modelId: params.modelId,
+                messages: answerMessages,
+                maxTokens: params.maxTokens,
+                systemExtra: params.systemExtra,
+                reasoningPhase: 'answer',
+                reasoning: true,
+              })
+            ).content.trim();
 
         persistStore(
           upsertAssistantInStore(
@@ -270,7 +333,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             {
               id: assistantId,
               role: 'assistant',
-              content: answerRes.content.trim(),
+              content: answerContent,
               createdAt: thinkStarted,
               modelId: params.modelId,
               thinkingPhase: null,
@@ -302,13 +365,24 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         params.firebaseUid,
       );
 
-      const reply = await requestXlaudeReply({
-        modelId: params.modelId,
-        messages: params.messages,
-        maxTokens: params.maxTokens,
-        systemExtra: params.systemExtra,
-        reasoning: false,
-      });
+      const replyContent = params.codingTools
+        ? await runWithCodingTools({
+            chatId: params.chatId,
+            modelId: params.modelId,
+            messages: params.messages,
+            maxTokens: params.maxTokens,
+            systemExtra: params.systemExtra,
+            reasoning: false,
+          })
+        : (
+            await requestXlaudeReply({
+              modelId: params.modelId,
+              messages: params.messages,
+              maxTokens: params.maxTokens,
+              systemExtra: params.systemExtra,
+              reasoning: false,
+            })
+          ).content;
 
       persistStore(
         upsertAssistantInStore(
@@ -316,7 +390,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           {
             id: assistantId,
             role: 'assistant',
-            content: reply.content,
+            content: replyContent,
             createdAt: waitStarted,
             modelId: params.modelId,
           },

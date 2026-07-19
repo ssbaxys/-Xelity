@@ -353,3 +353,22 @@ export function IconBrain({ className = 'h-3.5 w-3.5' }: IconProps) {
     </svg>
   );
 }
+
+export function IconCode({ className = 'h-3.5 w-3.5' }: IconProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8.5 7.5 4 12l4.5 4.5" />
+      <path d="M15.5 7.5 20 12l-4.5 4.5" />
+      <path d="M13.2 5.5 10.8 18.5" />
+    </svg>
+  );
+}
