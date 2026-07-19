@@ -1128,6 +1128,161 @@ body {
   font-family: inherit;
 }
 
+/* Подсветка синтаксиса (highlight.js) — тёмная */
+.chat-md .hljs,
+.coding-hljs.hljs {
+  color: #e8e0e0;
+  background: transparent;
+}
+
+.chat-md .hljs-comment,
+.chat-md .hljs-quote,
+.coding-hljs .hljs-comment,
+.coding-hljs .hljs-quote {
+  color: #8a7575;
+  font-style: italic;
+}
+
+.chat-md .hljs-keyword,
+.chat-md .hljs-selector-tag,
+.chat-md .hljs-addition,
+.coding-hljs .hljs-keyword,
+.coding-hljs .hljs-selector-tag,
+.coding-hljs .hljs-addition {
+  color: #ef9a9a;
+}
+
+.chat-md .hljs-number,
+.chat-md .hljs-string,
+.chat-md .hljs-meta .hljs-string,
+.chat-md .hljs-literal,
+.chat-md .hljs-doctag,
+.chat-md .hljs-regexp,
+.coding-hljs .hljs-number,
+.coding-hljs .hljs-string,
+.coding-hljs .hljs-literal,
+.coding-hljs .hljs-doctag,
+.coding-hljs .hljs-regexp {
+  color: #ffab91;
+}
+
+.chat-md .hljs-title,
+.chat-md .hljs-section,
+.chat-md .hljs-name,
+.chat-md .hljs-selector-id,
+.chat-md .hljs-selector-class,
+.coding-hljs .hljs-title,
+.coding-hljs .hljs-section,
+.coding-hljs .hljs-name,
+.coding-hljs .hljs-selector-id,
+.coding-hljs .hljs-selector-class {
+  color: #ef9a9a;
+}
+
+.chat-md .hljs-attribute,
+.chat-md .hljs-attr,
+.chat-md .hljs-variable,
+.chat-md .hljs-template-variable,
+.chat-md .hljs-class .hljs-title,
+.chat-md .hljs-type,
+.coding-hljs .hljs-attribute,
+.coding-hljs .hljs-attr,
+.coding-hljs .hljs-variable,
+.coding-hljs .hljs-template-variable,
+.coding-hljs .hljs-type {
+  color: #ce93d8;
+}
+
+.chat-md .hljs-symbol,
+.chat-md .hljs-bullet,
+.chat-md .hljs-link,
+.chat-md .hljs-meta,
+.chat-md .hljs-selector-attr,
+.chat-md .hljs-selector-pseudo,
+.coding-hljs .hljs-symbol,
+.coding-hljs .hljs-bullet,
+.coding-hljs .hljs-meta {
+  color: #90caf9;
+}
+
+.chat-md .hljs-built_in,
+.chat-md .hljs-title.class_,
+.coding-hljs .hljs-built_in,
+.coding-hljs .hljs-title.class_ {
+  color: #80cbc4;
+}
+
+.chat-md .hljs-deletion,
+.coding-hljs .hljs-deletion {
+  color: #ef5350;
+}
+
+.chat-md .hljs-emphasis {
+  font-style: italic;
+}
+.chat-md .hljs-strong {
+  font-weight: 700;
+}
+
+/* Светлая тема */
+html[data-theme='light'] .chat-md .hljs,
+html[data-theme='light'] .coding-hljs.hljs {
+  color: #2a2020;
+}
+
+html[data-theme='light'] .chat-md .hljs-comment,
+html[data-theme='light'] .chat-md .hljs-quote,
+html[data-theme='light'] .coding-hljs .hljs-comment,
+html[data-theme='light'] .coding-hljs .hljs-quote {
+  color: #8a7878;
+}
+
+html[data-theme='light'] .chat-md .hljs-keyword,
+html[data-theme='light'] .chat-md .hljs-selector-tag,
+html[data-theme='light'] .coding-hljs .hljs-keyword,
+html[data-theme='light'] .coding-hljs .hljs-selector-tag {
+  color: #c62828;
+}
+
+html[data-theme='light'] .chat-md .hljs-number,
+html[data-theme='light'] .chat-md .hljs-string,
+html[data-theme='light'] .chat-md .hljs-literal,
+html[data-theme='light'] .chat-md .hljs-doctag,
+html[data-theme='light'] .chat-md .hljs-regexp,
+html[data-theme='light'] .coding-hljs .hljs-number,
+html[data-theme='light'] .coding-hljs .hljs-string,
+html[data-theme='light'] .coding-hljs .hljs-literal {
+  color: #d84315;
+}
+
+html[data-theme='light'] .chat-md .hljs-title,
+html[data-theme='light'] .chat-md .hljs-section,
+html[data-theme='light'] .chat-md .hljs-name,
+html[data-theme='light'] .coding-hljs .hljs-title,
+html[data-theme='light'] .coding-hljs .hljs-name {
+  color: #ad1457;
+}
+
+html[data-theme='light'] .chat-md .hljs-attribute,
+html[data-theme='light'] .chat-md .hljs-attr,
+html[data-theme='light'] .chat-md .hljs-variable,
+html[data-theme='light'] .chat-md .hljs-type,
+html[data-theme='light'] .coding-hljs .hljs-attr,
+html[data-theme='light'] .coding-hljs .hljs-variable,
+html[data-theme='light'] .coding-hljs .hljs-type {
+  color: #6a1b9a;
+}
+
+html[data-theme='light'] .chat-md .hljs-built_in,
+html[data-theme='light'] .coding-hljs .hljs-built_in {
+  color: #00695c;
+}
+
+html[data-theme='light'] .chat-md .hljs-meta,
+html[data-theme='light'] .coding-hljs .hljs-meta {
+  color: #1565c0;
+}
+
 .chat-md a {
   color: #c62828;
   text-decoration: underline;

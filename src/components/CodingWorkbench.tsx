@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { highlightCode, langFromPath } from '../lib/highlightCode';
 import {
   buildFileTree,
   buildPreviewHtml,
@@ -123,6 +124,10 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
   }, [files, selected]);
 
   const content = selected ? readSandboxFile(chatId, selected) : null;
+  const highlighted = useMemo(() => {
+    if (content == null || !selected) return null;
+    return highlightCode(content, langFromPath(selected));
+  }, [content, selected]);
   const previewHtml = useMemo(() => {
     void tick;
     return buildPreviewHtml(chatId);
@@ -214,13 +219,21 @@ export default function CodingWorkbench({ chatId, mobileOpen, onMobileClose }: P
               </p>
             )}
           </div>
-          <pre className="min-h-0 overflow-auto p-3 font-mono text-[11px] leading-relaxed text-[var(--c-muted)]">
-            {selected && content != null
-              ? content
-              : files.length
-                ? 'Выберите файл'
-                : 'Пусто'}
-          </pre>
+          <div className="min-h-0 overflow-auto p-3">
+            {selected && highlighted != null ? (
+              <pre className="m-0 font-mono text-[11px] leading-relaxed">
+                <code
+                  className="coding-hljs hljs"
+                  data-lang={langFromPath(selected)}
+                  dangerouslySetInnerHTML={{ __html: highlighted }}
+                />
+              </pre>
+            ) : (
+              <p className="font-mono text-[11px] text-[var(--c-faint)]">
+                {files.length ? 'Выберите файл' : 'Пусто'}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

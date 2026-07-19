@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
+import { highlightCode } from '../lib/highlightCode';
 
 type Props = {
   content: string;
@@ -12,7 +14,32 @@ type Props = {
 function langFromClassName(className?: string | string[]): string | null {
   const raw = Array.isArray(className) ? className.join(' ') : className ?? '';
   const m = /language-([\w+-]+)/.exec(raw);
-  return m?.[1] ?? null;
+  return m?.[1]?.toLowerCase() ?? null;
+}
+
+function CodeBlock({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: ReactNode;
+}) {
+  const lang = langFromClassName(className);
+  const text = String(children ?? '').replace(/\n$/, '');
+  const isBlock = Boolean(className) || text.includes('\n');
+
+  if (!isBlock) {
+    return <code className="chat-md-inline-code">{children}</code>;
+  }
+
+  const html = highlightCode(text, lang);
+  return (
+    <code
+      className={`hljs${lang ? ` language-${lang}` : ''}`}
+      data-lang={lang || undefined}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
 const components: Components = {
@@ -27,26 +54,11 @@ const components: Components = {
     </a>
   ),
   pre: ({ children }) => <pre className="chat-md-pre">{children}</pre>,
-  code: ({ className, children, ...props }) => {
-    const lang = langFromClassName(className);
-    // fenced / multiline = блок (стили через .chat-md pre code)
-    if (className || (typeof children === 'string' && children.includes('\n'))) {
-      return (
-        <code className={className} data-lang={lang || undefined} {...props}>
-          {children}
-        </code>
-      );
-    }
-    return (
-      <code className="chat-md-inline-code" {...props}>
-        {children}
-      </code>
-    );
-  },
+  code: CodeBlock,
   img: ({ src, alt }) => <img src={src} alt={alt ?? ''} className="chat-md-img" loading="lazy" />,
 };
 
-/** Единый markdown для чата: GFM (таблицы/списки) + KaTeX */
+/** Единый markdown для чата: GFM + KaTeX + подсветка кода */
 export default function ChatMarkdown({ content, className = '' }: Props) {
   if (!content) return null;
   return (
