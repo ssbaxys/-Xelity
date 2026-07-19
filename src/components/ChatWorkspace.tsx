@@ -635,11 +635,21 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const createChat = (folderId: string | null = null) => {
     const prevId = activeIdRef.current;
     const savedDraft = draftRef.current.slice(0, MAX_CHARS);
-    const chat = makeChat(chats, active?.modelId ?? DEFAULT_MODEL_ID, folderId, {
-      reasoning: lastReasoning,
-      codingTools: lastCodingTools,
-      webTools: lastWebTools,
-    });
+    // берём тумблеры из текущего чата (не из prefs — там мог быть stale state)
+    const toolFlags = {
+      reasoning: active ? Boolean(active.reasoning) : lastReasoning,
+      codingTools: active ? Boolean(active.codingTools) : lastCodingTools,
+      webTools: active ? active.webTools !== false : lastWebTools,
+    };
+    setLastReasoning(toolFlags.reasoning);
+    setLastCodingTools(toolFlags.codingTools);
+    setLastWebTools(toolFlags.webTools);
+    const chat = makeChat(
+      chats,
+      active?.modelId ?? DEFAULT_MODEL_ID,
+      folderId,
+      toolFlags,
+    );
     const chatsWithPrevDraft = prevId
       ? chats.map((c) => (c.id === prevId ? { ...c, draft: savedDraft } : c))
       : chats;

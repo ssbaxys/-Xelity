@@ -164,9 +164,12 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
                   работаю
                 </span>
               ) : a.ok ? (
-                <span className="tool-status-done inline-flex items-center gap-1 text-[10px] text-[#81c784]">
+                <span
+                  className="tool-status-done inline-flex items-center gap-1 text-[10px] text-[#81c784]"
+                  aria-label="готово"
+                >
                   <IconCheck className="tool-check-in h-3.5 w-3.5 shrink-0" />
-                  ок
+                  {a.kind === 'search' ? null : 'ок'}
                 </span>
               ) : (
                 <span className="tool-status-fail text-[10px] text-[#e57373]">ошибка</span>
