@@ -259,6 +259,8 @@ async function runWithAgentTools(params: {
   seedThoughts?: string | null;
   seedReasoningMs?: number | null;
   thinkingPhase?: ChatMessage['thinkingPhase'];
+  /** не писать промежуточные шаги в чат пользователя (черновик в режиме бога) */
+  silent?: boolean;
 }): Promise<{ content: string; toolActivity: ToolActivity[] }> {
   const coding = params.codingTools === true;
   const web = params.webTools !== false;
@@ -275,12 +277,14 @@ async function runWithAgentTools(params: {
       reasoningPhase: params.reasoningPhase,
       codingTools: false,
       webTools: false,
+      skipCharge: params.silent === true,
     });
     return { content: reply.content.trim(), toolActivity: [] };
   }
 
   const withReasoning = Boolean(params.reasoning || params.seedThoughts);
   const pushAssistant = (partial: Partial<ChatMessage>) => {
+    if (params.silent) return;
     persistStore(
       upsertAssistantInStore(
         params.chatId,
@@ -330,6 +334,7 @@ async function runWithAgentTools(params: {
       reasoningPhase: params.reasoningPhase,
       codingTools: coding,
       webTools: web,
+      skipCharge: params.silent === true,
     });
 
     let calls = reply.tool_calls || [];
@@ -770,4 +775,99 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
 
   inflight.set(params.chatId, run);
   return run;
+}
+
+export type GodDraftResult = {
+  content: string;
+  reasoning: string | null;
+  reasoningMs: number | null;
+  toolActivity: ToolActivity[];
+};
+
+/**
+ * Полная генерация ответа для режима бога (черновик):
+ * рассуждения → поиск/кодинг tools → текст в поля, без записи в чат пользователя.
+ */
+export async function generateGodDraft(params: {
+  chatId: string;
+  modelId: ChatModelId | string;
+  messages: ChatApiMessage[];
+  maxTokens?: number;
+  systemExtra?: string | null;
+  reasoning?: boolean;
+  codingTools?: boolean;
+  webTools?: boolean;
+}): Promise<GodDraftResult> {
+  const modelId = params.modelId as ChatModelId;
+  const maxTokens = params.maxTokens ?? 4096;
+  const coding = params.codingTools === true;
+  const web = params.webTools !== false;
+  const wantReasoning = params.reasoning === true;
+  const assistantId = uid('god-draft');
+  const started = Date.now();
+  let thoughts: string | null = null;
+  let reasoningMs: number | null = null;
+  let messages = [...params.messages];
+
+  if (wantReasoning) {
+    const lastUser =
+      [...messages].reverse().find((m) => m.role === 'user')?.content?.trim() || '';
+    const thinkRes = await requestXlaudeReply({
+      modelId,
+      messages: [
+        ...messages,
+        {
+          role: 'user',
+          content: `Напоминание для шага мыслей: последняя реплика — «${lastUser.slice(0, 500)}». Напиши только простые внутренние заметки: цитата → о чём речь → 1–3 пункта что сделать в ответе. Не здоровайся, не пиши финальный ответ.`,
+        },
+      ],
+      maxTokens: Math.min(1024, maxTokens),
+      systemExtra: params.systemExtra,
+      reasoningPhase: 'think',
+      reasoning: true,
+      codingTools: false,
+      webTools: false,
+      skipCharge: true,
+    });
+    thoughts = sanitizeThoughts(thinkRes.content);
+    reasoningMs = Date.now() - started;
+    messages = [
+      ...messages,
+      {
+        role: 'assistant',
+        content: `[Внутренние заметки — не показывать как ответ]\n${thoughts}`,
+      },
+      {
+        role: 'user',
+        content:
+          'Перечитай внутренние заметки и мой запрос. Напиши только итоговый ответ в чат — без заметок и без заголовка «Рассуждения».',
+      },
+    ];
+  }
+
+  const coded = await runWithAgentTools({
+    chatId: params.chatId,
+    modelId,
+    messages,
+    maxTokens,
+    systemExtra: params.systemExtra,
+    reasoning: wantReasoning,
+    reasoningPhase: wantReasoning ? 'answer' : undefined,
+    codingTools: coding,
+    webTools: web,
+    assistantId,
+    createdAt: started,
+    firebaseUid: null,
+    seedThoughts: thoughts,
+    seedReasoningMs: reasoningMs,
+    thinkingPhase: wantReasoning ? 'answering' : null,
+    silent: true,
+  });
+
+  return {
+    content: coded.content.trim(),
+    reasoning: thoughts,
+    reasoningMs,
+    toolActivity: coded.toolActivity,
+  };
 }

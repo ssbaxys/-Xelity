@@ -431,6 +431,7 @@ export async function adminAppendAssistantMessage(params: {
   asAdmin?: boolean;
   toolActivity?: ToolActivity[];
   reasoning?: string | null;
+  reasoningMs?: number | null;
 }): Promise<ChatStore> {
   const current = (await fetchUserChatStore(params.uid)) ?? emptyChatStore();
   const now = Date.now();
@@ -445,8 +446,9 @@ export async function adminAppendAssistantMessage(params: {
     modelId: thread ? normalizeModelId(thread.modelId) : null,
     thinkingPhase: null,
     serverLoad: null,
-    toolActivity: params.toolActivity,
-    reasoning: params.reasoning ?? null,
+    ...(params.toolActivity?.length ? { toolActivity: params.toolActivity } : {}),
+    ...(params.reasoning ? { reasoning: params.reasoning } : {}),
+    ...(typeof params.reasoningMs === 'number' ? { reasoningMs: params.reasoningMs } : {}),
   };
   const chats = current.chats.map((c) => {
     if (c.id !== params.chatId) return c;
@@ -567,6 +569,33 @@ export async function adminSetChatSystemPrompt(
   );
   if (!chats.some((c) => c.id === chatId)) throw new Error('Чат не найден');
   const next: ChatStore = { ...current, chats, updatedAt: Date.now() };
+  await saveUserChatStore(uid, next);
+  return next;
+}
+
+/** Вкл/выкл поиск, кодинг, рассуждения у чата пользователя (режим бога) */
+export async function adminSetChatTools(
+  uid: string,
+  chatId: string,
+  tools: { webTools?: boolean; codingTools?: boolean; reasoning?: boolean },
+): Promise<ChatStore> {
+  const current = (await fetchUserChatStore(uid)) ?? emptyChatStore();
+  const now = Date.now();
+  let found = false;
+  const chats = current.chats.map((c) => {
+    if (c.id !== chatId) return c;
+    found = true;
+    return {
+      ...c,
+      webTools: tools.webTools !== undefined ? tools.webTools : c.webTools !== false,
+      codingTools:
+        tools.codingTools !== undefined ? Boolean(tools.codingTools) : Boolean(c.codingTools),
+      reasoning: tools.reasoning !== undefined ? Boolean(tools.reasoning) : Boolean(c.reasoning),
+      updatedAt: now,
+    };
+  });
+  if (!found) throw new Error('Чат не найден');
+  const next: ChatStore = { ...current, chats, updatedAt: now };
   await saveUserChatStore(uid, next);
   return next;
 }

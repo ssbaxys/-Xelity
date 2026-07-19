@@ -10,11 +10,14 @@ import {
   adminDeleteMessage,
   adminEditMessage,
   adminSetChatSystemPrompt,
+  adminSetChatTools,
   watchAllUserChatIndexes,
   watchUserChatStore,
   type ChatStore,
   type ChatThread,
+  type ToolActivity,
 } from '../../lib/chatStore';
+import { generateGodDraft } from '../../lib/chatGeneration';
 import {
   clearGodHold,
   GOD_MODE_OPTIONS,
@@ -31,7 +34,6 @@ import { modelLabel, normalizeModelId } from '../../lib/models';
 import { getPlan } from '../../lib/plans';
 import { isUserBanned, watchAllUsers, type UserProfile } from '../../lib/rtdb';
 import { resolveStaffRole } from '../../lib/staff';
-import { requestXlaudeReply } from '../../lib/xlaude';
 import { IconBrain, IconChevronDown } from '../../components/icons';
 import AdminSelect from './AdminSelect';
 
@@ -77,6 +79,9 @@ export default function AdminChats() {
   const [filterFlag, setFilterFlag] = useState<'all' | 'banned' | 'muted' | 'staff' | 'hasChats'>('all');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState('');
+  const [draftReasoning, setDraftReasoning] = useState('');
+  const [draftReasoningMs, setDraftReasoningMs] = useState<number | null>(null);
+  const [draftTools, setDraftTools] = useState<ToolActivity[]>([]);
   const [sendAs, setSendAs] = useState<SendAs>('model');
   const [busy, setBusy] = useState(false);
   const [genHint, setGenHint] = useState<string | null>(null);
@@ -125,6 +130,14 @@ export default function AdminChats() {
     // только при открытии чата — не затирать набор при live-синке
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate prompt on thread open
   }, [threadId, selectedUid, Boolean(store)]);
+
+  useEffect(() => {
+    setDraft('');
+    setDraftReasoning('');
+    setDraftReasoningMs(null);
+    setDraftTools([]);
+    setGenHint(null);
+  }, [threadId]);
 
   useEffect(() => {
     if (!godControl?.interceptUntil) {
@@ -329,6 +342,9 @@ export default function AdminChats() {
           content,
           replaceMessageId: godControl?.heldAssistantId || null,
           asAdmin,
+          reasoning: draftReasoning.trim() || null,
+          reasoningMs: draftReasoningMs,
+          toolActivity: draftTools.length ? draftTools : undefined,
         });
         try {
           await clearGodHold(selectedUid, chatId);
@@ -338,6 +354,9 @@ export default function AdminChats() {
       }
       setStore(nextStore);
       setDraft('');
+      setDraftReasoning('');
+      setDraftReasoningMs(null);
+      setDraftTools([]);
       setGenHint('Отправлено');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка отправки');
@@ -413,27 +432,85 @@ export default function AdminChats() {
     }
   };
 
+  const onToggleTool = async (
+    key: 'webTools' | 'codingTools' | 'reasoning',
+    value: boolean,
+  ) => {
+    if (!selectedUid || !threadId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await adminSetChatTools(selectedUid, threadId, { [key]: value });
+      setStore(next);
+      setGenHint(
+        key === 'webTools'
+          ? value
+            ? 'Поиск включён'
+            : 'Поиск выключен'
+          : key === 'codingTools'
+            ? value
+              ? 'Кодинг включён'
+              : 'Кодинг выключен'
+            : value
+              ? 'Рассуждения включены'
+              : 'Рассуждения выключены',
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось переключить инструмент');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onGenerateDraft = async () => {
     if (!godMode || !thread || !selectedUid) return;
     setBusy(true);
-    setGenHint('Генерация в черновик…');
     setError(null);
+    const useWeb = thread.webTools !== false;
+    const useCoding = Boolean(thread.codingTools);
+    const useReasoning = Boolean(thread.reasoning);
+    const parts = [
+      useWeb ? 'поиск' : null,
+      useCoding ? 'кодинг' : null,
+      useReasoning ? 'мысли' : null,
+    ].filter(Boolean);
+    setGenHint(
+      parts.length
+        ? `Генерация (${parts.join(' · ')})…`
+        : 'Генерация в черновик…',
+    );
     try {
       const history = thread.messages
+        .filter((m) => (m.content?.trim() || m.serverLoad) && m.role)
         .filter((m) => m.content?.trim() && !m.serverLoad)
         .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-      const res = await requestXlaudeReply({
+      if (!history.length) {
+        throw new Error('Нет сообщений для генерации — пользователь ещё ничего не написал');
+      }
+      const res = await generateGodDraft({
+        chatId: thread.id,
         modelId: normalizeModelId(thread.modelId),
         messages: history,
         maxTokens: 4096,
-        systemExtra: thread.adminSystemPrompt,
-        reasoning: Boolean(thread.reasoning),
-        codingTools: Boolean(thread.codingTools),
-        webTools: thread.webTools !== false,
+        systemExtra: thread.adminSystemPrompt || threadPrompt || null,
+        reasoning: useReasoning,
+        codingTools: useCoding,
+        webTools: useWeb,
       });
       setDraft(res.content || '');
+      setDraftReasoning(res.reasoning || '');
+      setDraftReasoningMs(res.reasoningMs);
+      setDraftTools(res.toolActivity || []);
       setSendAs(godControl?.mode === 'admin' ? 'admin' : 'model');
-      setGenHint('Черновик готов — отредактируйте и отправьте');
+      const extras = [
+        res.reasoning ? 'мысли' : null,
+        res.toolActivity?.length ? `${res.toolActivity.length} tool` : null,
+      ].filter(Boolean);
+      setGenHint(
+        extras.length
+          ? `Черновик готов (${extras.join(' · ')}) — проверьте и отправьте`
+          : 'Черновик готов — отредактируйте и отправьте',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка генерации');
       setGenHint(null);
@@ -699,11 +776,35 @@ export default function AdminChats() {
           {godMode && (
             <div className="admin-panel max-h-[min(42%,22rem)] shrink-0 space-y-3 overflow-y-auto overscroll-contain p-3 text-xs text-[var(--a-muted)]">
               <div>
-                <p className="font-medium text-[var(--a-strong)]">Инструменты чата</p>
+                <p className="font-medium text-[var(--a-strong)]">
+                  Инструменты чата
+                  <span className="ml-1 font-normal text-[var(--a-faint)]">
+                    (для пользователя и «В черновик»)
+                  </span>
+                </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  <Chip on={thread.webTools !== false} label="Поиск" />
-                  <Chip on={Boolean(thread.codingTools)} label="Кодинг" />
-                  <Chip on={Boolean(thread.reasoning)} label="Рассуждения" />
+                  <ToolToggle
+                    on={thread.webTools !== false}
+                    label="Поиск"
+                    disabled={busy}
+                    onClick={() =>
+                      void onToggleTool('webTools', !(thread.webTools !== false))
+                    }
+                  />
+                  <ToolToggle
+                    on={Boolean(thread.codingTools)}
+                    label="Кодинг"
+                    disabled={busy}
+                    onClick={() =>
+                      void onToggleTool('codingTools', !thread.codingTools)
+                    }
+                  />
+                  <ToolToggle
+                    on={Boolean(thread.reasoning)}
+                    label="Рассуждения"
+                    disabled={busy}
+                    onClick={() => void onToggleTool('reasoning', !thread.reasoning)}
+                  />
                 </div>
               </div>
 
@@ -974,20 +1075,47 @@ export default function AdminChats() {
                   disabled={busy}
                   onClick={() => void onGenerateDraft()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--a-border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--a-hover)] disabled:opacity-40"
-                  title="Сгенерировать в черновик (не отправляет)"
+                  title="Сгенерировать ответ с учётом поиска / кодинга / рассуждений и вставить в поля"
                 >
                   <IconWand className="h-3.5 w-3.5" />
-                  В черновик
+                  {busy ? 'Генерация…' : 'В черновик'}
                 </button>
                 {genHint && (
                   <span className="text-[11px] text-[var(--a-accent-fg)]">{genHint}</span>
                 )}
               </div>
+              {(draftReasoning.trim() || draftTools.length > 0) && (
+                <div className="space-y-2 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)]/60 p-2.5">
+                  {draftReasoning.trim() && (
+                    <label className="block">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--a-faint)]">
+                        <IconBrain className="h-3 w-3" />
+                        Рассуждения
+                        {draftReasoningMs != null ? ` · ${(draftReasoningMs / 1000).toFixed(1)}с` : ''}
+                      </span>
+                      <textarea
+                        value={draftReasoning}
+                        onChange={(e) => setDraftReasoning(e.target.value)}
+                        rows={3}
+                        className="mt-1 w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-2.5 py-1.5 text-[12px] text-[var(--a-muted)] outline-none"
+                      />
+                    </label>
+                  )}
+                  {draftTools.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-[var(--a-faint)]">
+                        Инструменты ({draftTools.length})
+                      </p>
+                      <ToolActivityCards items={draftTools} />
+                    </div>
+                  )}
+                </div>
+              )}
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                rows={3}
-                placeholder="Ответ… можно подкрутить после генерации в черновик"
+                rows={4}
+                placeholder="Ответ… «В черновик» заполнит поле (и мысли/tools, если включены)"
                 className="w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm text-[var(--a-text)] outline-none focus:border-[var(--admin-accent)]/50"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -1021,17 +1149,31 @@ export default function AdminChats() {
   );
 }
 
-function Chip({ on, label }: { on: boolean; label: string }) {
+function ToolToggle({
+  on,
+  label,
+  disabled,
+  onClick,
+}: {
+  on: boolean;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <span
-      className={`rounded-md px-2 py-0.5 text-[11px] ${
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-40 ${
         on
-          ? 'bg-[var(--admin-accent)]/20 text-[var(--a-accent-fg)]'
-          : 'bg-[var(--a-chip)] text-[var(--a-faint)] line-through'
+          ? 'bg-[var(--admin-accent)]/20 text-[var(--a-accent-fg)] ring-1 ring-[var(--admin-accent)]/40'
+          : 'bg-[var(--a-chip)] text-[var(--a-faint)] line-through hover:bg-[var(--a-hover)]'
       }`}
     >
+      {on ? '✓ ' : ''}
       {label}
-    </span>
+    </button>
   );
 }
 
