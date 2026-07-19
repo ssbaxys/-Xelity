@@ -1873,12 +1873,12 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         onClick={() => setWebTools(active.webTools === false)}
                         data-on={active.webTools !== false ? 'true' : 'false'}
                         className="chat-tool-toggle"
-                        aria-label="Сеть"
+                        aria-label="Поиск"
                         aria-pressed={active.webTools !== false}
                         title="Поиск в интернете (SearXNG) и чтение сайтов"
                       >
                         <IconSearch className="h-3.5 w-3.5 shrink-0" />
-                        <span className="chat-tool-toggle-label">Сеть</span>
+                        <span className="chat-tool-toggle-label">Поиск</span>
                       </button>
                       <button
                         type="button"

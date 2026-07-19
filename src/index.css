@@ -1883,8 +1883,8 @@ html[data-theme='light'] .tool-scroll-err {
   opacity: 1;
 }
 
-/* Сеть — чуть короче лейбл */
-.chat-tool-toggle[aria-label='Сеть'][data-on='true'] .chat-tool-toggle-label {
+/* Поиск — чуть короче лейбл */
+.chat-tool-toggle[aria-label='Поиск'][data-on='true'] .chat-tool-toggle-label {
   max-width: 3.5rem;
 }
 
