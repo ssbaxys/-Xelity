@@ -4427,3 +4427,81 @@ html[data-theme='light'] .broadcast-banner-hero {
 .broadcast-cta:active {
   transform: scale(0.98);
 }
+
+/* ??? Server load card (god mode wait) ??? */
+.server-load-card {
+  position: relative;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--c-border, #3a2424) 90%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-signal, #c62828) 12%, transparent),
+    color-mix(in srgb, var(--c-panel, #161010) 92%, #1a1212)
+  );
+  padding: 0.85rem 1rem 0.9rem;
+  animation: server-load-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.server-load-card--queue {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #e09f3e 14%, transparent),
+    color-mix(in srgb, var(--c-panel, #161010) 92%, #1a1212)
+  );
+}
+
+.server-load-card-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 40%;
+  background: var(--color-signal, #c62828);
+  animation: server-load-bar 1.6s ease-in-out infinite;
+}
+
+.server-load-card--queue .server-load-card-bar {
+  background: #e09f3e;
+}
+
+.server-load-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text, #f3ecec);
+}
+
+.server-load-card-body {
+  margin: 0.35rem 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--c-muted, #9a8585);
+}
+
+@keyframes server-load-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes server-load-bar {
+  0% {
+    transform: translateX(-20%);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateX(160%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(280%);
+    opacity: 0.3;
+  }
+}

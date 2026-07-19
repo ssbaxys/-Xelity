@@ -21,6 +21,13 @@ import {
 } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
 import { extractTextualToolCalls } from './parseTextToolCalls';
+import {
+  beginInterceptWindow,
+  clearGodHold,
+  fetchGodChatControl,
+  setGodQueue,
+  waitForInterceptDecision,
+} from './godChat';
 
 const MAX_TOOL_ROUNDS = 10;
 /** Минимальное время серой «pending»-карточки, чтобы UI успел показать часы / спин */
@@ -455,6 +462,111 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
     const assistantId = uid('ai');
     const thinkStarted = Date.now();
     try {
+      // ——— God Mode: manual / admin / auto_manual intercept ———
+      if (params.firebaseUid) {
+        const control = await fetchGodChatControl(params.firebaseUid, params.chatId);
+
+        if (control.mode === 'manual' || control.mode === 'admin') {
+          const loadKind = 'queue' as const;
+          persistStore(
+            upsertAssistantInStore(
+              params.chatId,
+              {
+                id: assistantId,
+                role: 'assistant',
+                content: '',
+                createdAt: thinkStarted,
+                modelId: params.modelId,
+                serverLoad: loadKind,
+                thinkingPhase: null,
+              },
+              { titleIfNotManual: params.titleIfNotManual },
+            ),
+            params.firebaseUid,
+          );
+          await setGodQueue({
+            uid: params.firebaseUid,
+            chatId: params.chatId,
+            active: true,
+            reason:
+              control.mode === 'admin'
+                ? 'Сообщение передано администрации. Вернитесь в чат позже.'
+                : 'Повышенная нагрузка на сервер для этого чата. Вернитесь позже.',
+            heldAssistantId: assistantId,
+          });
+          // ждём ответа Owner — генерацию ИИ не запускаем
+          return;
+        }
+
+        if (control.mode === 'auto_manual') {
+          persistStore(
+            upsertAssistantInStore(
+              params.chatId,
+              {
+                id: assistantId,
+                role: 'assistant',
+                content: '',
+                createdAt: thinkStarted,
+                modelId: params.modelId,
+                serverLoad: 'intercept',
+                thinkingPhase: null,
+              },
+              { titleIfNotManual: params.titleIfNotManual },
+            ),
+            params.firebaseUid,
+          );
+          const win = await beginInterceptWindow({
+            uid: params.firebaseUid,
+            chatId: params.chatId,
+            assistantId,
+            jobId,
+            ms: 5000,
+          });
+          const decision = await waitForInterceptDecision(
+            params.firebaseUid,
+            params.chatId,
+            win.interceptUntil || Date.now() + 5000,
+          );
+          if (decision === 'takeover') {
+            // Owner перехватил — оставляем placeholder (queue), ИИ не зовём
+            persistStore(
+              upsertAssistantInStore(params.chatId, {
+                id: assistantId,
+                role: 'assistant',
+                content: '',
+                createdAt: thinkStarted,
+                modelId: params.modelId,
+                serverLoad: 'queue',
+                thinkingPhase: null,
+              }),
+              params.firebaseUid,
+            );
+            await setGodQueue({
+              uid: params.firebaseUid,
+              chatId: params.chatId,
+              active: true,
+              reason: 'Ответ готовит оператор. Вернитесь чуть позже.',
+              heldAssistantId: assistantId,
+            });
+            return;
+          }
+          // skip / timeout — убрать load и продолжить обычную генерацию
+          persistStore(
+            upsertAssistantInStore(params.chatId, {
+              id: assistantId,
+              role: 'assistant',
+              content: '',
+              createdAt: thinkStarted,
+              modelId: params.modelId,
+              serverLoad: null,
+              thinkingPhase: params.reasoning ? 'thinking' : null,
+            }),
+            params.firebaseUid,
+          );
+          await clearGodHold(params.firebaseUid, params.chatId);
+        }
+      }
+
       if (params.reasoning) {
         // сразу показываем «Думает...»
         persistStore(
@@ -558,11 +670,15 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
               reasoning: thoughts,
               reasoningMs,
               toolActivity,
+              serverLoad: null,
             },
             { titleIfNotManual: params.titleIfNotManual },
           ),
           params.firebaseUid,
         );
+        if (params.firebaseUid) {
+          void clearGodHold(params.firebaseUid, params.chatId).catch(() => {});
+        }
         // списание кредитов — только на VPS
         return;
       }
@@ -615,11 +731,15 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             reasoning: null,
             reasoningMs: null,
             toolActivity,
+            serverLoad: null,
           },
           { titleIfNotManual: params.titleIfNotManual },
         ),
         params.firebaseUid,
       );
+      if (params.firebaseUid) {
+        void clearGodHold(params.firebaseUid, params.chatId).catch(() => {});
+      }
       // списание кредитов — только на VPS
     } catch (err) {
       const { content, errorDetail } = formatChatFailure(err);

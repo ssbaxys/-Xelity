@@ -59,7 +59,6 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
     'users.plan',
     'api.manage',
     'chats.view',
-    'chats.god',
     'payments',
     'broadcasts',
     'prompts',

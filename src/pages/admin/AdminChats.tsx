@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import ChatMarkdown from '../../components/ChatMarkdown';
+import ToolActivityCards from '../../components/ToolActivityCards';
 import { useAuth } from '../../context/AuthContext';
-import { getPlan } from '../../lib/plans';
 import {
   adminAppendAssistantMessage,
   adminAppendUserMessage,
@@ -10,19 +11,25 @@ import {
   type ChatStore,
   type ChatThread,
 } from '../../lib/chatStore';
+import {
+  clearGodHold,
+  GOD_MODE_OPTIONS,
+  setGodChatMode,
+  setInterceptDecision,
+  watchGodChatControl,
+  type GodChatControl,
+  type GodChatMode,
+} from '../../lib/godChat';
 import { modelLabel, normalizeModelId } from '../../lib/models';
-import { watchAllUsers, type UserProfile } from '../../lib/rtdb';
+import { getPlan } from '../../lib/plans';
+import { isUserBanned, watchAllUsers, type UserProfile } from '../../lib/rtdb';
+import { resolveStaffRole } from '../../lib/staff';
 import { requestXlaudeReply } from '../../lib/xlaude';
-import ChatMarkdown from '../../components/ChatMarkdown';
 import { IconBrain, IconChevronDown } from '../../components/icons';
 import AdminSelect from './AdminSelect';
-import AdminCheckbox from './AdminCheckbox';
 
-function MarkdownBody({ content }: { content: string }) {
-  return <ChatMarkdown content={content} className="text-[13px] leading-[1.6] text-[var(--a-strong)]" />;
-}
-
-type SendAs = 'user' | 'model';
+type Step = 'users' | 'chats' | 'thread';
+type SendAs = 'user' | 'model' | 'admin';
 
 function IconWand({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -33,57 +40,52 @@ function IconWand({ className = 'h-4 w-4' }: { className?: string }) {
   );
 }
 
+function formatAgo(ts: number): string {
+  if (!ts) return '—';
+  const d = Date.now() - ts;
+  if (d < 60_000) return 'только что';
+  if (d < 3600_000) return `${Math.floor(d / 60_000)} мин`;
+  if (d < 86400_000) return `${Math.floor(d / 3600_000)} ч`;
+  return new Date(ts).toLocaleDateString('ru-RU');
+}
+
 export default function AdminChats() {
   const { can } = useAuth();
   const allowGod = can('chats.god');
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [indexes, setIndexes] = useState<
     { uid: string; updatedAt: number; threadCount: number; messageCount: number }[]
   >([]);
-  const [selectedUid, setSelectedUid] = useState<string>(() => searchParams.get('uid') || '');
-  const [godMode, setGodMode] = useState(
-    () => allowGod && searchParams.get('god') === '1',
-  );
+
+  const godMode = allowGod && searchParams.get('god') === '1';
+  const selectedUid = searchParams.get('uid') || '';
+  const threadId = searchParams.get('chat') || '';
+
   const [store, setStore] = useState<ChatStore | null>(null);
-  const [threadId, setThreadId] = useState<string>('');
+  const [godControl, setGodControl] = useState<GodChatControl | null>(null);
+  const [userQuery, setUserQuery] = useState('');
+  const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [filterFlag, setFilterFlag] = useState<'all' | 'banned' | 'muted' | 'staff' | 'hasChats'>('all');
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState('');
+  const [sendAs, setSendAs] = useState<SendAs>('model');
   const [busy, setBusy] = useState(false);
   const [genHint, setGenHint] = useState<string | null>(null);
-  const [sendAs, setSendAs] = useState<SendAs>('user');
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  /** на мобиле: список чатов или переписка */
-  const [mobilePane, setMobilePane] = useState<'list' | 'detail'>('list');
+  const [interceptLeft, setInterceptLeft] = useState(0);
 
   useEffect(() => watchAllUsers(setUsers), []);
   useEffect(() => watchAllUserChatIndexes(setIndexes), []);
 
   useEffect(() => {
-    const fromUrl = searchParams.get('uid');
-    if (fromUrl && fromUrl !== selectedUid) setSelectedUid(fromUrl);
-    setGodMode(allowGod && searchParams.get('god') === '1');
-  }, [searchParams, allowGod]);
-
-  useEffect(() => {
-    setMobilePane('list');
-  }, [selectedUid]);
-
-  useEffect(() => {
     if (!selectedUid) {
       setStore(null);
-      setThreadId('');
       return;
     }
-    const nextParams: Record<string, string> = { uid: selectedUid };
-    if (godMode) nextParams.god = '1';
-    setSearchParams(nextParams, { replace: true });
     return watchUserChatStore(selectedUid, (s) => {
       setStore(s);
-      setThreadId((prev) => {
-        if (s?.chats.some((c) => c.id === prev)) return prev;
-        return s?.chats[0]?.id ?? '';
-      });
       if (s?.folders?.length) {
         setExpandedFolders((prev) => {
           const next = { ...prev };
@@ -94,7 +96,29 @@ export default function AdminChats() {
         });
       }
     });
-  }, [selectedUid, godMode, setSearchParams]);
+  }, [selectedUid]);
+
+  useEffect(() => {
+    if (!godMode || !selectedUid || !threadId) {
+      setGodControl(null);
+      return;
+    }
+    return watchGodChatControl(selectedUid, threadId, setGodControl);
+  }, [godMode, selectedUid, threadId]);
+
+  useEffect(() => {
+    if (!godControl?.interceptUntil) {
+      setInterceptLeft(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, (godControl.interceptUntil || 0) - Date.now());
+      setInterceptLeft(left);
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+  }, [godControl?.interceptUntil, godControl?.interceptDecision]);
 
   const userMap = useMemo(() => {
     const m = new Map<string, UserProfile>();
@@ -102,61 +126,140 @@ export default function AdminChats() {
     return m;
   }, [users]);
 
-  const userOptions = useMemo(() => {
-    const fromIndex = indexes.map((i) => i.uid);
-    const all = new Set([...fromIndex, ...users.map((u) => u.uid)]);
-    return [...all].map((uid) => {
-      const u = userMap.get(uid);
-      const idx = indexes.find((i) => i.uid === uid);
+  const indexMap = useMemo(() => {
+    const m = new Map<string, (typeof indexes)[0]>();
+    for (const i of indexes) m.set(i.uid, i);
+    return m;
+  }, [indexes]);
+
+  const cards = useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    const uids = new Set<string>([
+      ...users.map((u) => u.uid),
+      ...indexes.map((i) => i.uid),
+    ]);
+    const list = [...uids].map((uid) => {
+      const profile = userMap.get(uid);
+      const idx = indexMap.get(uid);
       return {
-        value: uid,
-        label: u?.email || u?.name || uid.slice(0, 8),
-        hint: idx
-          ? `${idx.threadCount} чатов · ${idx.messageCount} сообщ.`
-          : 'нет сохранённых чатов',
+        uid,
+        profile,
+        idx,
+        email: profile?.email || '',
+        name: profile?.name || '',
+        plan: getPlan(profile?.plan).id,
+        banned: isUserBanned(profile),
+        muted: Boolean(profile?.muted),
+        staff: resolveStaffRole(profile),
+        threadCount: idx?.threadCount ?? 0,
+        messageCount: idx?.messageCount ?? 0,
+        updatedAt: idx?.updatedAt ?? profile?.createdAt ?? 0,
       };
     });
-  }, [indexes, users, userMap]);
 
-  const thread = store?.chats.find((c) => c.id === threadId) ?? null;
-  const selectedUser = selectedUid ? userMap.get(selectedUid) : null;
-  const modelId = normalizeModelId(thread?.modelId);
-  const modelName = modelLabel(modelId);
+    return list
+      .filter((c) => {
+        if (filterPlan !== 'all' && c.plan !== filterPlan) return false;
+        if (filterFlag === 'banned' && !c.banned) return false;
+        if (filterFlag === 'muted' && !c.muted) return false;
+        if (filterFlag === 'staff' && !c.staff) return false;
+        if (filterFlag === 'hasChats' && c.threadCount < 1) return false;
+        if (!q) return true;
+        const hay = [
+          c.uid,
+          c.email,
+          c.name,
+          c.plan,
+          c.staff || '',
+          c.banned ? 'ban banned' : '',
+          c.muted ? 'mute muted' : '',
+          String(c.threadCount),
+          String(c.messageCount),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [users, indexes, userMap, indexMap, userQuery, filterPlan, filterFlag]);
 
-  const rootChats = useMemo(
-    () => (store?.chats || []).filter((c) => !c.folderId),
-    [store],
-  );
-  const folders = store?.folders ?? [];
+  const step: Step = !selectedUid ? 'users' : !threadId ? 'chats' : 'thread';
 
-  const chatsInFolder = (folderId: string) =>
-    (store?.chats || []).filter((c) => c.folderId === folderId);
+  const thread: ChatThread | null =
+    store?.chats.find((c) => c.id === threadId) ?? null;
+
+  const goUsers = () => {
+    const p: Record<string, string> = {};
+    if (godMode) p.god = '1';
+    setSearchParams(p, { replace: true });
+    setDraft('');
+    setError(null);
+  };
+
+  const goUser = (uid: string) => {
+    const p: Record<string, string> = { uid };
+    if (godMode) p.god = '1';
+    setSearchParams(p, { replace: true });
+    setDraft('');
+    setError(null);
+  };
+
+  const goThread = (chatId: string) => {
+    const p: Record<string, string> = { uid: selectedUid, chat: chatId };
+    if (godMode) p.god = '1';
+    setSearchParams(p, { replace: true });
+    setDraft('');
+    setError(null);
+  };
+
+  const onModeChange = async (mode: GodChatMode) => {
+    if (!selectedUid || !threadId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setGodChatMode(selectedUid, threadId, mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось сменить режим');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onIntercept = async (decision: 'takeover' | 'skip') => {
+    if (!selectedUid || !threadId) return;
+    try {
+      await setInterceptDecision(selectedUid, threadId, decision);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка перехвата');
+    }
+  };
 
   const onSend = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedUid || !threadId || !draft.trim()) return;
+    if (!godMode || !selectedUid || !thread || !draft.trim()) return;
     setBusy(true);
     setError(null);
-    setGenHint(null);
     try {
-      const text = draft.trim();
-      setDraft('');
-
-      if (sendAs === 'model') {
-        const next = await adminAppendAssistantMessage({
+      const content = draft.trim();
+      const asAdmin = sendAs === 'admin' || godControl?.mode === 'admin';
+      if (sendAs === 'user') {
+        await adminAppendUserMessage({
           uid: selectedUid,
-          chatId: threadId,
-          content: text,
+          chatId: thread.id,
+          content,
         });
-        setStore(next);
       } else {
-        const next = await adminAppendUserMessage({
+        await adminAppendAssistantMessage({
           uid: selectedUid,
-          chatId: threadId,
-          content: text,
+          chatId: thread.id,
+          content,
+          replaceMessageId: godControl?.heldAssistantId || null,
+          asAdmin,
         });
-        setStore(next);
+        await clearGodHold(selectedUid, thread.id);
       }
+      setDraft('');
+      setGenHint(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка отправки');
     } finally {
@@ -164,311 +267,449 @@ export default function AdminChats() {
     }
   };
 
-  /** Волшебная палочка: сгенерировать ответ модели в поле ввода */
-  const onWandGenerate = async () => {
-    if (!selectedUid || !threadId || busy) return;
-    const chat = store?.chats.find((c) => c.id === threadId);
-    if (!chat) {
-      setError('Чат не найден');
-      return;
-    }
+  const onGenerateDraft = async () => {
+    if (!godMode || !thread || !selectedUid) return;
     setBusy(true);
+    setGenHint('Генерация в черновик…');
     setError(null);
-    setGenHint('Ответ перегенерируется…');
     try {
-      const plan = getPlan(selectedUser?.plan);
-      const apiMessages = chat.messages.map((m) => ({ role: m.role, content: m.content }));
-      const hint = draft.trim();
-      if (hint) {
-        apiMessages.push({
-          role: 'user',
-          content: `[Подсказка для ответа ассистента]\n${hint}`,
-        });
-      }
-      const { content } = await requestXlaudeReply({
-        modelId: chat.modelId,
-        messages: apiMessages,
-        maxTokens: plan.maxTokens,
+      const history = thread.messages
+        .filter((m) => m.content?.trim() && !m.serverLoad)
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      const res = await requestXlaudeReply({
+        modelId: normalizeModelId(thread.modelId),
+        messages: history,
+        maxTokens: 4096,
+        systemExtra: thread.adminSystemPrompt,
+        reasoning: Boolean(thread.reasoning),
+        codingTools: Boolean(thread.codingTools),
+        webTools: thread.webTools !== false,
       });
-      setDraft(content);
-      setSendAs('model');
-      setGenHint('Готово — ответ в поле ввода. Нажмите «Отправить».');
+      setDraft(res.content || '');
+      setSendAs(godControl?.mode === 'admin' ? 'admin' : 'model');
+      setGenHint('Черновик готов — отредактируйте и отправьте');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось сгенерировать');
+      setError(err instanceof Error ? err.message : 'Ошибка генерации');
       setGenHint(null);
     } finally {
       setBusy(false);
     }
   };
 
-  const renderChatButton = (c: ChatThread, nested = false) => (
-    <button
-      key={c.id}
-      type="button"
-      onClick={() => {
-        setThreadId(c.id);
-        setMobilePane('detail');
-      }}
-      className={`mb-0.5 w-full rounded-lg px-2 py-2 text-left text-xs hover:bg-[var(--a-hover)] ${
-        nested ? 'pl-4' : ''
-      } ${threadId === c.id ? 'bg-[var(--admin-accent)]/15' : ''}`}
-    >
-      <span className="block truncate font-medium">{c.title || 'Без названия'}</span>
-      <span className="text-[10px] text-[var(--a-faint)]">
-        {c.messages.length} сообщ. · {modelLabel(c.modelId)}
-      </span>
-    </button>
-  );
+  const selectedProfile = userMap.get(selectedUid);
+  const rootChats = (store?.chats || []).filter((c) => !c.folderId);
+  const folders = store?.folders || [];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">
-            {godMode ? 'Режим бога' : 'Чаты пользователей'}
+            {godMode ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="rounded-md bg-[var(--admin-accent)]/20 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider text-[var(--a-accent-fg)]">
+                  Режим бога
+                </span>
+                Чаты
+              </span>
+            ) : (
+              'Чаты пользователей'
+            )}
           </h2>
           <p className="text-sm text-[var(--a-muted)]">
-            {godMode
-              ? 'Папки, markdown и ответ от лица модели пользователя'
-              : 'Просмотр облачных чатов и отправка от лица пользователя'}
+            {step === 'users' && 'Карточки пользователей · поиск и фильтры'}
+            {step === 'chats' && 'Папки и чаты · как у пользователя'}
+            {step === 'thread' && (godMode ? 'История + управление' : 'Только чтение истории')}
           </p>
         </div>
-        {allowGod && (
-          <AdminCheckbox
-            checked={godMode}
-            onChange={setGodMode}
-            label="Режим бога"
-          />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {step !== 'users' && (
+            <button
+              type="button"
+              onClick={() => (step === 'thread' ? goUser(selectedUid) : goUsers())}
+              className="rounded-lg border border-[var(--a-border)] px-3 py-1.5 text-xs text-[var(--a-muted)] hover:bg-[var(--a-hover)]"
+            >
+              ← Назад
+            </button>
+          )}
+          {allowGod && (
+            <button
+              type="button"
+              onClick={() => {
+                const p: Record<string, string> = {};
+                if (selectedUid) p.uid = selectedUid;
+                if (threadId) p.chat = threadId;
+                if (!godMode) p.god = '1';
+                setSearchParams(p, { replace: true });
+              }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                godMode
+                  ? 'bg-[var(--admin-accent)] text-white'
+                  : 'border border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
+              }`}
+            >
+              {godMode ? 'Выйти из режима бога' : 'Режим бога'}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <AdminSelect
-          value={selectedUid || (userOptions[0]?.value ?? '')}
-          options={
-            userOptions.length
-              ? userOptions
-              : [{ value: '', label: 'Нет пользователей', hint: '—' }]
-          }
-          onChange={(v) => {
-            setSelectedUid(v);
-            setThreadId('');
-            setMobilePane('list');
-          }}
-          className="w-full min-w-0 max-w-md sm:min-w-[14rem]"
-        />
-      </div>
+      {error && <p className="admin-error-inline">{error}</p>}
 
-      {!selectedUid ? (
-        <p className="text-sm text-[var(--a-faint)]">Выберите пользователя</p>
-      ) : !store || !store.chats.length ? (
-        <p className="admin-panel p-6 text-center text-sm text-[var(--a-faint)]">
-          У пользователя ещё нет чатов в базе
-        </p>
-      ) : (
-        <div className="admin-split is-chats">
-          <div
-            className={`admin-panel admin-split-list admin-split-pane overflow-hidden p-2 ${
-              mobilePane === 'detail' ? 'is-hidden-mobile' : ''
-            }`}
-          >
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {godMode &&
-                folders.map((folder) => {
-                  const inner = chatsInFolder(folder.id);
-                  const open = expandedFolders[folder.id] !== false;
-                  return (
-                    <div key={folder.id} className="mb-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedFolders((prev) => ({
-                            ...prev,
-                            [folder.id]: !open,
-                          }))
-                        }
-                        className="mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-[var(--a-soft)] hover:bg-[var(--a-hover)]"
-                      >
-                        <IconChevronDown
-                          className={`h-3 w-3 shrink-0 text-[var(--a-faint)] transition-transform ${
-                            open ? 'rotate-0' : '-rotate-90'
-                          }`}
-                        />
-                        <span className="truncate">{folder.title}</span>
-                        <span className="ml-auto text-[10px] text-[var(--a-faint)]">{inner.length}</span>
-                      </button>
-                      {open &&
-                        (inner.length ? (
-                          inner.map((c) => renderChatButton(c, true))
-                        ) : (
-                          <p className="px-4 py-1 text-[10px] text-[var(--a-faint)]">Пусто</p>
-                        ))}
-                    </div>
-                  );
-                })}
-
-              {godMode && folders.length > 0 && rootChats.length > 0 && (
-                <p className="mb-1 mt-2 px-2 text-[10px] uppercase tracking-wider text-[var(--a-faint)]">
-                  Без папки
-                </p>
-              )}
-
-              {(godMode ? rootChats : store.chats).map((c) => renderChatButton(c))}
-
-              {godMode && !folders.length && !rootChats.length && (
-                <p className="p-3 text-center text-xs text-[var(--a-faint)]">Нет чатов</p>
-              )}
+      {/* ——— Шаг A: карточки пользователей ——— */}
+      {step === 'users' && (
+        <>
+          <div className="admin-panel flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
+            <label className="block min-w-0 flex-1 text-xs text-[var(--a-muted)]">
+              Поиск
+              <input
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                placeholder="email, имя, uid, plan, ban…"
+                className="mt-1 w-full rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
+              />
+            </label>
+            <div className="w-full sm:w-40">
+              <p className="mb-1 text-xs text-[var(--a-muted)]">Тариф</p>
+              <AdminSelect
+                value={filterPlan}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'free', label: 'Free' },
+                  { value: 'pro', label: 'Pro' },
+                  { value: 'max', label: 'Max' },
+                ]}
+                onChange={setFilterPlan}
+                className="w-full"
+              />
+            </div>
+            <div className="w-full sm:w-44">
+              <p className="mb-1 text-xs text-[var(--a-muted)]">Фильтр</p>
+              <AdminSelect
+                value={filterFlag}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'hasChats', label: 'Есть чаты' },
+                  { value: 'banned', label: 'Забанены' },
+                  { value: 'muted', label: 'Мут' },
+                  { value: 'staff', label: 'Staff' },
+                ]}
+                onChange={(v) => setFilterFlag(v as typeof filterFlag)}
+                className="w-full"
+              />
             </div>
           </div>
 
-          <div
-            className={`admin-panel admin-split-detail admin-split-pane overflow-hidden ${
-              mobilePane === 'list' ? 'is-hidden-mobile' : ''
-            }`}
-          >
-            <div className="border-b border-[var(--a-border)] px-3 py-3 sm:px-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {cards.map((c) => (
               <button
+                key={c.uid}
                 type="button"
-                onClick={() => setMobilePane('list')}
-                className="mb-1 text-[12px] text-[var(--a-muted)] hover:text-[var(--a-text)] lg:hidden"
+                onClick={() => goUser(c.uid)}
+                className="admin-panel flex flex-col gap-1.5 p-3.5 text-left transition hover:border-[var(--admin-accent)]/40"
               >
-                ← К списку чатов
-              </button>
-              <p className="truncate font-medium">{thread?.title ?? '—'}</p>
-              <p className="break-words text-[11px] text-[var(--a-muted)]">
-                {selectedUser?.email || selectedUid}
-                {thread && (
-                  <>
-                    {' · '}
-                    модель:{' '}
-                    <span className="text-[var(--a-accent-fg)]">{modelName}</span>
-                  </>
-                )}
-                {godMode && ' · god mode'}
-              </p>
-            </div>
-
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
-              {thread?.messages.map((m, i) => {
-                const next = thread.messages[i + 1];
-                const usedReasoning =
-                  m.role === 'user' &&
-                  (Boolean(m.usedReasoning) ||
-                    (next?.role === 'assistant' && Boolean(next.reasoning?.trim())));
-                return (
-                  <div
-                    key={m.id}
-                    className={`max-w-[92%] rounded-xl px-3 py-2 text-sm ${
-                      m.role === 'user' ? 'ml-auto bg-[var(--a-chip)]' : 'bg-[var(--admin-accent)]/10'
-                    }`}
-                  >
-                    <p className="flex items-center gap-1.5 text-[10px] text-[var(--a-faint)]">
-                      <span>
-                        {m.role === 'user' ? 'user' : `assistant · ${modelName}`}
-                        {m.viaAdmin ? ' · via admin' : ''}
-                      </span>
-                      {usedReasoning && (
-                        <span
-                          className="inline-flex items-center gap-0.5 rounded bg-[var(--admin-accent)]/20 px-1 py-0.5 text-[var(--a-accent-fg)]"
-                          title="Пользователь включил «Рассуждения»"
-                        >
-                          <IconBrain className="h-3 w-3" />
-                          <span className="text-[9px] font-medium uppercase tracking-wide">
-                            reason
-                          </span>
-                        </span>
-                      )}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--a-text)]">
+                      {c.name || c.email || 'Без имени'}
                     </p>
-                    <div className="mt-1">
-                      <MarkdownBody content={m.content} />
-                    </div>
-                    {m.role === 'assistant' && m.reasoning?.trim() && (
-                      <details className="mt-2 rounded-lg border border-[var(--a-border)] bg-[var(--a-input)]/60 px-2 py-1.5">
-                        <summary className="cursor-pointer text-[10px] text-[var(--a-muted)]">
-                          Мысли модели
-                        </summary>
-                        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--a-faint)]">
-                          {m.reasoning}
-                        </p>
-                      </details>
+                    <p className="truncate text-[11px] text-[var(--a-faint)]">{c.email || c.uid}</p>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-[var(--a-chip)] px-1.5 py-0.5 text-[10px] uppercase text-[var(--a-muted)]">
+                    {c.plan}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-[10px] text-[var(--a-faint)]">
+                  <span>{c.threadCount} чатов</span>
+                  <span>·</span>
+                  <span>{c.messageCount} сообщ.</span>
+                  <span>·</span>
+                  <span>{formatAgo(c.updatedAt)}</span>
+                  {c.banned && (
+                    <span className="rounded bg-[var(--a-danger-soft)] px-1 text-[var(--a-danger)]">ban</span>
+                  )}
+                  {c.muted && (
+                    <span className="rounded bg-[var(--a-chip)] px-1">mute</span>
+                  )}
+                  {c.staff && (
+                    <span className="rounded bg-[var(--admin-accent)]/15 px-1 text-[var(--a-accent-fg)]">
+                      {c.staff}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+          {!cards.length && (
+            <p className="p-6 text-center text-sm text-[var(--a-faint)]">Никого не найдено</p>
+          )}
+        </>
+      )}
+
+      {/* ——— Шаг B: папки / чаты ——— */}
+      {step === 'chats' && (
+        <div className="admin-panel space-y-3 p-3 sm:p-4">
+          <div className="border-b border-[var(--a-border)] pb-2">
+            <p className="text-sm font-medium">
+              {selectedProfile?.name || selectedProfile?.email || selectedUid}
+            </p>
+            <p className="text-[11px] text-[var(--a-faint)]">{selectedProfile?.email}</p>
+          </div>
+
+          {!store && (
+            <p className="text-sm text-[var(--a-faint)]">Загрузка чатов…</p>
+          )}
+          {store && !store.chats.length && (
+            <p className="text-sm text-[var(--a-faint)]">У пользователя нет чатов</p>
+          )}
+
+          {folders.map((f) => {
+            const inFolder = (store?.chats || []).filter((c) => c.folderId === f.id);
+            const open = expandedFolders[f.id] !== false;
+            return (
+              <div key={f.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedFolders((p) => ({ ...p, [f.id]: !open }))
+                  }
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm font-medium hover:bg-[var(--a-hover)]"
+                >
+                  <IconChevronDown
+                    className={`h-3.5 w-3.5 transition ${open ? '' : '-rotate-90'}`}
+                  />
+                  {f.title}
+                  <span className="text-[11px] text-[var(--a-faint)]">({inFolder.length})</span>
+                </button>
+                {open && (
+                  <div className="ml-3 space-y-0.5 border-l border-[var(--a-border)] pl-2">
+                    {inFolder.map((c) => (
+                      <ThreadRow key={c.id} chat={c} onClick={() => goThread(c.id)} />
+                    ))}
+                    {!inFolder.length && (
+                      <p className="px-2 py-1 text-[11px] text-[var(--a-faint)]">Пусто</p>
                     )}
                   </div>
-                );
-              })}
-              {!thread?.messages.length && (
-                <p className="text-center text-sm text-[var(--a-faint)]">Пустой чат</p>
-              )}
+                )}
+              </div>
+            );
+          })}
+
+          {rootChats.length > 0 && (
+            <div className="space-y-0.5">
+              <p className="px-2 text-[11px] uppercase tracking-wider text-[var(--a-faint)]">
+                Без папки
+              </p>
+              {rootChats.map((c) => (
+                <ThreadRow key={c.id} chat={c} onClick={() => goThread(c.id)} />
+              ))}
             </div>
-
-            <form onSubmit={onSend} className="space-y-2 border-t border-[var(--a-border)] p-3">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSendAs('user')}
-                  className={`rounded-md border px-2.5 py-1 text-[11px] ${
-                    sendAs === 'user'
-                      ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
-                      : 'border-[var(--a-border)] text-[var(--a-muted)]'
-                  }`}
-                >
-                  От лица пользователя
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSendAs('model')}
-                  className={`rounded-md border px-2.5 py-1 text-[11px] ${
-                    sendAs === 'model'
-                      ? 'border-[var(--admin-accent)] bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
-                      : 'border-[var(--a-border)] text-[var(--a-muted)]'
-                  }`}
-                >
-                  От лица модели ({modelName})
-                </button>
-              </div>
-
-              {genHint && (
-                <p className="text-[11px] text-[var(--a-accent-fg)]">{genHint}</p>
-              )}
-              {error && <p className="admin-error-inline">{error}</p>}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <textarea
-                  value={draft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    if (genHint?.startsWith('Готово')) setGenHint(null);
-                  }}
-                  rows={godMode ? 3 : 2}
-                  placeholder={
-                    sendAs === 'model'
-                      ? `Текст ответа модели (${modelName})…`
-                      : 'Сообщение от лица пользователя…'
-                  }
-                  className="min-w-0 w-full flex-1 resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none"
-                />
-                <div className="flex shrink-0 gap-2 sm:flex-col">
-                  <button
-                    type="button"
-                    disabled={busy || !thread}
-                    onClick={() => void onWandGenerate()}
-                    title="Сгенерировать ответ в поле"
-                    aria-label="Сгенерировать ответ"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--admin-accent)]/45 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)] hover:bg-[var(--admin-accent)]/25 disabled:opacity-40"
-                  >
-                    <IconWand className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={busy || !draft.trim() || !thread}
-                    className="h-10 flex-1 rounded-lg bg-[var(--admin-accent)] px-4 text-sm font-semibold text-white disabled:opacity-40 sm:flex-none"
-                  >
-                    {busy ? '…' : 'Отправить'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+          )}
         </div>
       )}
+
+      {/* ——— Шаг C: история (+ god UI) ——— */}
+      {step === 'thread' && thread && (
+        <div className="space-y-3">
+          <div className="admin-panel flex flex-wrap items-center justify-between gap-2 p-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{thread.title || 'Без названия'}</p>
+              <p className="text-[11px] text-[var(--a-faint)]">
+                {modelLabel(normalizeModelId(thread.modelId))} ·{' '}
+                {selectedProfile?.email || selectedUid}
+              </p>
+            </div>
+            {godMode && (
+              <div className="w-full max-w-xs sm:w-56">
+                <AdminSelect
+                  value={godControl?.mode || 'auto'}
+                  options={GOD_MODE_OPTIONS.map((o) => ({
+                    value: o.value,
+                    label: o.label,
+                    hint: o.hint,
+                  }))}
+                  onChange={(v) => void onModeChange(v)}
+                  disabled={busy}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+
+          {godMode && (
+            <div className="admin-panel space-y-2 p-3 text-xs text-[var(--a-muted)]">
+              <p className="font-medium text-[var(--a-strong)]">Инструменты чата</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Chip on={thread.webTools !== false} label="Поиск / web" />
+                <Chip on={Boolean(thread.codingTools)} label="Кодинг" />
+                <Chip on={Boolean(thread.reasoning)} label="Рассуждения" />
+              </div>
+              {godControl?.mode === 'auto_manual' && interceptLeft > 0 && !godControl.interceptDecision && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 px-3 py-2">
+                  <span className="font-semibold text-[var(--a-accent-fg)]">
+                    Перехват {(interceptLeft / 1000).toFixed(1)}с
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void onIntercept('takeover')}
+                    className="rounded-md bg-[var(--admin-accent)] px-2.5 py-1 text-[11px] font-semibold text-white"
+                  >
+                    Перехватить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onIntercept('skip')}
+                    className="rounded-md border border-[var(--a-border)] px-2.5 py-1 text-[11px]"
+                  >
+                    Пропустить → ИИ
+                  </button>
+                </div>
+              )}
+              {godControl?.queueActive && (
+                <p className="text-[var(--a-accent-fg)]">
+                  Очередь активна — пользователь ждёт ответа
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="admin-panel max-h-[min(60vh,32rem)] space-y-3 overflow-y-auto p-3 sm:p-4">
+            {thread.messages.map((m) => (
+              <div
+                key={m.id}
+                className={`rounded-xl border border-[var(--a-border)] px-3 py-2 ${
+                  m.role === 'user' ? 'bg-[var(--a-chip)]/40' : 'bg-[var(--a-input)]'
+                }`}
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--a-faint)]">
+                  <span>{m.role === 'user' ? 'User' : m.asAdmin ? 'Admin' : 'Assistant'}</span>
+                  {m.viaAdmin && (
+                    <span className="rounded bg-[var(--admin-accent)]/20 px-1 text-[var(--a-accent-fg)]">
+                      via admin
+                    </span>
+                  )}
+                  {m.usedReasoning && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <IconBrain className="h-3 w-3" /> reasoning
+                    </span>
+                  )}
+                  {m.serverLoad && (
+                    <span className="rounded bg-amber-500/20 px-1 text-amber-200">
+                      load:{m.serverLoad}
+                    </span>
+                  )}
+                  <span className="ml-auto normal-case">
+                    {new Date(m.createdAt).toLocaleString('ru-RU')}
+                  </span>
+                </div>
+                {m.reasoning && (
+                  <details className="mb-1.5 text-[12px] text-[var(--a-muted)]">
+                    <summary className="cursor-pointer">Рассуждения</summary>
+                    <pre className="mt-1 whitespace-pre-wrap font-sans text-[12px]">{m.reasoning}</pre>
+                  </details>
+                )}
+                {m.toolActivity?.length ? (
+                  <div className="mb-2">
+                    <p className="mb-1 text-[10px] uppercase text-[var(--a-faint)]">
+                      Tools ({m.toolActivity.length})
+                    </p>
+                    <ToolActivityCards items={m.toolActivity} />
+                  </div>
+                ) : null}
+                {m.content?.trim() ? (
+                  <ChatMarkdown content={m.content} className="text-[13px] leading-[1.6]" />
+                ) : m.serverLoad ? (
+                  <p className="text-sm text-[var(--a-muted)] italic">
+                    Ожидание ({m.serverLoad})…
+                  </p>
+                ) : (
+                  <p className="text-sm text-[var(--a-faint)]">∅</p>
+                )}
+              </div>
+            ))}
+            {!thread.messages.length && (
+              <p className="text-sm text-[var(--a-faint)]">Пустой чат</p>
+            )}
+          </div>
+
+          {godMode && (
+            <form onSubmit={(e) => void onSend(e)} className="admin-panel space-y-2 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminSelect
+                  value={sendAs}
+                  options={[
+                    { value: 'user', label: 'От имени user' },
+                    { value: 'model', label: 'От имени модели' },
+                    { value: 'admin', label: 'От лица админа' },
+                  ]}
+                  onChange={(v) => setSendAs(v)}
+                  className="min-w-[10rem]"
+                />
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onGenerateDraft()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--a-border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--a-hover)] disabled:opacity-40"
+                  title="Сгенерировать в черновик (не отправляет)"
+                >
+                  <IconWand className="h-3.5 w-3.5" />
+                  В черновик
+                </button>
+                {genHint && (
+                  <span className="text-[11px] text-[var(--a-accent-fg)]">{genHint}</span>
+                )}
+              </div>
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={4}
+                placeholder="Ответ… (можно подкрутить после генерации в черновик)"
+                className="w-full resize-y rounded-lg border border-[var(--a-border)] bg-[var(--a-input)] px-3 py-2 text-sm outline-none focus:border-[var(--admin-accent)]/50"
+              />
+              <button
+                type="submit"
+                disabled={busy || !draft.trim()}
+                className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                Отправить
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {step === 'thread' && !thread && (
+        <p className="text-sm text-[var(--a-faint)]">Чат не найден</p>
+      )}
     </div>
+  );
+}
+
+function Chip({ on, label }: { on: boolean; label: string }) {
+  return (
+    <span
+      className={`rounded-md px-2 py-0.5 text-[11px] ${
+        on
+          ? 'bg-[var(--admin-accent)]/20 text-[var(--a-accent-fg)]'
+          : 'bg-[var(--a-chip)] text-[var(--a-faint)] line-through'
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ThreadRow({ chat, onClick }: { chat: ChatThread; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-[var(--a-hover)]"
+    >
+      <span className="min-w-0 truncate font-medium">{chat.title || 'Без названия'}</span>
+      <span className="shrink-0 text-[10px] text-[var(--a-faint)]">
+        {chat.messages.length} · {formatAgo(chat.updatedAt)}
+      </span>
+    </button>
   );
 }

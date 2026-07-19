@@ -23,6 +23,7 @@ import {
   saveUserChatStore,
   fetchUserChatStore,
   mergeChatStores,
+  watchUserChatStore,
   type ChatFolder,
   type ChatMessage,
   type ChatModelId,
@@ -34,6 +35,11 @@ import {
   isChatGenerating,
   subscribeChatStoreUpdates,
 } from '../lib/chatGeneration';
+import {
+  fetchGodChatControl,
+  watchGodChatControl,
+  type GodChatControl,
+} from '../lib/godChat';
 import { looksLikeWeatherQuery } from '../lib/weatherIntent';
 import { clearSandbox, ensureReactSiteTemplate } from '../lib/projectSandbox';
 import {
@@ -49,6 +55,7 @@ import {
 import AuthModal, { type AuthMode } from './AuthModal';
 import BroadcastBanner from './BroadcastBanner';
 import AssistantReply from './AssistantReply';
+import ServerLoadCard from './ServerLoadCard';
 import {
   IconAdmin,
   IconBrain,
@@ -357,6 +364,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [codingDockOpen, setCodingDockOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [limitHint, setLimitHint] = useState<string | null>(null);
+  const [godControl, setGodControl] = useState<GodChatControl | null>(null);
   const [usageToday, setUsageToday] = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -470,6 +478,31 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       cancelled = true;
     };
   }, [user?.uid]);
+
+  // Live sync с облаком (ответы Owner / god mode)
+  useEffect(() => {
+    if (!user) return;
+    return watchUserChatStore(user.uid, (remote) => {
+      if (!remote) return;
+      setStore((local) => {
+        const remoteTs = remote.updatedAt || 0;
+        const localTs = local.updatedAt || 0;
+        if (remoteTs < localTs - 50) return local;
+        const merged = mergeChatStores(local, remote);
+        saveLocalChatStore(merged);
+        return merged;
+      });
+    });
+  }, [user?.uid]);
+
+  // God-control активного чата
+  useEffect(() => {
+    if (!user || !activeId) {
+      setGodControl(null);
+      return;
+    }
+    return watchGodChatControl(user.uid, activeId, setGodControl);
+  }, [user?.uid, activeId]);
 
   const active = useMemo(
     () => (activeId ? chats.find((c) => c.id === activeId) ?? null : null),
@@ -933,6 +966,23 @@ export default function ChatWorkspace({ homeSlot }: Props) {
       return;
     }
     if (isChatGenerating(active.id)) return;
+
+    // God Mode: очередь — нельзя слать новые, пока Owner не ответит
+    let control = godControl;
+    if (user && !control) {
+      try {
+        control = await fetchGodChatControl(user.uid, active.id);
+      } catch {
+        control = null;
+      }
+    }
+    if (control?.queueActive) {
+      setLimitHint(
+        control.queueReason ||
+          'Этот чат в очереди из‑за нагрузки. Вернитесь позже.',
+      );
+      return;
+    }
 
     const creditCost = creditCostForRequest(active.modelId, active.reasoning);
     const gate = await canSendMessage(user?.uid ?? null, planId, creditCost);
@@ -1833,11 +1883,14 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                               toolActivity={msg.toolActivity}
                               errorDetail={msg.errorDetail}
                               debug={debug}
+                              serverLoad={msg.serverLoad}
+                              asAdmin={msg.asAdmin}
                               live={Boolean(
                                 sending &&
                                   (!msg.content ||
                                     msg.thinkingPhase === 'thinking' ||
                                     msg.thinkingPhase === 'answering' ||
+                                    msg.serverLoad ||
                                     msg.toolActivity?.some((t) => t.pending)),
                               )}
                             />
@@ -1880,6 +1933,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                   <Link to="/pricing" className="shrink-0 font-medium text-[#c62828] hover:underline">
                     Тарифы
                   </Link>
+                </div>
+              )}
+              {godControl?.queueActive && (
+                <div className="mx-auto mb-2 max-w-[720px]">
+                  <ServerLoadCard kind="queue" />
                 </div>
               )}
               <form onSubmit={onSubmit} className="mx-auto max-w-[720px]">

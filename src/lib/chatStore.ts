@@ -72,6 +72,14 @@ export type ChatMessage = {
   toolActivity?: ToolActivity[];
   /** техническая деталь ошибки (показывается только в debug) */
   errorDetail?: string | null;
+  /**
+   * Карточка нагрузки вместо точек:
+   * intercept — ждём 5с / Owner
+   * queue — ручной/админ режим, вернитесь позже
+   */
+  serverLoad?: 'intercept' | 'queue' | null;
+  /** ответ от лица администрации (режим Админ) */
+  asAdmin?: boolean;
 };
 
 export type ChatThread = {
@@ -197,6 +205,10 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                   : undefined,
                 errorDetail:
                   typeof m.errorDetail === 'string' ? m.errorDetail.slice(0, 4000) : m.errorDetail ?? null,
+                serverLoad:
+                  m.serverLoad === 'intercept' || m.serverLoad === 'queue' ? m.serverLoad : null,
+                asAdmin: Boolean(m.asAdmin),
+                viaAdmin: Boolean(m.viaAdmin) || undefined,
               }))
             : [],
           manualTitle: Boolean(c.manualTitle),
@@ -350,23 +362,49 @@ export async function adminAppendAssistantMessage(params: {
   uid: string;
   chatId: string;
   content: string;
+  /** заменить placeholder (heldAssistantId) вместо нового сообщения */
+  replaceMessageId?: string | null;
+  asAdmin?: boolean;
+  toolActivity?: ToolActivity[];
+  reasoning?: string | null;
 }): Promise<ChatStore> {
   const current = (await fetchUserChatStore(params.uid)) ?? emptyChatStore();
   const now = Date.now();
   const thread = current.chats.find((c) => c.id === params.chatId);
   const msg: ChatMessage = {
-    id: `ai-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    id: params.replaceMessageId || `ai-${now}-${Math.random().toString(36).slice(2, 7)}`,
     role: 'assistant',
     content: params.content.trim(),
     createdAt: now,
     viaAdmin: true,
+    asAdmin: Boolean(params.asAdmin),
     modelId: thread ? normalizeModelId(thread.modelId) : null,
+    thinkingPhase: null,
+    serverLoad: null,
+    toolActivity: params.toolActivity,
+    reasoning: params.reasoning ?? null,
   };
-  const chats = current.chats.map((c) =>
-    c.id === params.chatId
-      ? { ...c, messages: [...c.messages, msg], updatedAt: now }
-      : c,
-  );
+  const chats = current.chats.map((c) => {
+    if (c.id !== params.chatId) return c;
+    const idx = params.replaceMessageId
+      ? c.messages.findIndex((m) => m.id === params.replaceMessageId)
+      : -1;
+    const messages =
+      idx >= 0
+        ? c.messages.map((m, i) => (i === idx ? { ...m, ...msg } : m))
+        : [...c.messages, msg];
+    // убрать другие пустые load-плейсхолдеры
+    const cleaned = messages.filter(
+      (m) =>
+        !(
+          m.role === 'assistant' &&
+          !m.content?.trim() &&
+          m.serverLoad &&
+          m.id !== msg.id
+        ),
+    );
+    return { ...c, messages: cleaned, updatedAt: now };
+  });
   const next: ChatStore = { ...current, chats, updatedAt: now };
   await saveUserChatStore(params.uid, next);
   return next;

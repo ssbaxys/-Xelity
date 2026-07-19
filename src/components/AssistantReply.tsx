@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BlurMarkdown from './BlurMarkdown';
 import ReasoningPanel from './ReasoningPanel';
+import ServerLoadCard from './ServerLoadCard';
 import ToolActivityCards from './ToolActivityCards';
 import TypingDots from './TypingDots';
 import { usePrefs } from '../context/PrefsContext';
@@ -20,6 +21,8 @@ type Props = {
   toolActivity?: ToolActivity[];
   errorDetail?: string | null;
   debug?: boolean;
+  serverLoad?: 'intercept' | 'queue' | null;
+  asAdmin?: boolean;
 };
 
 /** Ответ: точки → мысли → карточки tools → markdown */
@@ -34,25 +37,30 @@ export default function AssistantReply({
   toolActivity,
   errorDetail,
   debug = false,
+  serverLoad = null,
+  asAdmin = false,
 }: Props) {
   const { t } = usePrefs();
   const hasContent = Boolean(content?.trim());
   const hasReasoning = Boolean(reasoning?.trim());
   const hasTools = Boolean(toolActivity?.length);
+  const showLoad = Boolean(serverLoad) && !hasContent;
   /** «answering» без текста мыслей не считаем рассуждениями (кодинг/сеть) */
   const thinking = thinkingPhase === 'thinking';
   const showReasoningBlock = thinking || hasReasoning;
 
   const [dotsExit, setDotsExit] = useState(false);
-  // точки только пока ждём ответ без блока мыслей
-  const [showDots, setShowDots] = useState(!hasContent && !hasReasoning && !thinking);
+  // точки только пока ждём ответ без блока мыслей / load-карточки
+  const [showDots, setShowDots] = useState(
+    !hasContent && !hasReasoning && !thinking && !serverLoad,
+  );
   const [showAnswer, setShowAnswer] = useState(hasContent && !live);
   const [animateAnswer, setAnimateAnswer] = useState(false);
   const seenRef = useRef<string | null>(hasContent && !live ? content : null);
 
   useEffect(() => {
-    // мысли / tools / ответ уже на экране — точки не нужны
-    if (hasContent || hasReasoning || thinking || hasTools) {
+    // мысли / tools / ответ / load уже на экране — точки не нужны
+    if (hasContent || hasReasoning || thinking || hasTools || showLoad) {
       setDotsExit(true);
       const t = window.setTimeout(() => setShowDots(false), 180);
       return () => window.clearTimeout(t);
@@ -62,7 +70,7 @@ export default function AssistantReply({
       setShowDots(true);
       setDotsExit(false);
     }
-  }, [hasContent, hasReasoning, live, thinking, hasTools]);
+  }, [hasContent, hasReasoning, live, thinking, hasTools, showLoad]);
 
   useEffect(() => {
     if (!hasContent) {
@@ -88,7 +96,7 @@ export default function AssistantReply({
   return (
     <div className="min-w-0">
       <p className="mb-1.5 text-[11px] font-medium text-[var(--c-faint)]">
-        {modelLabel(normalizeModelId(modelId))}
+        {asAdmin ? 'Администрация Xelity' : modelLabel(normalizeModelId(modelId))}
       </p>
 
       {showReasoningBlock && (
@@ -101,7 +109,9 @@ export default function AssistantReply({
         />
       )}
 
-      {showDots && !hasContent && !hasReasoning && !thinking && !hasTools && (
+      {showLoad && serverLoad && <ServerLoadCard kind={serverLoad} />}
+
+      {showDots && !hasContent && !hasReasoning && !thinking && !hasTools && !showLoad && (
         <div className="mt-1 min-h-[1.5rem]">
           <TypingDots exiting={dotsExit} />
         </div>
