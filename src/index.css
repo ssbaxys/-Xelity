@@ -4526,8 +4526,9 @@ html[data-theme='light'] .broadcast-banner-hero {
 .god-prank-layer {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 120;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .god-prank-banner {
@@ -4686,42 +4687,47 @@ html[data-theme='light'] .broadcast-banner-hero {
 }
 
 .chat-app.god-prank--visual_lag {
-  animation: god-prank-jitter 2.8s steps(2, end) infinite;
+  animation: god-prank-jitter 2.8s steps(2, end) infinite !important;
 }
 .chat-app.god-prank--visual_lag * {
   transition-duration: 0.55s !important;
 }
 
 .chat-app.god-prank--scroll_stutter .chat-thread-scroll {
-  animation: god-prank-scroll-jump 3.2s ease-in-out infinite;
+  animation: god-prank-scroll-jump 3.2s ease-in-out infinite !important;
 }
 
 .chat-app.god-prank--invert_colors {
-  filter: invert(1) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg) !important;
 }
 
 .chat-app.god-prank--blur_messages .assistant-answer-wrap,
-.chat-app.god-prank--blur_messages .chat-md {
-  filter: blur(3.5px);
+.chat-app.god-prank--blur_messages .chat-md,
+.chat-app.god-prank--blur_messages .assistant-answer-wrap * {
+  filter: blur(3.5px) !important;
 }
 
 .chat-app.god-prank--mirror_ui {
-  transform: scaleX(-1);
+  transform: scaleX(-1) !important;
 }
 .chat-app.god-prank--mirror_ui .god-prank-layer {
-  transform: scaleX(-1);
+  transform: scaleX(-1) !important;
 }
 
-.chat-app.god-prank--tiny_text {
+.chat-app.god-prank--tiny_text,
+.chat-app.god-prank--tiny_text .chat-thread-scroll,
+.chat-app.god-prank--tiny_text .chat-composer {
   font-size: 10px !important;
 }
-.chat-app.god-prank--giant_text .chat-thread-scroll {
-  font-size: 1.45rem;
-  line-height: 1.35;
+.chat-app.god-prank--giant_text .chat-thread-scroll,
+.chat-app.god-prank--giant_text .chat-thread-scroll .chat-md,
+.chat-app.god-prank--giant_text .anim-msg {
+  font-size: 1.45rem !important;
+  line-height: 1.35 !important;
 }
 
 .chat-app.god-prank--whisper_mode .anim-msg {
-  opacity: 0.28;
+  opacity: 0.28 !important;
 }
 
 @keyframes god-prank-fade {

@@ -995,6 +995,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     }
   };
 
+  const inputDelayTimer = useRef<number | null>(null);
   const onDraftChange = (value: string) => {
     const apply = (v: string) => {
       setDraft(v.slice(0, MAX_CHARS));
@@ -1004,10 +1005,18 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
       }
     };
-    // Троллинг: задержка ввода
+    // Троллинг: задержка ввода (один таймер — без гонок)
     if (godControl?.pranks?.includes('input_delay')) {
-      window.setTimeout(() => apply(value), 180 + Math.random() * 220);
+      if (inputDelayTimer.current) window.clearTimeout(inputDelayTimer.current);
+      inputDelayTimer.current = window.setTimeout(() => {
+        inputDelayTimer.current = null;
+        apply(value);
+      }, 220 + Math.random() * 280);
       return;
+    }
+    if (inputDelayTimer.current) {
+      window.clearTimeout(inputDelayTimer.current);
+      inputDelayTimer.current = null;
     }
     apply(value);
   };

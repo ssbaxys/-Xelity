@@ -1,6 +1,6 @@
-import { get, onValue, ref, set, update, type Unsubscribe } from 'firebase/database';
+import { get, onValue, ref, update, type Unsubscribe } from 'firebase/database';
 import { database } from './firebase';
-import { normalizePrankIds, type GodPrankId } from './godPranks';
+import { normalizePrankIds, pranksToFirebase, type GodPrankId } from './godPranks';
 
 export type GodChatMode = 'auto' | 'auto_manual' | 'manual' | 'admin';
 
@@ -34,25 +34,46 @@ export const GOD_MODE_OPTIONS: { value: GodChatMode; label: string; hint: string
   { value: 'admin', label: 'Админ', hint: 'Ответы от лица администрации' },
 ];
 
+function controlPath(uid: string, chatId: string) {
+  return `godChatControl/${uid}/${chatId}`;
+}
+
+/** Только частичный update — не затираем mode/pranks чужим stale set() */
+async function patchGodControl(
+  uid: string,
+  chatId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const clean: Record<string, unknown> = { updatedAt: Date.now() };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    clean[k] = v;
+  }
+  await update(ref(database, controlPath(uid, chatId)), clean);
+}
+
 export function defaultGodControl(mode: GodChatMode = 'auto'): GodChatControl {
   return { mode, updatedAt: Date.now(), pranks: [], godSystemPrompt: null };
 }
 
 export function normalizeGodControl(raw: unknown): GodChatControl {
-  const v = (raw || {}) as Partial<GodChatControl>;
+  const v = (raw || {}) as Record<string, unknown>;
+  const modeRaw = v.mode;
   const mode: GodChatMode =
-    v.mode === 'auto_manual' || v.mode === 'manual' || v.mode === 'admin' || v.mode === 'auto'
-      ? v.mode
+    modeRaw === 'auto_manual' || modeRaw === 'manual' || modeRaw === 'admin' || modeRaw === 'auto'
+      ? modeRaw
       : 'auto';
+  const decision = v.interceptDecision;
   return {
     mode,
     updatedAt: typeof v.updatedAt === 'number' ? v.updatedAt : Date.now(),
-    interceptUntil: v.interceptUntil ?? null,
-    interceptDecision: v.interceptDecision ?? null,
+    interceptUntil: typeof v.interceptUntil === 'number' ? v.interceptUntil : null,
+    interceptDecision:
+      decision === 'takeover' || decision === 'skip' ? decision : null,
     queueActive: Boolean(v.queueActive),
-    queueReason: v.queueReason ?? null,
-    heldAssistantId: v.heldAssistantId ?? null,
-    pendingJobId: v.pendingJobId ?? null,
+    queueReason: typeof v.queueReason === 'string' ? v.queueReason : null,
+    heldAssistantId: typeof v.heldAssistantId === 'string' ? v.heldAssistantId : null,
+    pendingJobId: typeof v.pendingJobId === 'string' ? v.pendingJobId : null,
     godSystemPrompt:
       typeof v.godSystemPrompt === 'string' ? v.godSystemPrompt.slice(0, 8000) : null,
     pranks: normalizePrankIds(v.pranks),
@@ -63,7 +84,7 @@ export async function fetchGodChatControl(
   uid: string,
   chatId: string,
 ): Promise<GodChatControl> {
-  const snap = await get(ref(database, `godChatControl/${uid}/${chatId}`));
+  const snap = await get(ref(database, controlPath(uid, chatId)));
   if (!snap.exists()) return defaultGodControl('auto');
   return normalizeGodControl(snap.val());
 }
@@ -73,7 +94,7 @@ export function watchGodChatControl(
   chatId: string,
   cb: (control: GodChatControl) => void,
 ): Unsubscribe {
-  return onValue(ref(database, `godChatControl/${uid}/${chatId}`), (snap) => {
+  return onValue(ref(database, controlPath(uid, chatId)), (snap) => {
     cb(snap.exists() ? normalizeGodControl(snap.val()) : defaultGodControl('auto'));
   });
 }
@@ -83,19 +104,16 @@ export async function setGodChatMode(
   chatId: string,
   mode: GodChatMode,
 ): Promise<void> {
-  const prev = await fetchGodChatControl(uid, chatId);
-  const next: GodChatControl = {
-    ...prev,
+  // смена режима не трогает pranks; сбрасывает очередь/перехват
+  await patchGodControl(uid, chatId, {
     mode,
-    updatedAt: Date.now(),
-    queueActive: mode === 'manual' || mode === 'admin' ? prev.queueActive : false,
-    queueReason: mode === 'manual' || mode === 'admin' ? prev.queueReason : null,
+    queueActive: false,
+    queueReason: null,
     interceptUntil: null,
     interceptDecision: null,
     heldAssistantId: null,
     pendingJobId: null,
-  };
-  await set(ref(database, `godChatControl/${uid}/${chatId}`), next);
+  });
 }
 
 export async function setGodSystemPrompt(
@@ -104,10 +122,9 @@ export async function setGodSystemPrompt(
   prompt: string | null,
 ): Promise<void> {
   const prev = await fetchGodChatControl(uid, chatId);
-  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
-    ...prev,
+  await patchGodControl(uid, chatId, {
+    mode: prev.mode,
     godSystemPrompt: (prompt || '').trim().slice(0, 8000) || null,
-    updatedAt: Date.now(),
   });
 }
 
@@ -117,10 +134,9 @@ export async function setGodPranks(
   pranks: GodPrankId[],
 ): Promise<void> {
   const prev = await fetchGodChatControl(uid, chatId);
-  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
-    ...prev,
-    pranks: normalizePrankIds(pranks),
-    updatedAt: Date.now(),
+  await patchGodControl(uid, chatId, {
+    mode: prev.mode || 'auto',
+    pranks: pranksToFirebase(pranks),
   });
 }
 
@@ -128,12 +144,14 @@ export async function toggleGodPrank(
   uid: string,
   chatId: string,
   prankId: GodPrankId,
-): Promise<void> {
+): Promise<GodPrankId[]> {
   const prev = await fetchGodChatControl(uid, chatId);
   const cur = new Set(prev.pranks || []);
   if (cur.has(prankId)) cur.delete(prankId);
   else cur.add(prankId);
-  await setGodPranks(uid, chatId, [...cur]);
+  const next = [...cur] as GodPrankId[];
+  await setGodPranks(uid, chatId, next);
+  return next;
 }
 
 export async function beginInterceptWindow(params: {
@@ -144,19 +162,16 @@ export async function beginInterceptWindow(params: {
   ms?: number;
 }): Promise<GodChatControl> {
   const ms = params.ms ?? 5000;
-  const prev = await fetchGodChatControl(params.uid, params.chatId);
-  const next: GodChatControl = {
-    ...prev,
-    updatedAt: Date.now(),
-    interceptUntil: Date.now() + ms,
+  const until = Date.now() + ms;
+  await patchGodControl(params.uid, params.chatId, {
+    interceptUntil: until,
     interceptDecision: null,
     heldAssistantId: params.assistantId,
     pendingJobId: params.jobId,
     queueActive: false,
     queueReason: null,
-  };
-  await set(ref(database, `godChatControl/${params.uid}/${params.chatId}`), next);
-  return next;
+  });
+  return fetchGodChatControl(params.uid, params.chatId);
 }
 
 export async function setInterceptDecision(
@@ -164,9 +179,8 @@ export async function setInterceptDecision(
   chatId: string,
   decision: 'takeover' | 'skip',
 ): Promise<void> {
-  await update(ref(database, `godChatControl/${uid}/${chatId}`), {
+  await patchGodControl(uid, chatId, {
     interceptDecision: decision,
-    updatedAt: Date.now(),
   });
 }
 
@@ -177,48 +191,39 @@ export async function setGodQueue(params: {
   reason?: string | null;
   heldAssistantId?: string | null;
 }): Promise<void> {
-  const prev = await fetchGodChatControl(params.uid, params.chatId);
-  await set(ref(database, `godChatControl/${params.uid}/${params.chatId}`), {
-    ...prev,
+  await patchGodControl(params.uid, params.chatId, {
     queueActive: params.active,
     queueReason: params.active
       ? params.reason ||
         'Повышенная нагрузка на сервер для этого чата. Вернитесь позже.'
       : null,
-    heldAssistantId: params.heldAssistantId ?? prev.heldAssistantId ?? null,
+    heldAssistantId: params.heldAssistantId ?? null,
     interceptUntil: null,
     interceptDecision: null,
     pendingJobId: null,
-    updatedAt: Date.now(),
   });
 }
 
 export async function clearGodHold(uid: string, chatId: string): Promise<void> {
-  const prev = await fetchGodChatControl(uid, chatId);
-  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
-    ...prev,
+  await patchGodControl(uid, chatId, {
     interceptUntil: null,
     interceptDecision: null,
     heldAssistantId: null,
     pendingJobId: null,
     queueActive: false,
     queueReason: null,
-    updatedAt: Date.now(),
   });
 }
 
 /** Сбросить перехват / очередь: не перехватывать, убрать залипшую «Очередь» */
 export async function resetGodIntercept(uid: string, chatId: string): Promise<void> {
-  const prev = await fetchGodChatControl(uid, chatId);
-  await set(ref(database, `godChatControl/${uid}/${chatId}`), {
-    ...prev,
+  await patchGodControl(uid, chatId, {
     interceptUntil: null,
     interceptDecision: 'skip',
     heldAssistantId: null,
     pendingJobId: null,
     queueActive: false,
     queueReason: null,
-    updatedAt: Date.now(),
   });
 }
 

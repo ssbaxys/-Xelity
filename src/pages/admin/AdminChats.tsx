@@ -236,12 +236,64 @@ export default function AdminChats() {
     if (!selectedUid || !threadId) return;
     setBusy(true);
     setError(null);
+    const prev = godControl;
+    // оптимистично — сразу видно в UI
+    setGodControl((c) =>
+      c
+        ? {
+            ...c,
+            mode,
+            queueActive: false,
+            queueReason: null,
+            interceptUntil: null,
+            interceptDecision: null,
+            heldAssistantId: null,
+            pendingJobId: null,
+            updatedAt: Date.now(),
+          }
+        : {
+            mode,
+            updatedAt: Date.now(),
+            pranks: [],
+            queueActive: false,
+          },
+    );
     try {
       await setGodChatMode(selectedUid, threadId, mode);
+      setGenHint(
+        mode === 'auto'
+          ? 'Режим: авто'
+          : mode === 'auto_manual'
+            ? 'Режим: авто + перехват 5с'
+            : mode === 'manual'
+              ? 'Режим: ручной (очередь)'
+              : 'Режим: админ',
+      );
     } catch (e) {
+      setGodControl(prev);
       setError(e instanceof Error ? e.message : 'Не удалось сменить режим');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onTogglePrank = async (prankId: (typeof GOD_PRANKS)[number]['id']) => {
+    if (!selectedUid || !threadId) return;
+    const prev = godControl;
+    const cur = new Set(prev?.pranks || []);
+    if (cur.has(prankId)) cur.delete(prankId);
+    else cur.add(prankId);
+    const nextPranks = [...cur];
+    setGodControl((c) =>
+      c
+        ? { ...c, pranks: nextPranks, updatedAt: Date.now() }
+        : { mode: 'auto', updatedAt: Date.now(), pranks: nextPranks },
+    );
+    try {
+      await toggleGodPrank(selectedUid, threadId, prankId);
+    } catch (e) {
+      setGodControl(prev);
+      setError(e instanceof Error ? e.message : 'Не удалось переключить троллинг');
     }
   };
 
@@ -697,20 +749,15 @@ export default function AdminChats() {
                         <button
                           key={p.id}
                           type="button"
-                          disabled={busy}
                           title={p.hint}
-                          onClick={() =>
-                            void toggleGodPrank(selectedUid, threadId, p.id).catch((e) =>
-                              setError(e instanceof Error ? e.message : 'Ошибка'),
-                            )
-                          }
+                          onClick={() => void onTogglePrank(p.id)}
                           className={`rounded-lg border px-2 py-1.5 text-left text-[11px] transition ${
                             on
                               ? 'border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 text-[var(--a-accent-fg)]'
                               : 'border-[var(--a-border)] text-[var(--a-muted)] hover:bg-[var(--a-hover)]'
                           }`}
                         >
-                          <span className="font-medium">{p.label}</span>
+                          <span className="font-medium">{on ? '✓ ' : ''}{p.label}</span>
                           <span className="mt-0.5 block text-[10px] opacity-70">{p.hint}</span>
                         </button>
                       );

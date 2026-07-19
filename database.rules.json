@@ -129,7 +129,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('isAdmin').val() == true)",
         "$chatId": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (auth.uid == $uid && ((!data.exists() && newData.child('mode').val() == 'auto') || (data.exists() && newData.child('mode').val() == data.child('mode').val()))))"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (auth.uid == $uid && ((!data.exists() && (!newData.hasChild('mode') || newData.child('mode').val() == 'auto')) || (data.exists() && newData.child('mode').val() == data.child('mode').val()))))"
         }
       }
     },

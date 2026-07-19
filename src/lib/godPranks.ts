@@ -59,11 +59,43 @@ export function isGodPrankId(v: unknown): v is GodPrankId {
   return typeof v === 'string' && GOD_PRANKS.some((p) => p.id === v);
 }
 
+/**
+ * Firebase RTDB превращает массивы в объекты `{0: id, 1: id}` —
+ * принимаем и массив, и map, и `{id: true}`.
+ */
 export function normalizePrankIds(raw: unknown): GodPrankId[] {
-  if (!Array.isArray(raw)) return [];
   const out: GodPrankId[] = [];
-  for (const x of raw) {
+  const push = (x: unknown) => {
     if (isGodPrankId(x) && !out.includes(x)) out.push(x);
+  };
+
+  if (Array.isArray(raw)) {
+    for (const x of raw) push(x);
+  } else if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    const keys = Object.keys(o);
+    const asFlagMap = keys.length > 0 && keys.every((k) => isGodPrankId(k));
+    if (asFlagMap) {
+      for (const k of keys) {
+        if (o[k] === true || o[k] === 1 || o[k] === '1') push(k);
+      }
+    } else {
+      for (const k of keys.sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))) {
+        push(o[k]);
+      }
+    }
   }
+
   return out.slice(0, 22);
+}
+
+/** Пишем map id→true — Firebase не ломает структуру как массивы */
+export function pranksToFirebase(
+  pranks: GodPrankId[],
+): Record<string, true> | null {
+  const ids = normalizePrankIds(pranks);
+  if (!ids.length) return null;
+  const out: Record<string, true> = {};
+  for (const id of ids) out[id] = true;
+  return out;
 }
