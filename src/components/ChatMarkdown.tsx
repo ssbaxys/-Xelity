@@ -5,6 +5,8 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import { highlightCode } from '../lib/highlightCode';
+import { splitContentWithSourceImages } from '../lib/sourceImage';
+import SourceImageCard from './SourceImageCard';
 
 type Props = {
   content: string;
@@ -55,23 +57,41 @@ const components: Components = {
   ),
   pre: ({ children }) => <pre className="chat-md-pre">{children}</pre>,
   code: CodeBlock,
-  img: ({ src, alt }) => <img src={src} alt={alt ?? ''} className="chat-md-img" loading="lazy" />,
+  img: ({ src, alt }) => (
+    <img src={src} alt={alt ?? ''} className="chat-md-img" loading="lazy" />
+  ),
 };
 
-/** Единый markdown для чата: GFM + KaTeX + подсветка кода */
+function MarkdownChunk({ content }: { content: string }) {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={components}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+/** Единый markdown для чата: GFM + KaTeX + картинки из поиска [[img: …]] */
 export default function ChatMarkdown({ content, className = '' }: Props) {
   if (!content) return null;
+  const parts = splitContentWithSourceImages(content);
+
   return (
     <div
       className={`chat-md min-w-0 max-w-full overflow-x-auto text-[15px] leading-[1.7] text-[var(--c-text)] ${className}`}
     >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
-        components={components}
-      >
-        {content}
-      </ReactMarkdown>
+      {parts.map((part, i) =>
+        part.type === 'img' ? (
+          <SourceImageCard key={`img-${i}`} image={part.image} />
+        ) : (
+          <MarkdownChunk key={`md-${i}`} content={part.text} />
+        ),
+      )}
     </div>
   );
 }

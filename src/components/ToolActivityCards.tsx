@@ -73,9 +73,22 @@ function DiffView({ activity, ok }: { activity: ToolActivity; ok?: boolean }) {
         {activity.links.map((l, i) => (
           <li key={`${l.url}-${i}`} className="tool-search-link-item">
             <a href={l.url} target="_blank" rel="noopener noreferrer" className="tool-search-link">
-              <span className="tool-search-link-title">{l.title}</span>
-              <span className="tool-search-link-url">{l.url}</span>
-              {l.snippet ? <span className="tool-search-link-snip">{l.snippet}</span> : null}
+              {l.image ? (
+                <img
+                  src={l.image}
+                  alt=""
+                  className="tool-search-thumb"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              ) : null}
+              <span className="tool-search-link-body">
+                <span className="tool-search-link-title">{l.title}</span>
+                <span className="tool-search-link-url">{l.url}</span>
+                {l.snippet ? (
+                  <span className="tool-search-link-snip">{l.snippet}</span>
+                ) : null}
+              </span>
             </a>
           </li>
         ))}

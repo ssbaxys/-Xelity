@@ -72,6 +72,7 @@ export function parseSearchLinks(forModel: string): ToolActivityLink[] {
     const titleM = block.match(/^(?:\[\d+\]|\d+\.)\s+(.+)/);
     const urlM = block.match(/URL:\s*(\S+)/i);
     if (!titleM || !urlM) continue;
+    const imageM = block.match(/IMAGE:\s*(\S+)/i);
     const snippetLine = block
       .split('\n')
       .map((l) => l.trim())
@@ -80,6 +81,7 @@ export function parseSearchLinks(forModel: string): ToolActivityLink[] {
           l &&
           !/^(?:\[\d+\]|\d+\.)/.test(l) &&
           !/^URL:/i.test(l) &&
+          !/^IMAGE:/i.test(l) &&
           l !== '(no snippet)' &&
           !/^Source:/i.test(l),
       );
@@ -88,6 +90,10 @@ export function parseSearchLinks(forModel: string): ToolActivityLink[] {
       title: titleM[1].trim().slice(0, 200),
       url: urlM[1].trim().slice(0, 500),
       snippet: snippet || undefined,
+      image:
+        imageM && /^https?:\/\//i.test(imageM[1])
+          ? imageM[1].trim().slice(0, 2000)
+          : undefined,
     });
   }
   return links.slice(0, 12);

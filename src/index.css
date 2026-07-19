@@ -1755,8 +1755,9 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
 
 .tool-search-link {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.65rem;
   padding: 0.55rem 0.85rem;
   text-decoration: none;
   transition: background 0.2s ease;
@@ -1764,6 +1765,24 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
 
 .tool-search-link:hover {
   background: var(--c-hover);
+}
+
+.tool-search-thumb {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  background: var(--c-soft);
+  border: 1px solid var(--c-border);
+}
+
+.tool-search-link-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
 .tool-search-link-title {
@@ -1782,6 +1801,57 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   font-size: 11px;
   color: var(--c-muted);
   line-height: 1.4;
+}
+
+/* ???????? ???????? ?? ?????? ? ?????? ?????????? */
+.source-img-card {
+  margin: 0.85rem 0;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--c-border-strong, #444) 65%, transparent);
+  background: color-mix(in srgb, var(--c-panel) 94%, #1a1010);
+  max-width: min(100%, 28rem);
+  animation: weather-card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.source-img-media {
+  display: block;
+  background: color-mix(in srgb, var(--c-soft) 70%, transparent);
+}
+
+.source-img-media img {
+  display: block;
+  width: 100%;
+  max-height: 16rem;
+  object-fit: cover;
+}
+
+.source-img-caption {
+  padding: 0.65rem 0.85rem 0.75rem;
+}
+
+.source-img-title {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--c-text);
+}
+
+.source-img-source {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c62828;
+  text-decoration: none;
+}
+
+.source-img-source:hover {
+  text-decoration: underline;
+}
+
+html[data-theme='light'] .source-img-card {
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 
 @keyframes tool-check-pop {

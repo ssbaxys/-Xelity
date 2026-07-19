@@ -89,13 +89,18 @@ export const WEB_TOOLS = [
     function: {
       name: 'web_search',
       description:
-        'Search the public web. Returns a numbered list of titles, URLs and short snippets ONLY — not full page bodies. After search, decide which URLs (if any) to open with web_fetch.',
+        'Search the public web. Returns titles, URLs, snippets; may include IMAGE urls. Set images:true to search image results for embedding in the reply. After text search, decide which URLs to open with web_fetch.',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
             description: 'Search query in the user language or English',
+          },
+          images: {
+            type: 'boolean',
+            description:
+              'If true — search images (for [[img: Title | IMAGE | PAGE]] blocks in the answer). Default false.',
           },
         },
         required: ['query'],
@@ -170,14 +175,22 @@ export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный 
 - Источник данных: Open-Meteo.
 
 ЭКОНОМИЯ ТОКЕНОВ (поиск):
-1) web_search даёт ТОЛЬКО список: номер, title, URL, короткий snippet — НЕ полный текст страниц.
+1) web_search даёт список: номер, title, URL, snippet; иногда строку IMAGE: (прямая картинка).
 2) После поиска САМА выбери, что читать:
    - если сниппетов достаточно — НЕ вызывай web_fetch;
    - обычно 1–3 URL; «все» — только если нужно; urls до 5 за один web_fetch.
 3) НЕ выдумывай содержимое сайтов и НЕ утверждай, что «проверил интернет», если tool не вызывался.
 
+КАРТИНКИ В ОТВЕТЕ ПОЛЬЗОВАТЕЛЮ:
+- Нужны фото/иллюстрации → web_search с images:true (или обычный поиск, если есть IMAGE:).
+- Вставь в ответ блок (строго такой формат, до 4 шт.):
+  [[img: Заголовок | URL_картинки | URL_страницы_источника]]
+- UI покажет картинку, заголовок и ссылку на КОРЕНЬ источника (https://домен/).
+- Только реальные URL из результатов tools — не выдумывай картинки.
+
 КОГДА ВЫЗЫВАТЬ:
 - Свежие факты / новости / доки / цены → web_search → выборочный web_fetch.
+- Картинки к ответу → web_search (images:true) + блоки [[img: …]].
 - Ссылка от пользователя → web_fetch.
 - Погода → get_weather.
 

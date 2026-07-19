@@ -18,6 +18,8 @@ export type WebToolLink = {
   title: string;
   url: string;
   snippet?: string;
+  /** прямая ссылка на изображение (SearXNG img_src / thumbnail) */
+  image?: string;
 };
 
 export type WebToolResult = {
@@ -161,6 +163,7 @@ function packResults(
   q: string,
   links: WebToolLink[],
   source: string,
+  opts?: { images?: boolean },
 ): WebToolResult {
   if (!links.length) {
     return {
@@ -171,31 +174,66 @@ function packResults(
       links: [],
     };
   }
+  const withImages = links.filter((l) => l.image);
   const forModel = [
-    `SEARCH RESULTS (titles + snippets only — NOT full pages) for: ${q}`,
+    opts?.images
+      ? `IMAGE SEARCH RESULTS for: ${q}`
+      : `SEARCH RESULTS (titles + snippets only — NOT full pages) for: ${q}`,
     `Source: ${source}`,
     '',
-    ...links.map(
-      (r, i) =>
-        `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    Snippet: ${r.snippet || '(no snippet)'}`,
-    ),
+    ...links.map((r, i) => {
+      const lines = [
+        `[${i + 1}] ${r.title}`,
+        `    URL: ${r.url}`,
+        `    Snippet: ${r.snippet || '(no snippet)'}`,
+      ];
+      if (r.image) {
+        lines.push(`    IMAGE: ${r.image}`);
+      }
+      return lines.join('\n');
+    }),
     '',
     'NEXT STEP (save tokens):',
     '- If snippets already answer the user — reply NOW, do NOT call web_fetch.',
     '- Else call web_fetch with the best 1–3 URLs (or urls:[...] up to 5).',
     '- Fetch all results only if the task truly needs every source.',
-    '- Example: web_fetch({ "urls": ["https://…", "https://…"] })',
+    '',
+    'IMAGES IN YOUR REPLY (optional):',
+    '- If a result has IMAGE: … you MAY embed it for the user with this exact block:',
+    '  [[img: Title | IMAGE_URL | PAGE_URL]]',
+    '- UI shows the picture, title, and a link to the source root only (https://domain/).',
+    '- Use ONLY real IMAGE/URL from this list. Max 4 images per answer.',
+    withImages.length
+      ? `- ${withImages.length} result(s) include IMAGE urls.`
+      : '- No IMAGE urls in this batch — call web_search with images:true if the user wants pictures.',
   ].join('\n');
   return {
     ok: true,
     forModel: forModel.slice(0, 40_000),
-    summary: `${links.length} · ${source}`,
+    summary: `${links.length} · ${source}${opts?.images ? ' · img' : ''}`,
     query: q,
     links,
   };
 }
 
-async function searchSearxng(q: string): Promise<WebToolResult | null> {
+function pickImageUrl(r: {
+  img_src?: string;
+  thumbnail?: string;
+  thumbnail_src?: string;
+  url?: string;
+}): string | undefined {
+  for (const cand of [r.img_src, r.thumbnail_src, r.thumbnail]) {
+    if (typeof cand === 'string' && /^https?:\/\//i.test(cand)) {
+      return cand.slice(0, 2000);
+    }
+  }
+  return undefined;
+}
+
+async function searchSearxng(
+  q: string,
+  opts?: { images?: boolean },
+): Promise<WebToolResult | null> {
   const bases = Array.from(
     new Set([SEARXNG_URL, 'http://127.0.0.1:8888', 'http://127.0.0.1:8080']),
   );
@@ -203,11 +241,13 @@ async function searchSearxng(q: string): Promise<WebToolResult | null> {
   let lastErr = '';
   for (const base of bases) {
     try {
-      const url = `${base}/search?${new URLSearchParams({
+      const params = new URLSearchParams({
         q,
         format: 'json',
         language: 'auto',
-      })}`;
+      });
+      if (opts?.images) params.set('categories', 'images');
+      const url = `${base}/search?${params}`;
       const res = await fetchWithTimeout(
         url,
         {
@@ -228,17 +268,32 @@ async function searchSearxng(q: string): Promise<WebToolResult | null> {
         continue;
       }
       const data = (await res.json()) as {
-        results?: { title?: string; url?: string; content?: string }[];
+        results?: {
+          title?: string;
+          url?: string;
+          content?: string;
+          img_src?: string;
+          thumbnail?: string;
+          thumbnail_src?: string;
+        }[];
       };
       const links: WebToolLink[] = (data.results || [])
-        .filter((r) => r.url)
-        .slice(0, 8)
-        .map((r) => ({
-          title: (r.title || r.url || '').slice(0, 200),
-          url: String(r.url).slice(0, 500),
-          snippet: (r.content || '').slice(0, 400) || undefined,
-        }));
-      return packResults(q, links, 'SearXNG');
+        .filter((r) => r.url || r.img_src)
+        .slice(0, opts?.images ? 10 : 8)
+        .map((r) => {
+          const pageUrl = String(r.url || r.img_src || '').slice(0, 500);
+          const image = pickImageUrl(r);
+          return {
+            title: (r.title || pageUrl || 'Image').slice(0, 200),
+            url: pageUrl,
+            snippet: (r.content || '').slice(0, 400) || undefined,
+            image,
+          };
+        })
+        .filter((l) => l.url && (!opts?.images || l.image));
+      return packResults(q, links, opts?.images ? 'SearXNG images' : 'SearXNG', {
+        images: opts?.images,
+      });
     } catch (err) {
       lastErr = errMessage(err, 'ошибка');
     }
@@ -373,7 +428,10 @@ async function searchWikipedia(q: string): Promise<WebToolResult | null> {
   }
 }
 
-export async function executeWebSearch(query: string): Promise<WebToolResult> {
+export async function executeWebSearch(
+  query: string,
+  opts?: { images?: boolean },
+): Promise<WebToolResult> {
   const q = query.trim().slice(0, 300);
   if (!q) {
     return { ok: false, forModel: 'Error: empty query', error: 'Пустой запрос', query: q };
@@ -381,9 +439,19 @@ export async function executeWebSearch(query: string): Promise<WebToolResult> {
 
   const attempts: string[] = [];
 
-  const searx = await searchSearxng(q);
-  if (searx?.ok) return searx;
+  const searx = await searchSearxng(q, opts);
+  if (searx?.ok && (searx.links?.length || 0) > 0) return searx;
   if (searx?.error) attempts.push(searx.error);
+
+  // картинки — только SearXNG; без Docker нет надёжного image API
+  if (opts?.images) {
+    return {
+      ok: false,
+      forModel: `Image search failed for: ${q}\n${attempts.join(' · ') || 'SearXNG unavailable'}\nHint: sudo ai-tool searxng`,
+      error: (attempts[0] || 'Нет картинок').slice(0, 180),
+      query: q,
+    };
+  }
 
   const ddg = await searchDuckDuckGo(q);
   if (ddg?.ok) return ddg;
@@ -594,7 +662,13 @@ export async function runWebTool(
   }
 
   if (name === 'web_search') {
-    return executeWebSearch(String(args.query ?? args.q ?? ''));
+    const images =
+      args.images === true ||
+      args.images === 1 ||
+      args.images === 'true' ||
+      args.category === 'images' ||
+      args.categories === 'images';
+    return executeWebSearch(String(args.query ?? args.q ?? ''), { images });
   }
   if (name === 'web_fetch') {
     return executeWebFetchMany(collectFetchUrls(args));

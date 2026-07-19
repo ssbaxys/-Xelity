@@ -20,6 +20,8 @@ export type ToolActivityLink = {
   title: string;
   url: string;
   snippet?: string;
+  /** прямая картинка из поиска */
+  image?: string;
 };
 
 /** Карточка tool-шага в ответе (кодинг / web / погода) */
@@ -173,6 +175,11 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                                 snippet:
                                   typeof l.snippet === 'string'
                                     ? l.snippet.slice(0, 400)
+                                    : undefined,
+                                image:
+                                  typeof l.image === 'string' &&
+                                  /^https?:\/\//i.test(l.image)
+                                    ? l.image.slice(0, 2000)
                                     : undefined,
                               }))
                           : undefined,
