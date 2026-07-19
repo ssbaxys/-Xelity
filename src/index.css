@@ -2117,7 +2117,7 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   overflow-y: auto;
   border-right: 1px solid var(--c-border);
   padding: 0.45rem 0.35rem 0.75rem;
-  background: color-mix(in srgb, var(--c-soft) 40%, transparent);
+  background: color-mix(in srgb, var(--c-panel, var(--c-soft)) 88%, transparent);
 }
 
 .coding-wb-sidebar-label {
@@ -2126,7 +2126,7 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--c-faint);
+  color: var(--c-muted);
 }
 
 .coding-tree-item {
@@ -2155,9 +2155,16 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   font-weight: 500;
 }
 
+/* --c-soft = фон панели, не текст — иначе папки «сливаются» */
 .coding-tree-dir {
-  font-weight: 500;
-  color: var(--c-soft);
+  font-weight: 650;
+  color: var(--c-text);
+  background: color-mix(in srgb, var(--c-text) 5%, transparent);
+}
+
+.coding-tree-dir:hover {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+  color: var(--c-text);
 }
 
 .coding-wb-editor {
@@ -3158,9 +3165,13 @@ html[data-theme='light'] .tool-diff-del {
   z-index: 9999;
   display: grid;
   place-items: center;
-  background: rgba(8, 6, 6, 0.72);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--c-bg, #0c0808) 55%, rgba(0, 0, 0, 0.65));
+  backdrop-filter: blur(10px);
   animation: ui-backdrop-in 0.25s ease both;
+}
+
+html[data-theme='light'] .xelity-update-overlay {
+  background: color-mix(in srgb, #ffffff 45%, rgba(18, 18, 18, 0.35));
 }
 
 .xelity-update-card {
@@ -3170,10 +3181,17 @@ html[data-theme='light'] .tool-diff-del {
   gap: 0.55rem;
   padding: 1.75rem 2rem;
   border-radius: 1.1rem;
-  border: 1px solid var(--c-border-strong);
-  background: var(--c-panel);
+  border: 1px solid var(--c-border-strong, var(--c-border));
+  background: var(--c-panel, var(--c-elevated, #1a1212));
+  color: var(--c-text);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
   animation: pop-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-theme='light'] .xelity-update-card {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
 }
 
 .xelity-update-spinner {

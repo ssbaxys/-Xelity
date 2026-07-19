@@ -14,19 +14,36 @@ fi
 # не запускать параллельно (таймер + ручной ai-tool update)
 exec 9>/var/lock/xelity-update.lock
 if ! flock -n 9; then
-  echo "Уже идёт обновление — пропуск."
-  exit 0
+  echo "Уже идёт обновление — жду до 10 мин…"
+  if ! flock -w 600 9; then
+    echo "!! Не дождался lock — выходи и повтори: sudo ai-tool update"
+    exit 1
+  fi
 fi
 
 git config --global --add safe.directory "${APP_DIR}"
 cd "${APP_DIR}"
+# .git всегда от root — иначе fetch/reset ломаются после chown www-data
 chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
 
 echo ">> Fetch ${BRANCH}…"
-git -c safe.directory="${APP_DIR}" fetch origin "${BRANCH}"
+# источник истины — tip с GitHub, не кэш origin/*
+REMOTE_TIP="$(git -c safe.directory="${APP_DIR}" ls-remote origin "refs/heads/${BRANCH}" 2>/dev/null | awk 'NR==1 {print $1; exit}' || true)"
+git -c safe.directory="${APP_DIR}" fetch origin "${BRANCH}" --prune --force
 
 OLD_HEAD="$(git -c safe.directory="${APP_DIR}" rev-parse HEAD)"
-NEW_HEAD="$(git -c safe.directory="${APP_DIR}" rev-parse "origin/${BRANCH}")"
+NEW_HEAD="$(git -c safe.directory="${APP_DIR}" rev-parse "origin/${BRANCH}" 2>/dev/null || echo "")"
+if [[ -n "${REMOTE_TIP}" && "${REMOTE_TIP}" =~ ^[0-9a-f]{7,40}$ ]]; then
+  if [[ "${NEW_HEAD}" != "${REMOTE_TIP}" ]]; then
+    echo ">> sync origin/${BRANCH} → ${REMOTE_TIP:0:7} (ls-remote)"
+    git -c safe.directory="${APP_DIR}" update-ref "refs/remotes/origin/${BRANCH}" "${REMOTE_TIP}"
+    NEW_HEAD="${REMOTE_TIP}"
+  fi
+fi
+if [[ -z "${NEW_HEAD}" ]]; then
+  echo "!! Не удалось узнать origin/${BRANCH}. Проверь сеть / git remote."
+  exit 1
+fi
 
 ensure_cli_and_timer() {
   if [[ -f "${APP_DIR}/deploy/ai-tool" ]]; then
@@ -73,8 +90,25 @@ if [[ "${COUNT}" -gt 40 ]]; then
   echo "  … и ещё $((COUNT - 40))"
 fi
 
-git -c safe.directory="${APP_DIR}" checkout "${BRANCH}"
-git -c safe.directory="${APP_DIR}" pull --ff-only origin "${BRANCH}"
+# reset --hard: локальные правки (searxng secret в settings и т.п.) больше не блокируют update
+echo ">> git reset --hard origin/${BRANCH}"
+git -c safe.directory="${APP_DIR}" checkout -B "${BRANCH}" "origin/${BRANCH}"
+git -c safe.directory="${APP_DIR}" reset --hard "origin/${BRANCH}"
+# мусор не из git, но не трогаем секреты и артефакты
+git -c safe.directory="${APP_DIR}" clean -fd \
+  -e .env \
+  -e 'deploy/searxng/.env' \
+  -e node_modules \
+  -e dist \
+  -e data \
+  || true
+
+HEAD_NOW="$(git -c safe.directory="${APP_DIR}" rev-parse HEAD)"
+if [[ "${HEAD_NOW}" != "${NEW_HEAD}" ]]; then
+  echo "!! HEAD ${HEAD_NOW:0:7} ≠ ожидаемый ${NEW_HEAD:0:7}"
+  exit 1
+fi
+echo ">> код: ${HEAD_NOW:0:7}"
 
 need_npm=0
 need_build=0
@@ -174,10 +208,9 @@ if [[ ${need_build} -eq 1 ]]; then
   npm run build
 fi
 
-if [[ ${need_cli} -eq 1 || ! -x /usr/local/bin/ai-tool ]]; then
-  echo ">> install ai-tool"
-  install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
-fi
+# ai-tool всегда переустанавливаем после смены кода
+echo ">> install ai-tool"
+install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
 
 if [[ ${need_unit} -eq 1 ]]; then
   echo ">> systemd units"
@@ -198,7 +231,13 @@ if [[ ${need_searxng} -eq 1 || -f /var/lock/xelity-restart-after-searxng ]]; the
   rm -f /var/lock/xelity-restart-after-searxng
 fi
 
+# www-data на код, но .git остаётся root (иначе следующий fetch «залипает»)
 chown -R www-data:www-data "${APP_DIR}"
+chown -R root:root "${APP_DIR}/.git"
+if [[ -f "${APP_DIR}/.env" ]]; then
+  chown www-data:www-data "${APP_DIR}/.env"
+  chmod 640 "${APP_DIR}/.env"
+fi
 
 if [[ ${need_restart} -eq 1 ]]; then
   echo ">> systemctl restart xelity"
@@ -209,4 +248,4 @@ fi
 
 systemctl --no-pager --full status xelity || true
 echo
-echo "Готово ${NEW_HEAD:0:7}. Меню: sudo ai-tool"
+echo "Готово $(git -c safe.directory="${APP_DIR}" rev-parse --short HEAD). Меню: sudo ai-tool"
