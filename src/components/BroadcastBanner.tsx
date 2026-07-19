@@ -57,7 +57,7 @@ export default function BroadcastBanner({ uid }: Props) {
 
   return (
     <div className="broadcast-overlay fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
-      <div className="absolute inset-0 bg-ink/55 backdrop-blur-[3px]" aria-hidden />
+      <div className="broadcast-scrim absolute inset-0" aria-hidden />
       <article
         className={`broadcast-card relative z-10 w-full max-w-lg overflow-hidden ${
           isAlert ? 'broadcast-card--alert' : ''
