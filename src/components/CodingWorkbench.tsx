@@ -9,7 +9,8 @@ import {
   subscribeSandbox,
   type FileTreeNode,
 } from '../lib/projectSandbox';
-import { IconChevronDown, IconChevronRight, IconClose, IconFileCode } from './icons';
+import { FileTreeFromItems, type FileTreeNodeData } from './FileTree';
+import { IconClose } from './icons';
 
 function usePreviewSrc(html: string | null): string | null {
   const [src, setSrc] = useState<string | null>(null);
@@ -25,6 +26,25 @@ function usePreviewSrc(html: string | null): string | null {
   return src;
 }
 
+function toFileTreeItems(nodes: FileTreeNode[]): FileTreeNodeData[] {
+  return nodes.map((n) => ({
+    id: n.path,
+    label: n.name,
+    hasChildren: n.kind === 'dir',
+    children: n.children?.length ? toFileTreeItems(n.children) : undefined,
+  }));
+}
+
+function collectDirPaths(nodes: FileTreeNode[], acc: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.kind === 'dir') {
+      acc.push(n.path);
+      if (n.children) collectDirPaths(n.children, acc);
+    }
+  }
+  return acc;
+}
+
 type Tab = 'files' | 'preview';
 
 type Props = {
@@ -33,72 +53,6 @@ type Props = {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 };
-
-function Tree({
-  nodes,
-  depth,
-  selected,
-  expanded,
-  onToggle,
-  onSelect,
-}: {
-  nodes: FileTreeNode[];
-  depth: number;
-  selected: string | null;
-  expanded: Record<string, boolean>;
-  onToggle: (path: string) => void;
-  onSelect: (path: string) => void;
-}) {
-  return (
-    <ul className="coding-tree select-none">
-      {nodes.map((n) => {
-        if (n.kind === 'dir') {
-          const open = expanded[n.path] !== false;
-          return (
-            <li key={n.path}>
-              <button
-                type="button"
-                onClick={() => onToggle(n.path)}
-                className="coding-tree-item coding-tree-dir"
-                style={{ paddingLeft: 8 + depth * 12 }}
-              >
-                {open ? (
-                  <IconChevronDown className="h-3 w-3 shrink-0 opacity-70" />
-                ) : (
-                  <IconChevronRight className="h-3 w-3 shrink-0 opacity-70" />
-                )}
-                <span className="truncate">{n.name}</span>
-              </button>
-              {open && n.children && (
-                <Tree
-                  nodes={n.children}
-                  depth={depth + 1}
-                  selected={selected}
-                  expanded={expanded}
-                  onToggle={onToggle}
-                  onSelect={onSelect}
-                />
-              )}
-            </li>
-          );
-        }
-        return (
-          <li key={n.path}>
-            <button
-              type="button"
-              onClick={() => onSelect(n.path)}
-              className={`coding-tree-item ${selected === n.path ? 'is-active' : ''}`}
-              style={{ paddingLeft: 8 + depth * 12 + 16 }}
-            >
-              <IconFileCode className="h-3 w-3 shrink-0 opacity-60" />
-              <span className="truncate">{n.name}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 export default function CodingWorkbench({
   chatId,
@@ -109,7 +63,7 @@ export default function CodingWorkbench({
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>('files');
   const [selected, setSelected] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,6 +72,7 @@ export default function CodingWorkbench({
     setSelected(null);
     setTab('files');
     setError(null);
+    setExpandedIds([]);
   }, [chatId]);
 
   const files = useMemo(() => {
@@ -126,6 +81,18 @@ export default function CodingWorkbench({
   }, [chatId, tick]);
 
   const tree = useMemo(() => buildFileTree(files), [files]);
+  const items = useMemo(() => toFileTreeItems(tree), [tree]);
+
+  useEffect(() => {
+    const dirs = collectDirPaths(tree);
+    setExpandedIds((prev) => {
+      if (!dirs.length) return [];
+      if (!prev.length) return dirs;
+      const keep = prev.filter((id) => dirs.includes(id));
+      const extras = dirs.filter((id) => !keep.includes(id));
+      return extras.length ? [...keep, ...extras] : keep;
+    });
+  }, [tree]);
 
   useEffect(() => {
     if (!selected && files.length) {
@@ -227,19 +194,24 @@ export default function CodingWorkbench({
             <p className="coding-wb-sidebar-label">
               Проект{files.length ? ` · ${files.length}` : ''}
             </p>
-            {tree.length ? (
-              <Tree
-                nodes={tree}
-                depth={0}
-                selected={selected}
-                expanded={expanded}
-                onToggle={(path) =>
-                  setExpanded((prev) => ({
-                    ...prev,
-                    [path]: prev[path] === false,
-                  }))
-                }
-                onSelect={setSelected}
+            {items.length ? (
+              <FileTreeFromItems
+                className="coding-file-tree"
+                items={items}
+                expandedIds={expandedIds}
+                onExpandedIdsChange={setExpandedIds}
+                selectedIds={selected ? [selected] : []}
+                onSelectedIdsChange={(ids) => {
+                  const next = ids[0] ?? null;
+                  if (next && files.includes(next)) setSelected(next);
+                }}
+                onNodeClick={(nodeId) => {
+                  if (files.includes(nodeId)) setSelected(nodeId);
+                }}
+                highlightColor="var(--color-signal, #c62828)"
+                indentSize={14}
+                showIcons
+                truncate
               />
             ) : (
               <p className="coding-wb-empty-sm">Файлы появятся после первого ответа</p>

@@ -2167,6 +2167,168 @@ html[data-theme='light'] .coding-wb-tab.is-active {
   color: var(--c-text);
 }
 
+/* ——— Xelity FileTree (coding + reusable) ——— */
+.xft {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+}
+
+.xft-scroll {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  padding: 0.15rem 0.1rem;
+}
+
+.xft-scroll--capped {
+  overflow-y: auto;
+}
+
+.xft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.xft-hover {
+  z-index: 0;
+  border-radius: 0.45rem;
+  border: 1px solid color-mix(in srgb, #c62828 28%, transparent);
+  background: color-mix(in srgb, #c62828 12%, transparent);
+}
+
+.xft-item {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: none;
+  font: inherit;
+}
+
+.xft-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, #c62828 55%, transparent);
+  outline-offset: 1px;
+}
+
+.xft-item.is-selected {
+  background: color-mix(in srgb, #c62828 14%, transparent);
+}
+
+.xft-item--dir .xft-label {
+  font-weight: 650;
+  color: var(--c-text);
+}
+
+.xft-row-inner {
+  pointer-events: none;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.4rem;
+}
+
+.xft-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--c-muted);
+}
+
+.xft-item--dir .xft-icon {
+  color: color-mix(in srgb, #c62828 55%, var(--c-muted));
+}
+
+.xft-item.is-selected .xft-icon {
+  color: #c62828;
+}
+
+.xft-icon-slot {
+  display: inline-flex;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.xft-icon-slot--anim {
+  position: relative;
+}
+
+.xft-lucide {
+  width: 1.05rem;
+  height: 1.05rem;
+  stroke-width: 1.75;
+}
+
+.xft-folder,
+.xft-folder-open {
+  color: inherit;
+}
+
+.xft-file {
+  color: inherit;
+  opacity: 0.9;
+}
+
+.xft-spin {
+  animation: xelity-spin 0.75s linear infinite;
+}
+
+.xft-label {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--c-muted);
+}
+
+.xft-item.is-selected .xft-label {
+  color: var(--c-text);
+  font-weight: 550;
+}
+
+.xft-branch {
+  position: relative;
+  margin: 0;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+
+.xft-branch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.45rem;
+  width: 1px;
+  background: color-mix(in srgb, var(--c-border) 80%, transparent);
+}
+
+.coding-file-tree.xft {
+  margin-top: 0.1rem;
+}
+
+html[data-theme='light'] .xft-hover {
+  border-color: color-mix(in srgb, #c62828 22%, transparent);
+  background: color-mix(in srgb, #c62828 8%, transparent);
+}
+
+html[data-theme='light'] .xft-item.is-selected {
+  background: color-mix(in srgb, #c62828 10%, transparent);
+}
+
 .coding-wb-editor {
   display: flex;
   min-width: 0;
