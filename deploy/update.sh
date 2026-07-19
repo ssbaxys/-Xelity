@@ -135,13 +135,42 @@ echo "  restart:    $([[ ${need_restart} -eq 1 ]] && echo да || echo проп�
 echo "  searxng:    да (проверить/поднять)"
 echo
 
+# Vite/npm на маленьких VPS легко ловят heap OOM — поднимаем лимит и swap.
+ensure_build_memory() {
+  local avail_kb
+  avail_kb="$(awk '/MemAvailable/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+  # ~1.5GB heap по умолчанию; на очень тесных машинах — 768
+  if [[ "${avail_kb}" -gt 0 && "${avail_kb}" -lt 900000 ]]; then
+    export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+  else
+    export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
+  fi
+  echo ">> NODE_OPTIONS=${NODE_OPTIONS} (MemAvailable≈${avail_kb} kB)"
+
+  if [[ "${avail_kb}" -gt 0 && "${avail_kb}" -lt 700000 ]]; then
+    if ! swapon --show 2>/dev/null | grep -q .; then
+      if [[ ! -f /swapfile ]]; then
+        echo ">> мало RAM — создаём swap 2G"
+        fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+        chmod 600 /swapfile
+        mkswap /swapfile >/dev/null
+      fi
+      swapon /swapfile 2>/dev/null || true
+    fi
+  fi
+}
+
 if [[ ${need_npm} -eq 1 ]]; then
   echo ">> npm ci"
+  ensure_build_memory
   npm ci
 fi
 
 if [[ ${need_build} -eq 1 ]]; then
   echo ">> npm run build"
+  ensure_build_memory
+  # без singlefile — иначе OOM на VPS
+  unset XELITY_SINGLEFILE || true
   npm run build
 fi
 

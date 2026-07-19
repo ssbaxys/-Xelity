@@ -127,7 +127,18 @@ else
 fi
 
 cd "${APP_DIR}"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
+if ! swapon --show 2>/dev/null | grep -q .; then
+  if [[ ! -f /swapfile ]]; then
+    echo ">> создаём swap 2G (на случай маленькой RAM)"
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+  fi
+  swapon /swapfile 2>/dev/null || true
+fi
 npm ci
+unset XELITY_SINGLEFILE || true
 npm run build
 
 # preserve PORT/CORS if existed

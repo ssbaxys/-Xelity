@@ -20,8 +20,9 @@ const buildId = `${clientVer}+${Date.now()}`;
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiKey = env.AITUNNEL_API_KEY || '';
-  // На Vercel — обычный multi-file dist (CDN). singlefile оставляем для VPS/локали.
-  const useSingleFile = process.env.VERCEL !== '1';
+  // singlefile жрёт гигантский heap (особенно с @babel/standalone) — только по явному флагу.
+  // Vercel и VPS по умолчанию: обычный multi-file dist.
+  const useSingleFile = process.env.XELITY_SINGLEFILE === '1';
 
   return {
     plugins: [
@@ -31,6 +32,12 @@ export default defineConfig(({ mode }) => {
       ...(useSingleFile ? [viteSingleFile()] : []),
       aitunnelChatPlugin(apiKey),
     ],
+    build: {
+      // меньше пик памяти на слабых VPS
+      sourcemap: false,
+      reportCompressedSize: false,
+      chunkSizeWarningLimit: 2000,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
