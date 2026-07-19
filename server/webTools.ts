@@ -7,7 +7,10 @@ const SEARXNG_URL = (process.env.SEARXNG_URL || 'http://127.0.0.1:8888').replace
 const FETCH_TIMEOUT_MS = 12_000;
 const SEARCH_TIMEOUT_MS = 10_000;
 const MAX_FETCH_BYTES = 1_500_000;
-const MAX_TEXT_CHARS = 24_000;
+/** лимит текста одной страницы в tool-результате (экономия токенов AITunnel) */
+const MAX_TEXT_CHARS = 14_000;
+const MAX_FETCH_URLS = 5;
+const MAX_BATCH_TOTAL_CHARS = 36_000;
 
 export type WebToolLink = {
   title: string;
@@ -166,13 +169,19 @@ function packResults(
     };
   }
   const forModel = [
-    `Search results for: ${q} (via ${source})`,
+    `SEARCH RESULTS (titles + snippets only — NOT full pages) for: ${q}`,
+    `Source: ${source}`,
+    '',
     ...links.map(
       (r, i) =>
-        `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet || '(no snippet)'}`,
+        `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    Snippet: ${r.snippet || '(no snippet)'}`,
     ),
     '',
-    'If you need full page text, call web_fetch on a promising URL.',
+    'NEXT STEP (save tokens):',
+    '- If snippets already answer the user — reply NOW, do NOT call web_fetch.',
+    '- Else call web_fetch with the best 1–3 URLs (or urls:[...] up to 5).',
+    '- Fetch all results only if the task truly needs every source.',
+    '- Example: web_fetch({ "urls": ["https://…", "https://…"] })',
   ].join('\n');
   return {
     ok: true,
@@ -390,7 +399,10 @@ export async function executeWebSearch(query: string): Promise<WebToolResult> {
   };
 }
 
-export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
+async function fetchOnePage(
+  rawUrl: string,
+  textLimit: number,
+): Promise<WebToolResult> {
   let safe: URL;
   try {
     safe = assertSafePublicUrl(rawUrl.trim().slice(0, 2000));
@@ -446,11 +458,13 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
     }
 
     const raw = buf.toString('utf8');
+    const limit = Math.max(2_000, Math.min(textLimit, MAX_TEXT_CHARS));
+
     if (
       ctype.includes('application/json') ||
       (!ctype.includes('html') && raw.trimStart().startsWith('{'))
     ) {
-      const text = raw.slice(0, MAX_TEXT_CHARS);
+      const text = raw.slice(0, limit);
       return {
         ok: true,
         forModel: `URL: ${res.url}\nContent-Type: ${ctype || 'unknown'}\n\n${text}`,
@@ -463,7 +477,7 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
     if (ctype.includes('text/plain') || (!ctype.includes('html') && !ctype.includes('xml'))) {
       return {
         ok: true,
-        forModel: `URL: ${res.url}\nContent-Type: ${ctype || 'unknown'}\n\n${raw.slice(0, MAX_TEXT_CHARS)}`,
+        forModel: `URL: ${res.url}\nContent-Type: ${ctype || 'unknown'}\n\n${raw.slice(0, limit)}`,
         summary: 'Текст',
         url: res.url,
       };
@@ -472,7 +486,7 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
     const { title, text } = htmlToText(raw);
     return {
       ok: true,
-      forModel: `URL: ${res.url}\nTitle: ${title || '(none)'}\n\n${text}`,
+      forModel: `URL: ${res.url}\nTitle: ${title || '(none)'}\n\n${text.slice(0, limit)}`,
       summary: title || 'Страница прочитана',
       url: res.url,
       title,
@@ -486,6 +500,83 @@ export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
       url: safe.toString(),
     };
   }
+}
+
+export async function executeWebFetch(rawUrl: string): Promise<WebToolResult> {
+  return fetchOnePage(rawUrl, MAX_TEXT_CHARS);
+}
+
+/** Один или несколько URL (макс. MAX_FETCH_URLS) — для выборочного чтения после поиска */
+export async function executeWebFetchMany(rawUrls: string[]): Promise<WebToolResult> {
+  const unique: string[] = [];
+  for (const u of rawUrls) {
+    const s = String(u || '').trim();
+    if (!s || unique.includes(s)) continue;
+    unique.push(s);
+    if (unique.length >= MAX_FETCH_URLS) break;
+  }
+  if (!unique.length) {
+    return {
+      ok: false,
+      forModel: 'Fetch failed: no url / urls provided',
+      error: 'Нужен url или urls',
+    };
+  }
+  if (unique.length === 1) {
+    return fetchOnePage(unique[0]!, MAX_TEXT_CHARS);
+  }
+
+  const perPage = Math.min(
+    MAX_TEXT_CHARS,
+    Math.floor(MAX_BATCH_TOTAL_CHARS / unique.length),
+  );
+  const parts: string[] = [
+    `Fetched ${unique.length} pages (selected by you). Text page truncated to ~${perPage} chars.`,
+    '',
+  ];
+  let okCount = 0;
+  const links: WebToolLink[] = [];
+
+  // параллельно, но с лимитом — быстрее один раунд для модели
+  const results = await Promise.all(
+    unique.map((u) => fetchOnePage(u, perPage)),
+  );
+
+  results.forEach((r, i) => {
+    const requested = unique[i]!;
+    if (r.ok) okCount += 1;
+    links.push({
+      title: r.title || requested,
+      url: r.url || requested,
+      snippet: r.ok ? undefined : r.error,
+    });
+    parts.push(`===== PAGE ${i + 1}/${unique.length} =====`);
+    parts.push(r.forModel);
+    parts.push('');
+  });
+
+  return {
+    ok: okCount > 0,
+    forModel: parts.join('\n').slice(0, MAX_BATCH_TOTAL_CHARS + 4_000),
+    summary:
+      okCount === unique.length
+        ? `${okCount} стр.`
+        : `${okCount}/${unique.length} стр.`,
+    links,
+    error: okCount === 0 ? 'Не удалось прочитать страницы' : undefined,
+  };
+}
+
+function collectFetchUrls(args: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  if (typeof args.url === 'string' && args.url.trim()) out.push(args.url.trim());
+  if (typeof args.href === 'string' && args.href.trim()) out.push(args.href.trim());
+  if (Array.isArray(args.urls)) {
+    for (const u of args.urls) {
+      if (typeof u === 'string' && u.trim()) out.push(u.trim());
+    }
+  }
+  return out;
 }
 
 export async function runWebTool(
@@ -503,7 +594,7 @@ export async function runWebTool(
     return executeWebSearch(String(args.query ?? args.q ?? ''));
   }
   if (name === 'web_fetch') {
-    return executeWebFetch(String(args.url ?? args.href ?? ''));
+    return executeWebFetchMany(collectFetchUrls(args));
   }
   return {
     ok: false,

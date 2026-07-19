@@ -30,7 +30,12 @@ function KindIcon({
 
 function labelFor(a: ToolActivity): string {
   if (a.kind === 'search') return `Поиск: ${a.path || '…'}`;
-  if (a.kind === 'fetch') return `Чтение сайта: ${a.path || '…'}`;
+  if (a.kind === 'fetch') {
+    if (a.links && a.links.length > 1) {
+      return `Чтение ${a.links.length} сайтов`;
+    }
+    return `Чтение сайта: ${a.path || '…'}`;
+  }
   if (a.kind === 'list') return 'Список файлов';
   if (a.kind === 'read') {
     const range =

@@ -311,10 +311,16 @@ async function runWithAgentTools(params: {
           path?: string;
           query?: string;
           url?: string;
+          urls?: string[];
         };
         if (args.path) pending.path = String(args.path);
         else if (args.query) pending.path = String(args.query);
-        else if (args.url) pending.path = String(args.url);
+        else if (Array.isArray(args.urls) && args.urls.length > 1) {
+          pending.path = `${args.urls.length} стр.`;
+        } else if (args.url) pending.path = String(args.url);
+        else if (Array.isArray(args.urls) && args.urls[0]) {
+          pending.path = String(args.urls[0]);
+        }
       } catch {
         /* ignore */
       }

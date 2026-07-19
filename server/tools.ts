@@ -89,7 +89,7 @@ export const WEB_TOOLS = [
     function: {
       name: 'web_search',
       description:
-        'Search the public web via SearXNG. Use for fresh facts, news, docs, prices, or anything you do not know for sure. Returns titles, URLs, snippets.',
+        'Search the public web. Returns a numbered list of titles, URLs and short snippets ONLY — not full page bodies. After search, decide which URLs (if any) to open with web_fetch.',
       parameters: {
         type: 'object',
         properties: {
@@ -108,16 +108,21 @@ export const WEB_TOOLS = [
     function: {
       name: 'web_fetch',
       description:
-        'Fetch and extract readable text from a public http(s) URL (HTML/text/JSON). Use after web_search or when the user gives a link. Do not invent page contents.',
+        'Read full readable text from one or more public http(s) URLs chosen from web_search (or given by the user). Prefer few relevant pages to save tokens. Pass url for one page, or urls for several (max 5). Do not invent page contents.',
       parameters: {
         type: 'object',
         properties: {
           url: {
             type: 'string',
-            description: 'Full public URL to read',
+            description: 'Single public URL to read',
+          },
+          urls: {
+            type: 'array',
+            description: 'Several public URLs to read in one call (max 5). Prefer this over many separate fetches.',
+            items: { type: 'string' },
+            maxItems: 5,
           },
         },
-        required: ['url'],
         additionalProperties: false,
       },
     },
@@ -125,19 +130,24 @@ export const WEB_TOOLS = [
 ];
 
 export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный доступ):
-У тебя есть tools: web_search (поиск через SearXNG) и web_fetch (чтение страницы по URL).
+У тебя есть tools: web_search (список результатов) и web_fetch (чтение содержимого выбранных сайтов).
 
-КОГДА ВЫЗЫВАТЬ:
-1) Нужны свежие факты, новости, цены, даты, документация, «что сейчас» — web_search.
-2) Пользователь дал ссылку или в выдаче есть нужный URL — web_fetch.
-3) Недостаточно сниппета поиска — открой 1–2 лучшие страницы через web_fetch.
+ЭКОНОМИЯ ТОКЕНОВ (важно):
+1) web_search даёт ТОЛЬКО список: номер, title, URL, короткий snippet — НЕ полный текст страниц.
+2) После поиска САМА выбери, что читать:
+   - если сниппетов достаточно для ответа — НЕ вызывай web_fetch;
+   - обычно открой 1–3 самых релевантных URL;
+   - «прочитать все» — только если задача явно требует сверки многих источников;
+   - не больше 5 URL за один web_fetch (параметр urls).
+3) Один вызов web_fetch с urls=[...] лучше, чем много отдельных вызовов (меньше раундов API).
 4) НЕ выдумывай содержимое сайтов и НЕ утверждай, что «проверил интернет», если tool не вызывался.
 
-КАК РАБОТАТЬ:
-- Сначала узкий web_search, потом при необходимости web_fetch.
-- В ответе пользователю опирайся на полученные данные; при спорных фактах укажи источник (URL).
-- Не пытайся открывать localhost, внутренние IP и не-http(s) схемы — такие запросы будут отклонены.
-- Если поиск/загрузка упали — скажи честно и предложи альтернативу (другой запрос / без сети).`;
+КОГДА ВЫЗЫВАТЬ:
+- Свежие факты / новости / доки / цены → web_search → выборочный web_fetch.
+- Пользователь дал ссылку → сразу web_fetch по этой ссылке.
+- Спорные факты → укажи URL источника в ответе.
+
+ЗАПРЕЩЕНО: localhost, внутренние IP, не-http(s). При ошибке поиска/загрузки — скажи честно.`;
 
 export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (песочница проекта в этом чате):
 У тебя ОБЯЗАТЕЛЬНО есть tools: list_files, read_file, write_file, delete_file.
