@@ -237,6 +237,7 @@ async function runWithAgentTools(params: {
     return { content: reply.content.trim(), toolActivity: [] };
   }
 
+  const withReasoning = Boolean(params.reasoning || params.seedThoughts);
   const pushAssistant = (partial: Partial<ChatMessage>) => {
     persistStore(
       upsertAssistantInStore(
@@ -247,9 +248,16 @@ async function runWithAgentTools(params: {
           content: partial.content ?? '',
           createdAt: params.createdAt,
           modelId: params.modelId,
-          thinkingPhase: partial.thinkingPhase ?? params.thinkingPhase ?? null,
-          reasoning: partial.reasoning ?? params.seedThoughts ?? null,
-          reasoningMs: partial.reasoningMs ?? params.seedReasoningMs ?? null,
+          // без режима «Рассуждения» не трогаем мысли — иначе мелькает «Думает…»
+          thinkingPhase: withReasoning
+            ? (partial.thinkingPhase ?? params.thinkingPhase ?? null)
+            : null,
+          reasoning: withReasoning
+            ? (partial.reasoning ?? params.seedThoughts ?? null)
+            : null,
+          reasoningMs: withReasoning
+            ? (partial.reasoningMs ?? params.seedReasoningMs ?? null)
+            : null,
           toolActivity: partial.toolActivity ?? activities,
         },
         { titleIfNotManual: params.titleIfNotManual },
@@ -527,7 +535,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         createdAt: waitStarted,
         firebaseUid: params.firebaseUid,
         titleIfNotManual: params.titleIfNotManual,
-        thinkingPhase: 'answering',
+        thinkingPhase: null,
       });
       const replyContent = coded.content;
       const toolActivity = coded.toolActivity.length ? coded.toolActivity : undefined;
@@ -542,6 +550,8 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             createdAt: waitStarted,
             modelId: params.modelId,
             thinkingPhase: null,
+            reasoning: null,
+            reasoningMs: null,
             toolActivity,
           },
           { titleIfNotManual: params.titleIfNotManual },

@@ -39,7 +39,9 @@ export default function AssistantReply({
   const hasContent = Boolean(content?.trim());
   const hasReasoning = Boolean(reasoning?.trim());
   const hasTools = Boolean(toolActivity?.length);
-  const thinking = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
+  /** «answering» без текста мыслей не считаем рассуждениями (кодинг/сеть) */
+  const thinking = thinkingPhase === 'thinking';
+  const showReasoningBlock = thinking || hasReasoning;
 
   const [dotsExit, setDotsExit] = useState(false);
   // точки только пока ждём ответ без блока мыслей
@@ -82,8 +84,6 @@ export default function AssistantReply({
     }, delay);
     return () => window.clearTimeout(t);
   }, [hasContent, content, showDots, dotsExit]);
-
-  const showReasoningBlock = thinking || hasReasoning;
 
   return (
     <div className="min-w-0">

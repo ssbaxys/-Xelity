@@ -20,10 +20,25 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ——— Custom scrollbars (global) ——— */
+/* ——— Custom scrollbars (единая система цветов) ——— */
+:root,
+html[data-theme='dark'] {
+  --scroll-thumb: rgba(198, 40, 40, 0.5);
+  --scroll-thumb-hover: rgba(239, 83, 80, 0.72);
+  --scroll-thumb-active: rgba(198, 40, 40, 0.88);
+  --scroll-track: transparent;
+}
+
+html[data-theme='light'] {
+  --scroll-thumb: rgba(198, 40, 40, 0.42);
+  --scroll-thumb-hover: rgba(211, 47, 47, 0.62);
+  --scroll-thumb-active: rgba(183, 28, 28, 0.8);
+  --scroll-track: rgba(229, 214, 214, 0.35);
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(198, 40, 40, 0.45) transparent;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 *::-webkit-scrollbar {
@@ -32,12 +47,12 @@ html {
 }
 
 *::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--scroll-track);
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(198, 40, 40, 0.55), rgba(142, 27, 27, 0.4));
+  background: var(--scroll-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -45,13 +60,13 @@ html {
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(239, 83, 80, 0.75), rgba(198, 40, 40, 0.55));
+  background: var(--scroll-thumb-hover);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
 
 *::-webkit-scrollbar-thumb:active {
-  background: rgba(198, 40, 40, 0.9);
+  background: var(--scroll-thumb-active);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
@@ -60,30 +75,19 @@ html {
   background: transparent;
 }
 
-html[data-theme='light'] * {
-  scrollbar-color: rgba(198, 40, 40, 0.4) rgba(229, 214, 214, 0.35);
-}
-
-html[data-theme='light'] *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(198, 40, 40, 0.45), rgba(158, 31, 31, 0.35));
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-html[data-theme='light'] *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(211, 47, 47, 0.65), rgba(198, 40, 40, 0.5));
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
 /* Чуть заметнее трек в плотных панелях чата/админки */
-.chat-app *::-webkit-scrollbar-track,
-.admin-scroll *::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+.chat-app,
+.admin-scroll,
+.coding-workbench,
+.coding-wb-dock {
+  --scroll-track: rgba(255, 255, 255, 0.04);
 }
 
-html[data-theme='light'] .chat-app *::-webkit-scrollbar-track {
-  background: rgba(18, 20, 26, 0.04);
+html[data-theme='light'] .chat-app,
+html[data-theme='light'] .admin-scroll,
+html[data-theme='light'] .coding-workbench,
+html[data-theme='light'] .coding-wb-dock {
+  --scroll-track: rgba(18, 20, 26, 0.05);
 }
 
 html[data-ui-scale='sm'] {
@@ -1791,33 +1795,37 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   }
 }
 
-/* Зелёный скролл у успешных tool-карточек */
+/* Успех / ошибка — перекрашиваем всю карточку и вложенный скролл */
+.tool-card-ok,
 .tool-scroll-ok {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(76, 175, 80, 0.55) transparent;
+  --scroll-thumb: rgba(76, 175, 80, 0.55);
+  --scroll-thumb-hover: rgba(129, 199, 132, 0.8);
+  --scroll-thumb-active: rgba(56, 142, 60, 0.9);
+  --scroll-track: rgba(46, 125, 50, 0.08);
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
-.tool-scroll-ok::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(129, 199, 132, 0.75), rgba(76, 175, 80, 0.45));
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
-.tool-scroll-ok::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(165, 214, 167, 0.85), rgba(102, 187, 106, 0.55));
-  background-clip: padding-box;
-  border: 2px solid transparent;
-}
-
+.tool-card-err,
 .tool-scroll-err {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(198, 40, 40, 0.55) transparent;
+  --scroll-thumb: rgba(198, 40, 40, 0.55);
+  --scroll-thumb-hover: rgba(239, 83, 80, 0.75);
+  --scroll-thumb-active: rgba(183, 28, 28, 0.9);
+  --scroll-track: rgba(198, 40, 40, 0.08);
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
-.tool-scroll-err::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(239, 83, 80, 0.7), rgba(198, 40, 40, 0.45));
-  background-clip: padding-box;
-  border: 2px solid transparent;
+html[data-theme='light'] .tool-card-ok,
+html[data-theme='light'] .tool-scroll-ok {
+  --scroll-thumb: rgba(46, 125, 50, 0.5);
+  --scroll-thumb-hover: rgba(56, 142, 60, 0.7);
+  --scroll-track: rgba(46, 125, 50, 0.1);
+}
+
+html[data-theme='light'] .tool-card-err,
+html[data-theme='light'] .tool-scroll-err {
+  --scroll-thumb: rgba(198, 40, 40, 0.48);
+  --scroll-thumb-hover: rgba(211, 47, 47, 0.68);
+  --scroll-track: rgba(198, 40, 40, 0.08);
 }
 
 /* Тогглы Кодинг / Рассуждения — плавное вкл и выкл */

@@ -25,12 +25,13 @@ export default function ReasoningPanel({
   startedAt,
   animateThoughts = true,
 }: Props) {
-  const live = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
+  const hasText = Boolean(reasoning?.trim());
+  /** answering без текста не считаем живыми мыслями */
+  const live =
+    thinkingPhase === 'thinking' || (thinkingPhase === 'answering' && hasText);
   const [open, setOpen] = useState(live);
   const [tick, setTick] = useState(0);
   const [thoughtKey, setThoughtKey] = useState(0);
-
-  const hasText = Boolean(reasoning?.trim());
 
   useEffect(() => {
     if (!live) {
@@ -58,7 +59,7 @@ export default function ReasoningPanel({
 
   const label = live
     ? thinkingPhase === 'answering'
-      ? `Думает пишу ответ…`
+      ? `Думает · пишу ответ…`
       : `Думает ${formatThinkDuration(liveElapsedMs)}…`
     : `Думал ${formatThinkDuration(doneMs)}`;
 
