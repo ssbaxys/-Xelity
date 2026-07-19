@@ -9,36 +9,67 @@ import {
 import WeatherIcon from './WeatherIcons';
 
 type Props = {
-  weather: WeatherPayload;
+  weather?: WeatherPayload | null;
   pending?: boolean;
+  /** Пока грузится — подпись места из args */
+  pendingPlace?: string;
 };
 
 function windArrow(deg: number) {
   return { transform: `rotate(${deg}deg)` };
 }
 
-export default function WeatherCard({ weather, pending }: Props) {
+export default function WeatherCard({ weather, pending, pendingPlace }: Props) {
   const uid = useId().replace(/:/g, '');
   const [selected, setSelected] = useState(0);
-  const place = formatWeatherPlace(weather);
-  const days = weather.daily.slice(0, 7);
-  const focus = days[selected] ?? null;
-  const currentKind = weatherIconKind(weather.current.code);
+  const showPending = Boolean(pending) || !weather;
 
   const tone = useMemo(() => {
+    if (!weather) return 'mild';
     const t = weather.current.tempC;
     if (t >= 28) return 'hot';
     if (t >= 18) return 'warm';
     if (t >= 5) return 'mild';
     if (t >= -5) return 'cool';
     return 'cold';
-  }, [weather.current.tempC]);
+  }, [weather]);
+
+  if (showPending || !weather) {
+    return (
+      <div className="weather-card weather-card--mild is-pending" data-weather={uid}>
+        <div className="weather-card-glow" aria-hidden />
+        <header className="weather-card-head">
+          <div className="min-w-0">
+            <p className="weather-card-place truncate">
+              {pendingPlace?.trim() || 'Погода'}
+            </p>
+            <p className="weather-card-meta">Загрузка Open-Meteo…</p>
+          </div>
+          <WeatherIcon kind="partly" isDay className="weather-card-hero-icon tool-icon-spin" />
+        </header>
+        <div className="weather-card-now">
+          <div className="weather-card-temp">
+            <span className="weather-card-temp-num weather-card-temp-skeleton">··</span>
+            <span className="weather-card-temp-unit">°C</span>
+          </div>
+          <div className="weather-card-now-info">
+            <p className="weather-card-label">Получаю данные</p>
+            <p className="weather-card-feels">Карточка появится через мгновение</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const place = formatWeatherPlace(weather);
+  const days = weather.daily.slice(0, 7);
+  const focus = days[selected] ?? null;
+  const currentKind = weatherIconKind(weather.current.code);
+  const todayMax = days[0]?.tempMaxC;
+  const todayMin = days[0]?.tempMinC;
 
   return (
-    <div
-      className={`weather-card weather-card--${tone} ${pending ? 'is-pending' : ''}`}
-      data-weather={uid}
-    >
+    <div className={`weather-card weather-card--${tone}`} data-weather={uid}>
       <div className="weather-card-glow" aria-hidden />
       <header className="weather-card-head">
         <div className="min-w-0">
@@ -66,6 +97,9 @@ export default function WeatherCard({ weather, pending }: Props) {
           <p className="weather-card-label">{weather.current.label}</p>
           <p className="weather-card-feels">
             Ощущается как {Math.round(weather.current.feelsLikeC)}°
+            {typeof todayMax === 'number' && typeof todayMin === 'number'
+              ? ` · сегодня ${Math.round(todayMin)}…${Math.round(todayMax)}°`
+              : ''}
           </p>
         </div>
       </div>
@@ -134,9 +168,7 @@ export default function WeatherCard({ weather, pending }: Props) {
           </p>
           {(focus.sunrise || focus.sunset) && (
             <p className="weather-card-sun">
-              {focus.sunrise
-                ? `↑ ${focus.sunrise.slice(11, 16)}`
-                : ''}
+              {focus.sunrise ? `↑ ${focus.sunrise.slice(11, 16)}` : ''}
               {focus.sunrise && focus.sunset ? ' · ' : ''}
               {focus.sunset ? `↓ ${focus.sunset.slice(11, 16)}` : ''}
             </p>

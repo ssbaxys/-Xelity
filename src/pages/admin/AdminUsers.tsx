@@ -314,9 +314,7 @@ export default function AdminUsers() {
                     {' · '}
                     <span
                       className={
-                        targetRole
-                          ? 'text-[var(--admin-accent,#c62828)]'
-                          : 'text-[var(--a-muted)]'
+                        targetRole ? 'text-[var(--admin-accent)]' : 'text-[var(--a-muted)]'
                       }
                     >
                       {targetRole ? STAFF_ROLE_LABEL[targetRole] : 'user'}
@@ -348,7 +346,7 @@ export default function AdminUsers() {
                             setError(null);
                             setModal(openSubModal(u));
                           }}
-                          className="rounded-md border border-[var(--admin-accent,#c62828)]/40 bg-[var(--admin-accent-soft,rgba(198,40,40,0.1))] px-2 py-1 text-[11px] text-[var(--a-accent-fg)] hover:brightness-110 disabled:opacity-40"
+                          className="rounded-md border border-[var(--admin-accent)]/40 bg-[var(--admin-accent-soft)] px-2 py-1 text-[11px] text-[var(--a-accent-fg)] hover:brightness-110 disabled:opacity-40"
                         >
                           {active ? 'Изменить подписку' : 'Выдать подписку'}
                         </button>
@@ -356,7 +354,7 @@ export default function AdminUsers() {
                       {canGod && (
                         <Link
                           to={`/admin/chats?uid=${u.uid}&god=1`}
-                          className="rounded-md border border-[var(--admin-accent,#c62828)]/50 bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))] px-2 py-1 text-[11px] font-medium text-[var(--a-accent-fg)] hover:brightness-110"
+                          className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent-soft)] px-2 py-1 text-[11px] font-medium text-[var(--a-accent-fg)] hover:brightness-110"
                         >
                           Режим бога
                         </Link>

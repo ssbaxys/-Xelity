@@ -5,13 +5,13 @@
       "$uid": {
         ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')",
         "isAdmin": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || ((!data.exists() || data.val() == false) && newData.val() == false))"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || ((!data.exists() || data.val() == false) && newData.val() == false))"
         },
         "staffRole": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || (root.child('users').child(auth.uid).child('staffRole').val() == 'admin' && newData.val() != 'owner' && (!data.exists() || data.val() != 'owner')) || ((!data.exists() || data.val() == null) && newData.val() == null))"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || ((!data.exists() || data.val() == null) && newData.val() == null))"
         },
         "admin": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('staffRole').val() == 'owner' || ((!data.exists() || data.val() == false) && newData.val() == false))"
         },
         "banned": {
           ".write": "auth != null && (root.child('users').child(auth.uid).child('isAdmin').val() == true || root.child('users').child(auth.uid).child('admin').val() == true || root.child('users').child(auth.uid).child('staffRole').val() == 'moderator' || root.child('users').child(auth.uid).child('staffRole').val() == 'admin' || root.child('users').child(auth.uid).child('staffRole').val() == 'owner')"

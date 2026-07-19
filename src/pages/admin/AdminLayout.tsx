@@ -47,6 +47,7 @@ export default function AdminLayout() {
 
   const shellStyle = {
     '--admin-accent': brand.accent,
+    '--admin-accent-soft': brand.accentSoft,
   } as CSSProperties;
 
   if (loading) {

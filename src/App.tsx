@@ -22,6 +22,7 @@ import AdminBroadcasts from './pages/admin/AdminBroadcasts';
 import AdminModelPrompts from './pages/admin/AdminModelPrompts';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminTickets from './pages/admin/AdminTickets';
+import AdminApi from './pages/admin/AdminApi';
 import ApiCabinetPage from './pages/ApiCabinetPage';
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
                   <Route index element={<AdminDashboard />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="users/:uid" element={<AdminUserCase />} />
+                  <Route path="api" element={<AdminApi />} />
                   <Route path="payments" element={<AdminPayments />} />
                   <Route path="chats" element={<AdminChats />} />
                   <Route path="broadcasts" element={<AdminBroadcasts />} />

@@ -10,7 +10,7 @@ import {
   listUserApiKeys,
   revokeUserApiKey,
 } from './apiKeys';
-import { API_USD, API_STARTER_USD, formatUsd } from '../src/lib/apiPricing';
+import { API_USD, formatUsd } from '../src/lib/apiPricing';
 
 function cors(req: Request, res: Response) {
   const raw = process.env.CORS_ORIGIN || '*';
@@ -54,10 +54,9 @@ export async function handleAccountBilling(req: Request, res: Response) {
   res.json({
     currency: 'USD',
     usdBalance: balance,
-    starterUsd: API_STARTER_USD,
     pricing: {
-      chat: API_USD.chat,
-      reasoningMultiplier: API_USD.reasoningMultiplier,
+      chatPer1M: API_USD.chatPer1M,
+      reasoningOutputMultiplier: API_USD.reasoningOutputMultiplier,
       search: API_USD.search,
       searchWithImages: API_USD.searchWithImages,
       weather: API_USD.weather,

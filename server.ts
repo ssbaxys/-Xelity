@@ -6,6 +6,7 @@ import { handleToolExecute } from './server/toolHandler';
 import { initFirebaseAdmin } from './server/firebaseAdmin';
 import {
   handleV1ChatCompletions,
+  handleV1Messages,
   handleV1Models,
   handleV1Search,
   handleV1Weather,
@@ -16,6 +17,16 @@ import {
   handleAccountKeysList,
   handleAccountKeysRevoke,
 } from './server/accountApi';
+import {
+  handleAdminApiBalance,
+  handleAdminApiFreeze,
+  handleAdminApiKeysCreate,
+  handleAdminApiKeysRevoke,
+  handleAdminApiKeysRevokeAll,
+  handleAdminApiLookup,
+  handleAdminApiOverview,
+  handleAdminApiUserGet,
+} from './server/adminApi';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +80,56 @@ app.options('/api/account/keys/:keyId', (req, res) => {
   void handleAccountKeysRevoke(req, res);
 });
 
+/** Админ: клиентский API */
+app.get('/api/admin/api/overview', json, (req, res) => {
+  void handleAdminApiOverview(req, res);
+});
+app.options('/api/admin/api/overview', (req, res) => {
+  void handleAdminApiOverview(req, res);
+});
+app.get('/api/admin/api/lookup', json, (req, res) => {
+  void handleAdminApiLookup(req, res);
+});
+app.options('/api/admin/api/lookup', (req, res) => {
+  void handleAdminApiLookup(req, res);
+});
+app.get('/api/admin/api/user/:uid', json, (req, res) => {
+  void handleAdminApiUserGet(req, res);
+});
+app.options('/api/admin/api/user/:uid', (req, res) => {
+  void handleAdminApiUserGet(req, res);
+});
+app.post('/api/admin/api/user/:uid/balance', json, (req, res) => {
+  void handleAdminApiBalance(req, res);
+});
+app.options('/api/admin/api/user/:uid/balance', (req, res) => {
+  void handleAdminApiBalance(req, res);
+});
+app.post('/api/admin/api/user/:uid/freeze', json, (req, res) => {
+  void handleAdminApiFreeze(req, res);
+});
+app.options('/api/admin/api/user/:uid/freeze', (req, res) => {
+  void handleAdminApiFreeze(req, res);
+});
+app.post('/api/admin/api/user/:uid/keys', json, (req, res) => {
+  void handleAdminApiKeysCreate(req, res);
+});
+app.options('/api/admin/api/user/:uid/keys', (req, res) => {
+  void handleAdminApiKeysCreate(req, res);
+});
+app.delete('/api/admin/api/user/:uid/keys/:keyId', json, (req, res) => {
+  void handleAdminApiKeysRevoke(req, res);
+});
+app.options('/api/admin/api/user/:uid/keys/:keyId', (req, res) => {
+  void handleAdminApiKeysRevoke(req, res);
+});
+app.post('/api/admin/api/user/:uid/keys/revoke-all', json, (req, res) => {
+  void handleAdminApiKeysRevokeAll(req, res);
+});
+app.options('/api/admin/api/user/:uid/keys/revoke-all', (req, res) => {
+  void handleAdminApiKeysRevokeAll(req, res);
+});
+
 /** Публичное API (xel_… keys) */
 app.get('/v1/models', (req, res) => {
   void handleV1Models(req, res);
@@ -81,6 +142,12 @@ app.post('/v1/chat/completions', json, (req, res) => {
 });
 app.options('/v1/chat/completions', (req, res) => {
   void handleV1ChatCompletions(req, res);
+});
+app.post('/v1/messages', json, (req, res) => {
+  void handleV1Messages(req, res);
+});
+app.options('/v1/messages', (req, res) => {
+  void handleV1Messages(req, res);
 });
 app.post('/v1/search', json, (req, res) => {
   void handleV1Search(req, res);

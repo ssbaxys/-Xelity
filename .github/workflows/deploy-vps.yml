@@ -9,14 +9,6 @@ name: Deploy VPS
 on:
   push:
     branches: [main]
-    paths:
-      - 'server/**'
-      - 'server.ts'
-      - 'src/lib/models.ts'
-      - 'src/lib/plans.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'deploy/**'
   workflow_dispatch:
 
 jobs:

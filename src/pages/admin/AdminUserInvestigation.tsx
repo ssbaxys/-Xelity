@@ -66,7 +66,8 @@ export default function AdminUserInvestigation({
   embedded = false,
   hideTicketsBlock = false,
 }: Props) {
-  const { user: actor } = useAuth();
+  const { user: actor, can } = useAuth();
+  const allowGod = can('chats.god');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<AdminNote[]>([]);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
@@ -240,12 +241,14 @@ export default function AdminUserInvestigation({
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <Link
-              to={`/admin/chats?uid=${uid}&god=1`}
-              className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
-            >
-              Режим бога
-            </Link>
+            {allowGod && (
+              <Link
+                to={`/admin/chats?uid=${uid}&god=1`}
+                className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent-soft)] px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
+              >
+                Режим бога
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => void exportEvidence()}
@@ -264,12 +267,14 @@ export default function AdminUserInvestigation({
             Разбор · <span className="text-[var(--a-strong)]">{profile.email}</span>
           </p>
           <div className="flex flex-wrap gap-1.5">
-            <Link
-              to={`/admin/chats?uid=${uid}&god=1`}
-              className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent)]/15 px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
-            >
-              Режим бога
-            </Link>
+            {allowGod && (
+              <Link
+                to={`/admin/chats?uid=${uid}&god=1`}
+                className="rounded-md border border-[var(--admin-accent)]/50 bg-[var(--admin-accent-soft)] px-2.5 py-1.5 text-[11px] text-[var(--a-accent-fg)]"
+              >
+                Режим бога
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => void exportEvidence()}
@@ -604,7 +609,11 @@ export default function AdminUserInvestigation({
                   <span>· {fmt(h.createdAt)}</span>
                   {h.viaAdmin && <span>· via admin</span>}
                   <Link
-                    to={`/admin/chats?uid=${uid}&god=1`}
+                    to={
+                      allowGod
+                        ? `/admin/chats?uid=${uid}&god=1`
+                        : `/admin/chats?uid=${uid}`
+                    }
                     className="text-[var(--admin-accent)] hover:underline"
                   >
                     открыть

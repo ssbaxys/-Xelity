@@ -1546,7 +1546,7 @@ html[data-theme='light'] .coding-hljs .hljs-meta {
   animation: thinking-pulse 1.4s ease-in-out infinite;
 }
 
-/* Пока tool работает — иконка (глаз и др.) крутится */
+/* ???? tool ???????? ? ?????? (???? ? ??.) ???????? */
 .tool-icon-spin {
   display: inline-block;
   transform-origin: center;
@@ -2996,7 +2996,8 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   --a-chip: #221616;
   --a-hover: rgba(255, 255, 255, 0.05);
   --a-header: rgba(20, 15, 15, 0.82);
-  --a-accent-fg: #ff8a80;
+  /* ??????? --admin-accent ???? (owner=??????, helper=??????, ?) */
+  --a-accent-fg: color-mix(in srgb, var(--admin-accent) 72%, #fff);
   --a-danger: #e57373;
   --a-danger-soft: #2a1212;
   --a-danger-border: #5c2a2a;
@@ -3064,21 +3065,25 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 .admin-theme-helper {
   --admin-accent: #2a9d8f;
   --admin-accent-soft: rgba(42, 157, 143, 0.18);
+  --a-accent-fg: #7fd4c8;
 }
 
 .admin-theme-moderator {
   --admin-accent: #e09f3e;
   --admin-accent-soft: rgba(224, 159, 62, 0.18);
+  --a-accent-fg: #f0c57a;
 }
 
 .admin-theme-admin {
   --admin-accent: #c62828;
   --admin-accent-soft: rgba(198, 40, 40, 0.2);
+  --a-accent-fg: #ff8a80;
 }
 
 .admin-theme-owner {
   --admin-accent: #d4a017;
   --admin-accent-soft: rgba(212, 160, 23, 0.2);
+  --a-accent-fg: #f0d060;
 }
 
 .admin-shell.is-light.admin-theme-helper {
@@ -3096,24 +3101,6 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 
 .admin-brand-code {
   color: var(--admin-accent);
-}
-
-.admin-shell::before {
-  content: '';
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.35;
-  background-image:
-    linear-gradient(var(--a-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--a-grid) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 75%);
-}
-
-.admin-shell.is-light::before {
-  opacity: 0.55;
 }
 
 .admin-header {
@@ -3839,11 +3826,22 @@ html[data-theme='light'] .xelity-update-card {
 .weather-card--warm .weather-card-glow {
   background: radial-gradient(circle, rgba(245, 166, 35, 0.2), transparent 70%);
 }
+.weather-card--mild .weather-card-glow {
+  background: radial-gradient(circle, rgba(120, 200, 160, 0.16), transparent 70%);
+}
 .weather-card--cool .weather-card-glow {
   background: radial-gradient(circle, rgba(80, 160, 230, 0.18), transparent 70%);
 }
 .weather-card--cold .weather-card-glow {
   background: radial-gradient(circle, rgba(140, 190, 255, 0.22), transparent 70%);
+}
+
+.weather-card.is-pending {
+  opacity: 0.92;
+}
+.weather-card-temp-skeleton {
+  opacity: 0.45;
+  letter-spacing: 0.08em;
 }
 
 .weather-card-head {

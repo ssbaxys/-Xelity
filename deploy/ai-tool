@@ -210,8 +210,11 @@ show_status() {
     c_warn "$(systemctl is-active "${SERVICE}" 2>/dev/null || echo stopped)"
   fi
   echo -n "Автообн.:  "
-  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null \
+    && systemctl is-active --quiet xelity-autoupdate.timer 2>/dev/null; then
     c_ok "on (каждые 2 мин)"
+  elif systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
+    c_warn "enabled, но не active — sudo ai-tool autoupdate on"
   else
     c_warn "off"
   fi
@@ -294,18 +297,29 @@ do_update() {
 
 autoupdate_status() {
   echo
-  if systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
-    c_ok "Автообновление: включено (каждые 2 мин)"
+  local en act
+  en=$(systemctl is-enabled xelity-autoupdate.timer 2>/dev/null || echo disabled)
+  act=$(systemctl is-active xelity-autoupdate.timer 2>/dev/null || echo inactive)
+  if [[ "${en}" == "enabled" && "${act}" == "active" ]]; then
+    c_ok "Автообновление: enabled + active (каждые 2 мин после update)"
+  elif [[ "${en}" == "enabled" ]]; then
+    c_warn "Автообновление: enabled, но timer ${act} — нужен: systemctl start xelity-autoupdate.timer"
   else
-    c_warn "Автообновление: выключено"
+    c_warn "Автообновление: выключено (${en}/${act})"
   fi
   if [[ -f /etc/xelity-autoupdate.disabled ]]; then
     c_warn "Флаг: /etc/xelity-autoupdate.disabled (не включать автоматически)"
   fi
+  echo
+  systemctl list-timers xelity-autoupdate.timer --no-pager 2>/dev/null || true
+  echo
   systemctl --no-pager --full status xelity-autoupdate.timer 2>/dev/null || true
   echo
   echo "Последний прогон:"
-  systemctl --no-pager --full status xelity-autoupdate.service 2>/dev/null | head -n 20 || true
+  systemctl --no-pager --full status xelity-autoupdate.service 2>/dev/null | head -n 25 || true
+  echo
+  echo "Журнал (последние строки):"
+  journalctl -u xelity-autoupdate.service -n 15 --no-pager 2>/dev/null || true
 }
 
 autoupdate_on() {
@@ -318,7 +332,9 @@ autoupdate_on() {
   install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
   rm -f /etc/xelity-autoupdate.disabled
   systemctl daemon-reload
-  systemctl enable --now xelity-autoupdate.timer
+  systemctl enable xelity-autoupdate.timer
+  systemctl restart xelity-autoupdate.timer
+  systemctl start xelity-autoupdate.timer
   c_ok "Автообновление включено"
   autoupdate_status
 }

@@ -681,10 +681,30 @@ export async function runWebTool(
         : typeof daysRaw === 'string'
           ? Number(daysRaw)
           : undefined;
+    const locRaw =
+      (typeof args.location === 'string' && args.location) ||
+      (typeof args.city === 'string' && args.city) ||
+      (typeof args.place === 'string' && args.place) ||
+      (typeof args.q === 'string' && args.q) ||
+      '';
+    const latRaw = args.latitude ?? args.lat;
+    const lonRaw = args.longitude ?? args.lon ?? args.lng;
+    const lat =
+      typeof latRaw === 'number'
+        ? latRaw
+        : typeof latRaw === 'string'
+          ? Number(latRaw)
+          : undefined;
+    const lon =
+      typeof lonRaw === 'number'
+        ? lonRaw
+        : typeof lonRaw === 'string'
+          ? Number(lonRaw)
+          : undefined;
     return executeGetWeather({
-      location: typeof args.location === 'string' ? args.location : undefined,
-      latitude: typeof args.latitude === 'number' ? args.latitude : undefined,
-      longitude: typeof args.longitude === 'number' ? args.longitude : undefined,
+      location: locRaw.trim() || undefined,
+      latitude: Number.isFinite(lat) ? lat : undefined,
+      longitude: Number.isFinite(lon) ? lon : undefined,
       days: Number.isFinite(days) ? days : undefined,
     });
   }

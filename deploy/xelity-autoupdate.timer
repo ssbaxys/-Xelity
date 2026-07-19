@@ -3,9 +3,10 @@ Description=Xelity auto-update from GitHub (every 2 min)
 After=network-online.target
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=2min
-AccuracySec=30s
+# После завершения предыдущего update — ещё через 2 мин (oneshot)
+OnBootSec=1min
+OnUnitInactiveSec=2min
+AccuracySec=15s
 Persistent=true
 Unit=xelity-autoupdate.service
 

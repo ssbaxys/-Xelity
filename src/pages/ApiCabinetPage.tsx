@@ -9,7 +9,7 @@ import {
   type BillingInfo,
 } from '../lib/accountApi';
 import type { ApiKeyMeta } from '../lib/apiTypes';
-import { formatUsd } from '../lib/apiPricing';
+import { formatUsd, formatUsdRatePer1M } from '../lib/apiPricing';
 import { IconBrain, IconCopy, IconPlus, IconTrash } from '../components/icons';
 
 export default function ApiCabinetPage() {
@@ -90,15 +90,27 @@ export default function ApiCabinetPage() {
             {billing ? formatUsd(billing.usdBalance) : '—'}
           </p>
           <p className="mt-1 text-xs text-slate">
-            Стартовый грант {billing ? formatUsd(billing.starterUsd) : '$1'} · списание за каждый
-            запрос API
+            Chat — по токенам (вход + выход). Search / Weather — фикс за вызов. Суммы вида{' '}
+            {formatUsd(1)}.
           </p>
           {billing && (
             <ul className="mt-4 grid gap-2 text-xs text-slate sm:grid-cols-2">
-              <li>Mini K1 — {formatUsd(billing.pricing.chat['xlaude-mini-k1'] ?? 0.002)}</li>
-              <li>Pro K1 — {formatUsd(billing.pricing.chat['xlaude-pro-k1'] ?? 0.004)}</li>
-              <li>Mini K2 — {formatUsd(billing.pricing.chat['xlaude-mini-k2'] ?? 0.008)}</li>
-              <li>Pro K2 — {formatUsd(billing.pricing.chat['xlaude-pro-k2'] ?? 0.016)}</li>
+              {(
+                [
+                  ['Mini K1', 'xlaude-mini-k1'],
+                  ['Pro K1', 'xlaude-pro-k1'],
+                  ['Mini K2', 'xlaude-mini-k2'],
+                  ['Pro K2', 'xlaude-pro-k2'],
+                ] as const
+              ).map(([label, id]) => {
+                const r = billing.pricing.chatPer1M[id];
+                return (
+                  <li key={id}>
+                    {label} — in {formatUsdRatePer1M(r?.input ?? 0)}, out{' '}
+                    {formatUsdRatePer1M(r?.output ?? 0)}
+                  </li>
+                );
+              })}
               <li>Xelity Search — {formatUsd(billing.pricing.search)}</li>
               <li>Xelity Weather — {formatUsd(billing.pricing.weather)}</li>
             </ul>
@@ -196,7 +208,15 @@ export default function ApiCabinetPage() {
           <h2 className="mb-2 text-sm font-semibold text-ink">Эндпоинты</h2>
           <ul className="space-y-1.5 font-mono text-[11px] leading-relaxed">
             <li>
-              <span className="text-[#81c784]">POST</span> {apiHost}/v1/chat/completions
+              <span className="text-[#81c784]">POST</span> {apiHost}/v1/chat/completions{' '}
+              <span className="text-slate/60">· OpenAI</span>
+            </li>
+            <li>
+              <span className="text-[#81c784]">POST</span> {apiHost}/v1/messages{' '}
+              <span className="text-slate/60">· Anthropic</span>
+            </li>
+            <li>
+              <span className="text-[#81c784]">GET</span> {apiHost}/v1/models
             </li>
             <li>
               <span className="text-[#81c784]">POST</span> {apiHost}/v1/search{' '}

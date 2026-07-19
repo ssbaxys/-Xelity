@@ -230,14 +230,14 @@ export default function AdminTickets() {
                         onClick={() => setActiveId(t.id)}
                         className={`w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-[var(--a-hover)] ${
                           activeId === t.id
-                            ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
+                            ? 'bg-[var(--admin-accent-soft)]'
                             : ''
                         }`}
                       >
                         <span className="flex items-center gap-1.5">
                           {waiting && (
                             <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--admin-accent,#c62828)]"
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--admin-accent)]"
                               title="Ждёт ответа"
                             />
                           )}
@@ -295,7 +295,7 @@ export default function AdminTickets() {
                         {' · uid '}
                         <Link
                           to={`/admin/users/${active.uid}`}
-                          className="text-[var(--admin-accent,#c62828)] hover:underline"
+                          className="text-[var(--admin-accent)] hover:underline"
                         >
                           {active.uid.slice(0, 8)}…
                         </Link>
@@ -321,7 +321,7 @@ export default function AdminTickets() {
                       type="button"
                       disabled={busy}
                       onClick={() => void onClaim()}
-                      className="mt-1 text-[11px] text-[var(--admin-accent,#c62828)] underline"
+                      className="mt-1 text-[11px] text-[var(--admin-accent)] underline"
                     >
                       Взять в работу
                     </button>
@@ -378,7 +378,7 @@ export default function AdminTickets() {
                           key={m.id}
                           className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
                             staffSide
-                              ? 'bg-[var(--admin-accent-soft,rgba(198,40,40,0.15))]'
+                              ? 'bg-[var(--admin-accent-soft)]'
                               : 'ml-auto bg-[var(--a-chip)]'
                           }`}
                         >
@@ -438,7 +438,7 @@ export default function AdminTickets() {
                         <button
                           type="submit"
                           disabled={busy || !reply.trim()}
-                          className="w-full rounded-lg bg-[var(--admin-accent,#c62828)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto"
+                          className="w-full rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto"
                         >
                           Ответить
                         </button>

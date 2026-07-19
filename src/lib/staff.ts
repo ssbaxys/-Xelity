@@ -11,6 +11,7 @@ export type StaffPermission =
   | 'users.plan'
   | 'users.roles'
   | 'users.roles.owner'
+  | 'api.manage'
   | 'chats.view'
   | 'chats.god'
   | 'payments'
@@ -56,7 +57,7 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
     'users.view',
     'users.moderate',
     'users.plan',
-    'users.roles',
+    'api.manage',
     'chats.view',
     'chats.god',
     'payments',
@@ -74,6 +75,7 @@ const PERMS: Record<StaffRole, StaffPermission[]> = {
     'users.plan',
     'users.roles',
     'users.roles.owner',
+    'api.manage',
     'chats.view',
     'chats.god',
     'payments',
@@ -107,7 +109,7 @@ export const STAFF_BRAND: Record<StaffRole, StaffBrand> = {
     theme: 'admin',
     accent: '#c62828',
     accentSoft: 'rgba(198, 40, 40, 0.2)',
-    hint: 'Полная панель, кроме назначения Owner',
+    hint: 'Полная панель; роли назначает только Owner',
   },
   owner: {
     code: 'OWNER',
@@ -115,7 +117,7 @@ export const STAFF_BRAND: Record<StaffRole, StaffBrand> = {
     theme: 'owner',
     accent: '#d4a017',
     accentSoft: 'rgba(212, 160, 23, 0.2)',
-    hint: 'Полный доступ и управление ролями',
+    hint: 'Полный доступ и единственный, кто меняет роли',
   },
 };
 
@@ -175,14 +177,11 @@ export function canAssignRole(
   actor: StaffRole | null | undefined,
   target: StaffRole | null,
 ): boolean {
-  if (!actor) return false;
+  // роли меняет только Owner
+  if (actor !== 'owner') return false;
   if (!hasPermission(actor, 'users.roles')) return false;
   if (target === 'owner') return hasPermission(actor, 'users.roles.owner');
-  if (target === null) {
-    // снять роль — admin+
-    return hasPermission(actor, 'users.roles');
-  }
-  // нельзя назначить роль выше своей
+  if (target === null) return true;
   return roleRank(actor) >= roleRank(target);
 }
 
@@ -202,6 +201,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { to: '/admin', end: true, label: 'Обзор', perm: 'dashboard' },
   { to: '/admin/tickets', label: 'Тикеты', perm: 'tickets' },
   { to: '/admin/users', label: 'Пользователи', perm: 'users.view' },
+  { to: '/admin/api', label: 'API', perm: 'api.manage' },
   { to: '/admin/chats', label: 'Чаты', perm: 'chats.view' },
   { to: '/admin/payments', label: 'Платежи', perm: 'payments' },
   { to: '/admin/broadcasts', label: 'Broadcasts', perm: 'broadcasts' },
@@ -222,6 +222,9 @@ export function pathAllowed(pathname: string, role: StaffRole | null): boolean {
   if (!role) return false;
   if (pathname.startsWith('/admin/users/')) {
     return hasPermission(role, 'users.view');
+  }
+  if (pathname.startsWith('/admin/api')) {
+    return hasPermission(role, 'api.manage');
   }
   const exact = ADMIN_NAV.find((n) => n.to === pathname);
   if (exact) return hasPermission(role, exact.perm);

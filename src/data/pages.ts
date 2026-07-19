@@ -2,6 +2,7 @@ export type PageBlock =
   | { type: 'p'; text: string }
   | { type: 'h2'; text: string }
   | { type: 'ul'; items: string[] }
+  | { type: 'code'; lang?: string; text: string }
   | { type: 'cta'; label: string; to: string };
 
 export type SitePage = {
@@ -123,75 +124,176 @@ export const sitePages: SitePage[] = [
     title: 'Документация API',
     eyebrow: 'Разработчикам',
     summary:
-      'Публичное API Xelity: модели Xlaude по нашим id, Xelity Search и Xelity Weather. Ключи xel_… и списание виртуальных USD с баланса аккаунта.',
+      'Публичное API Xelity: текстовые модели Xlaude (OpenAI Chat Completions и Anthropic Messages), Xelity Search и Xelity Weather. Ключи xel_…, списание виртуальных USD с баланса.',
     blocks: [
+      { type: 'h2', text: 'Быстрый старт' },
       {
-        type: 'h2',
-        text: 'Быстрый старт',
+        type: 'p',
+        text: 'Войдите → чат → профиль → «API кабинет» (или /account/api). Создайте ключ xel_… — он показывается один раз. Базовый URL: https://api.xelity.ru. Авторизация: Authorization: Bearer xel_… или заголовок x-api-key: xel_… (удобно для Anthropic-клиентов). Баланс пополняет админ в /admin/api — стартового гранта нет.',
+      },
+      { type: 'h2', text: 'Эндпоинты' },
+      {
+        type: 'ul',
+        items: [
+          'GET /v1/models — id моделей, цены $/1M токенов, список продуктов',
+          'POST /v1/chat/completions — OpenAI-совместимый chat',
+          'POST /v1/messages — Anthropic-совместимый Messages API',
+          'POST /v1/search — Xelity Search',
+          'POST /v1/weather — Xelity Weather (Open-Meteo)',
+        ],
+      },
+      { type: 'h2', text: 'ID моделей Xlaude' },
+      {
+        type: 'ul',
+        items: [
+          'xlaude-mini-k1 — быстрый Mini K1',
+          'xlaude-pro-k1 — Pro K1',
+          'xlaude-mini-k2 — Mini K2',
+          'xlaude-pro-k2 — Pro K2',
+        ],
       },
       {
         type: 'p',
-        text: 'Войдите в аккаунт → профиль в чате → «API кабинет» (или /account/api). Создайте ключ xel_… — он показывается один раз. Базовый URL: https://api.xelity.ru. Заголовок: Authorization: Bearer xel_…',
+        text: 'Во всех chat-эндпоинтах передавайте именно эти id в поле model. Ответ вернёт тот же model id. В чате сайта tools (поиск/погода) работают автоматически; в публичном API chat tools на сервере не крутятся — Search и Weather вызывайте отдельными POST.',
       },
-      {
-        type: 'h2',
-        text: 'Продукты',
-      },
+      { type: 'h2', text: 'Тарифы (виртуальные USD)' },
       {
         type: 'ul',
         items: [
-          'POST /v1/chat/completions — модели xlaude-mini-k1, xlaude-pro-k1, xlaude-mini-k2, xlaude-pro-k2',
-          'GET /v1/models — список моделей и продуктов',
-          'POST /v1/search — Xelity Search (query, опционально images: true)',
-          'POST /v1/weather — Xelity Weather (location или latitude/longitude)',
+          'Chat: оплата за токены (prompt + completion). Минимум $0.01 за успешный chat-вызов.',
+          'Mini K1 — $0.40 / 1M in · $1.20 / 1M out',
+          'Pro K1 — $0.80 / 1M in · $2.40 / 1M out',
+          'Mini K2 — $1.60 / 1M in · $4.80 / 1M out',
+          'Pro K2 — $3.20 / 1M in · $9.60 / 1M out',
+          'reasoning: true (OpenAI) или metadata.reasoning: true (Anthropic) — ×2 на output',
+          'Xelity Search — $0.01 за вызов ($0.015 с images: true)',
+          'Xelity Weather — $0.005 за вызов',
+          'HTTP 402 при нулевом / недостаточном балансе',
         ],
       },
+      { type: 'h2', text: 'OpenAI-совместимость: POST /v1/chat/completions' },
       {
-        type: 'h2',
-        text: 'Chat completions',
+        type: 'p',
+        text: 'Формат как у OpenAI Chat Completions. Поддерживаются: model, messages[{role, content}], max_tokens, temperature, reasoning (bool, расширение Xelity). Streaming (stream: true) пока не поддерживается. Ответ: object chat.completion, choices[0].message.content, usage.{prompt_tokens,completion_tokens,total_tokens}, плюс xelity.{billedUsd,balanceUsd}.',
       },
       {
-        type: 'ul',
-        items: [
-          'model: xlaude-mini-k1 | xlaude-pro-k1 | xlaude-mini-k2 | xlaude-pro-k2',
-          'messages: массив { role, content }',
-          'reasoning: true — удваивает стоимость запроса',
-          'temperature, max_tokens — опционально',
-        ],
+        type: 'code',
+        lang: 'bash',
+        text: `curl https://api.xelity.ru/v1/chat/completions \\
+  -H "Authorization: Bearer xel_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "xlaude-mini-k1",
+    "messages": [
+      {"role": "system", "content": "Отвечай кратко"},
+      {"role": "user", "content": "Привет!"}
+    ],
+    "max_tokens": 512,
+    "temperature": 0.4
+  }'`,
       },
       {
-        type: 'h2',
-        text: 'Виртуальные USD',
+        type: 'code',
+        lang: 'json',
+        text: `{
+  "id": "chatcmpl_…",
+  "object": "chat.completion",
+  "model": "xlaude-mini-k1",
+  "choices": [{
+    "index": 0,
+    "message": { "role": "assistant", "content": "…" },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 40,
+    "total_tokens": 160
+  },
+  "xelity": { "billedUsd": 0.01, "balanceUsd": 9.99 }
+}`,
       },
       {
         type: 'p',
-        text: 'Новому аккаунту начисляется $1.00. Списание за запрос: Mini K1 $0.002 · Pro K1 $0.004 · Mini K2 $0.008 · Pro K2 $0.016; с reasoning ×2. Xelity Search $0.001 ($0.0015 с картинками). Xelity Weather $0.0005. При нулевом балансе — HTTP 402.',
+        text: 'SDK: можно указать base_url=https://api.xelity.ru/v1 и api_key=xel_… в официальном OpenAI SDK (Python/JS) — пути /chat/completions и /models совпадают.',
+      },
+      { type: 'h2', text: 'Anthropic-совместимость: POST /v1/messages' },
+      {
+        type: 'p',
+        text: 'Формат как у Anthropic Messages API. Обязательны: model (наш id Xlaude), max_tokens, messages[{role: user|assistant, content}]. system — строка или массив блоков {type:"text", text}. content сообщения может быть строкой или массивом [{type:"text", text}]. Авторизация: x-api-key: xel_… или Bearer. Заголовок anthropic-version принимается, но не обязателен. Расширение Xelity: metadata.reasoning = true (×2 на output). Ответ: type message, content[{type:"text", text}], usage.{input_tokens,output_tokens}, stop_reason end_turn|max_tokens, плюс xelity.',
       },
       {
-        type: 'h2',
-        text: 'Ответы и ошибки',
+        type: 'code',
+        lang: 'bash',
+        text: `curl https://api.xelity.ru/v1/messages \\
+  -H "x-api-key: xel_YOUR_KEY" \\
+  -H "anthropic-version: 2023-06-01" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "xlaude-pro-k1",
+    "max_tokens": 1024,
+    "system": "Ты помощник Xelity",
+    "messages": [
+      {"role": "user", "content": "Кратко: что такое Xlaude?"}
+    ]
+  }'`,
       },
+      {
+        type: 'code',
+        lang: 'json',
+        text: `{
+  "id": "msg_…",
+  "type": "message",
+  "role": "assistant",
+  "model": "xlaude-pro-k1",
+  "content": [{ "type": "text", "text": "…" }],
+  "stop_reason": "end_turn",
+  "usage": { "input_tokens": 90, "output_tokens": 55 },
+  "xelity": { "billedUsd": 0.01, "balanceUsd": 9.98 }
+}`,
+      },
+      {
+        type: 'p',
+        text: 'В Anthropic SDK: base_url=https://api.xelity.ru, api_key=xel_…, model=xlaude-…. Полный tool-use / vision Anthropic пока не эмулируются — только текстовые сообщения.',
+      },
+      { type: 'h2', text: 'Xelity Search — POST /v1/search' },
+      {
+        type: 'code',
+        lang: 'json',
+        text: `{ "query": "Xelity AI", "images": false }`,
+      },
+      {
+        type: 'p',
+        text: 'Ответ: product, results[{title,url,snippet,image?}]. Списание фикс $0.01 ($0.015 при images:true).',
+      },
+      { type: 'h2', text: 'Xelity Weather — POST /v1/weather' },
+      {
+        type: 'code',
+        lang: 'json',
+        text: `{ "location": "Москва", "days": 7 }`,
+      },
+      {
+        type: 'p',
+        text: 'Либо latitude + longitude. Ответ: weather.{place, current.tempC, daily[], timezone, coords}. Источник Open-Meteo; «сейчас» и дневной max/min могут отличаться от «температуры дня» в Google — сравнивайте с daily[].tempMaxC.',
+      },
+      { type: 'h2', text: 'Ошибки' },
       {
         type: 'ul',
         items: [
-          '200 — успех; в теле поле xelity.billedUsd и xelity.balanceUsd',
-          '401 — нет ключа или ключ отозван',
-          '402 — недостаточно виртуальных USD',
-          '400 — невалидный запрос',
-          '502 — ошибка поиска/погоды/апстрима',
+          '401 — нет ключа / ключ отозван / API заморожен админом',
+          '402 — недостаточно USD',
+          '400 — невалидный JSON / нет messages / нет max_tokens (Anthropic)',
+          '502 — апстрим, поиск или погода недоступны',
+          'В OpenAI-форме: { error: { message, type } }. В Anthropic-форме: { type:"error", error:{ type, message } }',
         ],
       },
-      {
-        type: 'h2',
-        text: 'Безопасность',
-      },
+      { type: 'h2', text: 'Безопасность' },
       {
         type: 'ul',
         items: [
-          'Не вшивайте ключи в клиентский код и публичные репозитории',
+          'Не вшивайте ключи в фронтенд и публичные репозитории',
           'Храните ключ только на сервере',
-          'Отзывайте ключ в кабинете при утечке',
-          'Максимум 5 активных ключей на аккаунт',
+          'Отзовите ключ в кабинете при утечке',
+          'Максимум 5 активных ключей у пользователя (админ может выдать до 10)',
         ],
       },
       { type: 'cta', label: 'Открыть API кабинет', to: '/account/api' },
@@ -211,7 +313,8 @@ export const sitePages: SitePage[] = [
         type: 'ul',
         items: [
           'Ключи xel_… и кабинет /account/api с виртуальными USD',
-          'POST /v1/chat/completions по id моделей Xlaude',
+          'POST /v1/chat/completions (OpenAI) и POST /v1/messages (Anthropic)',
+          'Модели: xlaude-mini-k1 / pro-k1 / mini-k2 / pro-k2, биллинг за токены',
           'Xelity Search — POST /v1/search',
           'Xelity Weather — POST /v1/weather',
         ],

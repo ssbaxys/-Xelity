@@ -86,7 +86,7 @@ export default function Company() {
           <Reveal delay={140}>
             <div className="relative overflow-hidden rounded-2xl border border-line shadow-lg shadow-ink/5 transition hover:scale-[1.01]">
               <img
-                src="https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80"
+                src="/company-infra.png"
                 alt="Исследования и инфраструктура Xelity"
                 className="h-72 w-full object-cover transition duration-700 hover:scale-105 sm:h-80"
               />

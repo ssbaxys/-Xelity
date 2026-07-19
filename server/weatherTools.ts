@@ -98,6 +98,70 @@ const PLACE_ALIASES: Record<
     longitude: 85.9603,
     timezone: 'Asia/Barnaul',
   },
+  москва: {
+    name: 'Москва',
+    admin1: 'Москва',
+    country: 'Россия',
+    latitude: 55.7558,
+    longitude: 37.6173,
+    timezone: 'Europe/Moscow',
+  },
+  moscow: {
+    name: 'Москва',
+    admin1: 'Москва',
+    country: 'Россия',
+    latitude: 55.7558,
+    longitude: 37.6173,
+    timezone: 'Europe/Moscow',
+  },
+  'санкт-петербург': {
+    name: 'Санкт-Петербург',
+    admin1: 'Санкт-Петербург',
+    country: 'Россия',
+    latitude: 59.9343,
+    longitude: 30.3351,
+    timezone: 'Europe/Moscow',
+  },
+  'санкт петербург': {
+    name: 'Санкт-Петербург',
+    admin1: 'Санкт-Петербург',
+    country: 'Россия',
+    latitude: 59.9343,
+    longitude: 30.3351,
+    timezone: 'Europe/Moscow',
+  },
+  петербург: {
+    name: 'Санкт-Петербург',
+    admin1: 'Санкт-Петербург',
+    country: 'Россия',
+    latitude: 59.9343,
+    longitude: 30.3351,
+    timezone: 'Europe/Moscow',
+  },
+  питер: {
+    name: 'Санкт-Петербург',
+    admin1: 'Санкт-Петербург',
+    country: 'Россия',
+    latitude: 59.9343,
+    longitude: 30.3351,
+    timezone: 'Europe/Moscow',
+  },
+  новосибирск: {
+    name: 'Новосибирск',
+    admin1: 'Новосибирская область',
+    country: 'Россия',
+    latitude: 55.0084,
+    longitude: 82.9357,
+    timezone: 'Asia/Novosibirsk',
+  },
+  барнаул: {
+    name: 'Барнаул',
+    admin1: 'Алтайский край',
+    country: 'Россия',
+    latitude: 53.3606,
+    longitude: 83.7636,
+    timezone: 'Asia/Barnaul',
+  },
 };
 
 /** WMO Weather interpretation codes → короткий label (ru) */
@@ -226,34 +290,45 @@ function scoreHit(hit: GeoHit, query: string): number {
   const name = (hit.name || '').toLowerCase().replace(/ё/g, 'е').replace(/-/g, ' ');
   const admin = `${hit.admin1 || ''} ${hit.country || ''}`.toLowerCase();
   let score = 0;
-  if (name === q) score += 120;
-  else if (name.startsWith(q) || q.startsWith(name)) score += 80;
-  else if (name.includes(q) || q.includes(name)) score += 50;
-  // токены
+  if (name === q) score += 160;
+  else if (name.startsWith(q) || q.startsWith(name)) score += 90;
+  else if (name.includes(q) || q.includes(name)) score += 45;
   const qTokens = q.split(/\s+/).filter((t) => t.length > 2);
   const nameTokens = name.split(/\s+/);
   for (const t of qTokens) {
-    if (nameTokens.some((n) => n.startsWith(t) || t.startsWith(n))) score += 12;
+    if (nameTokens.some((n) => n === t)) score += 22;
+    else if (nameTokens.some((n) => n.startsWith(t) || t.startsWith(n))) score += 10;
   }
-  if (hit.country_code === 'RU' || /россия|russia/i.test(hit.country || '')) score += 25;
-  if (/алтай/i.test(admin) && /усть|алтай|кой|кокс/i.test(q)) score += 40;
+  const isRu =
+    hit.country_code === 'RU' || /россия|russia/i.test(hit.country || '');
+  if (isRu) score += 35;
+  if (/алтай/i.test(admin) && /усть|алтай|кой|кокс/i.test(q)) score += 50;
+  // население — только тай-брейкер, не перебивает точное имя
   if (typeof hit.population === 'number') {
-    // лёгкий бонус крупным городам, но не перебиваем точное имя
-    score += Math.min(15, Math.log10(hit.population + 10));
+    score += Math.min(12, Math.log10(hit.population + 10));
   }
-  // штраф за «чужие» страны при явно русских запросах
-  if (/[а-яё]/i.test(q) && hit.country_code && hit.country_code !== 'RU') score -= 30;
+  if (/[а-яё]/i.test(q) && hit.country_code && hit.country_code !== 'RU') score -= 55;
+  // штраф за «чужое» короткое совпадение (напр. деревня vs город с другим именем)
+  if (name !== q && q.length >= 4 && !name.includes(q) && !q.includes(name)) {
+    score -= 20;
+  }
   return score;
 }
 
-async function geocodeOpenMeteo(name: string): Promise<GeoHit[]> {
-  const url = `${GEO_URL}?${new URLSearchParams({
+async function geocodeOpenMeteo(
+  name: string,
+  opts?: { countryCode?: string },
+): Promise<GeoHit[]> {
+  const params: Record<string, string> = {
     name,
-    count: '10',
+    count: '12',
     language: 'ru',
     format: 'json',
-  })}`;
-  const data = await fetchJson<{ results?: GeoHit[] }>(url);
+  };
+  if (opts?.countryCode) params.countryCode = opts.countryCode;
+  const data = await fetchJson<{ results?: GeoHit[] }>(
+    `${GEO_URL}?${new URLSearchParams(params)}`,
+  );
   return data.results || [];
 }
 
@@ -325,25 +400,34 @@ async function geocode(location: string): Promise<GeoHit | null> {
   let best: GeoHit | null = null;
   let bestScore = -Infinity;
 
+  const preferRu = /[а-яё]/i.test(raw);
+
   for (const v of variants) {
     const aliasV = aliasLookup(v);
     if (aliasV) return aliasV;
 
-    let hits: GeoHit[] = [];
-    try {
-      hits = await geocodeOpenMeteo(v);
-    } catch {
-      hits = [];
-    }
-    for (const h of hits) {
-      const s = scoreHit(h, v);
-      if (s > bestScore) {
-        bestScore = s;
-        best = h;
+    const passCountry: (string | undefined)[] = preferRu
+      ? ['RU', undefined]
+      : [undefined];
+
+    for (const countryCode of passCountry) {
+      let hits: GeoHit[] = [];
+      try {
+        hits = await geocodeOpenMeteo(v, { countryCode });
+      } catch {
+        hits = [];
       }
+      for (const h of hits) {
+        const s = scoreHit(h, v);
+        if (s > bestScore) {
+          bestScore = s;
+          best = h;
+        }
+      }
+      // точное RU-совпадение — достаточно
+      if (best && bestScore >= 140) break;
     }
-    // достаточно точное совпадение — не мучаем дальше
-    if (best && bestScore >= 100) break;
+    if (best && bestScore >= 140) break;
   }
 
   if (best && bestScore >= 40) return best;
@@ -440,7 +524,11 @@ export async function executeGetWeather(args: {
       latitude: String(lat),
       longitude: String(lon),
       timezone: 'auto',
+      temperature_unit: 'celsius',
+      wind_speed_unit: 'kmh',
       forecast_days: String(days),
+      // best_match ближе к «народной» погоде (как в агрегаторах)
+      models: 'best_match',
       current: [
         'temperature_2m',
         'relative_humidity_2m',
@@ -459,10 +547,16 @@ export async function executeGetWeather(args: {
         'sunrise',
         'sunset',
       ].join(','),
-      wind_speed_unit: 'kmh',
     });
 
-    const fc = await fetchJson<ForecastResp>(`${FORECAST_URL}?${params}`);
+    let fc: ForecastResp;
+    try {
+      fc = await fetchJson<ForecastResp>(`${FORECAST_URL}?${params}`);
+    } catch {
+      // некоторые зеркала не принимают models=best_match
+      params.delete('models');
+      fc = await fetchJson<ForecastResp>(`${FORECAST_URL}?${params}`);
+    }
     const cur = fc.current;
     if (!cur || cur.temperature_2m == null || cur.weather_code == null) {
       return {
@@ -509,11 +603,15 @@ export async function executeGetWeather(args: {
     };
 
     const where = [place, admin1, country].filter(Boolean).join(', ');
+    const today = weather.daily[0];
     const forModel = [
       `WEATHER (Open-Meteo) for ${where}`,
       `Coords: ${lat.toFixed(4)}, ${lon.toFixed(4)} · TZ: ${weather.timezone}`,
       `Updated: ${weather.updatedAt}`,
-      `Now: ${weather.current.tempC}°C (feels ${weather.current.feelsLikeC}°C), ${weather.current.label}, humidity ${weather.current.humidity}%, wind ${weather.current.windKmh} km/h, precip ${weather.current.precipMm} mm`,
+      `Now (current): ${weather.current.tempC}°C (feels ${weather.current.feelsLikeC}°C), ${weather.current.label}, humidity ${weather.current.humidity}%, wind ${weather.current.windKmh} km/h, precip ${weather.current.precipMm} mm`,
+      today
+        ? `Today range: ${today.tempMinC}…${today.tempMaxC}°C (Google/Yandex often show daytime high ≈ ${today.tempMaxC}°C, not "now")`
+        : '',
       'Daily:',
       ...weather.daily.map(
         (d) =>
@@ -521,14 +619,18 @@ export async function executeGetWeather(args: {
       ),
       '',
       'UI already shows an interactive weather card from this tool result.',
-      'In your reply: short summary for the user; do not invent other temperatures.',
-      'Note: timezone Asia/Barnaul is used across Altai Krai / Altai Republic — it does NOT mean the city is Barnaul.',
-    ].join('\n');
+      'In your reply: say BOTH current temp and today high/low. Do not invent other temperatures.',
+      'Note: timezone Asia/Barnaul is Altai region TZ — NOT the city Barnaul.',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     return {
       ok: true,
       forModel,
-      summary: `${where}: ${weather.current.tempC}°C`,
+      summary: today
+        ? `${where}: сейчас ${weather.current.tempC}°C, сегодня до ${today.tempMaxC}°C`
+        : `${where}: ${weather.current.tempC}°C`,
       weather,
     };
   } catch (err) {

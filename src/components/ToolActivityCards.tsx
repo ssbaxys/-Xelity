@@ -177,16 +177,28 @@ export default function ToolActivityCards({ items }: { items: ToolActivity[] }) 
   return (
     <div className="tool-cards mb-3 space-y-1.5">
       {items.map((a, index) => {
-        if (a.kind === 'weather' && a.weather && a.ok && !a.pending) {
-          return (
-            <div
-              key={a.id}
-              className="tool-card weather-tool-wrap"
-              style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
-            >
-              <WeatherCard weather={a.weather} pending={false} />
-            </div>
-          );
+        // Кастомная карточка погоды (и скелетон на pending)
+        if (a.kind === 'weather' || a.name === 'get_weather') {
+          const hasPayload =
+            a.weather &&
+            typeof a.weather === 'object' &&
+            a.weather.current &&
+            typeof a.weather.place === 'string';
+          if (hasPayload || a.pending) {
+            return (
+              <div
+                key={a.id}
+                className="tool-card weather-tool-wrap"
+                style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+              >
+                <WeatherCard
+                  weather={hasPayload ? a.weather : null}
+                  pending={Boolean(a.pending) || !hasPayload}
+                  pendingPlace={a.path}
+                />
+              </div>
+            );
+          }
         }
 
         const expanded = openId === a.id;

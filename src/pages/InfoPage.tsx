@@ -97,6 +97,16 @@ export default function InfoPage() {
                   </ul>
                 );
               }
+              if (block.type === 'code') {
+                return (
+                  <pre
+                    key={i}
+                    className="overflow-x-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3 text-[11px] leading-relaxed text-[var(--c-text)] sm:text-[12px]"
+                  >
+                    <code className="whitespace-pre font-mono">{block.text}</code>
+                  </pre>
+                );
+              }
               return (
                 <div key={i} className="pt-2">
                   <Link to={block.to} className="btn-primary">

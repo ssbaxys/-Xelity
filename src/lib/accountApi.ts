@@ -1,5 +1,6 @@
 import { auth } from './firebase';
 import type { ApiKeyMeta } from './apiTypes';
+import type { TokenRates } from './apiPricing';
 
 const apiBase =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || '';
@@ -34,11 +35,10 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export type BillingInfo = {
   currency: string;
   usdBalance: number;
-  starterUsd: number;
   formatted: string;
   pricing: {
-    chat: Record<string, number>;
-    reasoningMultiplier: number;
+    chatPer1M: Record<string, TokenRates>;
+    reasoningOutputMultiplier: number;
     search: number;
     searchWithImages: number;
     weather: number;

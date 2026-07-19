@@ -1,27 +1,49 @@
 import { normalizeModelId, type ChatModelId } from './models';
 
-/** Виртуальные USD за запросы публичного API Xelity */
-export const API_STARTER_USD = 1;
+/** Цены за 1_000_000 токенов (вход / выход), виртуальные USD */
+export type TokenRates = { input: number; output: number };
 
 export const API_USD = {
-  chat: {
-    'xlaude-mini-k1': 0.002,
-    'xlaude-pro-k1': 0.004,
-    'xlaude-mini-k2': 0.008,
-    'xlaude-pro-k2': 0.016,
-  } as Record<ChatModelId, number>,
-  reasoningMultiplier: 2,
-  /** Xelity Search */
-  search: 0.001,
-  searchWithImages: 0.0015,
-  /** Xelity Weather */
-  weather: 0.0005,
+  /** $/1M tokens */
+  chatPer1M: {
+    'xlaude-mini-k1': { input: 0.4, output: 1.2 },
+    'xlaude-pro-k1': { input: 0.8, output: 2.4 },
+    'xlaude-mini-k2': { input: 1.6, output: 4.8 },
+    'xlaude-pro-k2': { input: 3.2, output: 9.6 },
+  } as Record<ChatModelId, TokenRates>,
+  /** Удорожание выхода при reasoning */
+  reasoningOutputMultiplier: 2,
+  /** Фикс за вызов Search / Weather */
+  search: 0.01,
+  searchWithImages: 0.015,
+  weather: 0.005,
 } as const;
 
-export function chatUsdCost(modelId: string, reasoning?: boolean): number {
+export function getChatRates(modelId: string): TokenRates {
   const id = normalizeModelId(modelId);
-  const base = API_USD.chat[id] ?? API_USD.chat['xlaude-mini-k1'];
-  return reasoning ? base * API_USD.reasoningMultiplier : base;
+  return API_USD.chatPer1M[id] ?? API_USD.chatPer1M['xlaude-mini-k1'];
+}
+
+/** Оценка токенов по тексту (~4 символа ≈ 1 токен) */
+export function estimateTokensFromText(text: string): number {
+  const n = Math.ceil((text || '').length / 4);
+  return Math.max(1, n);
+}
+
+export function chatUsdCostFromTokens(
+  modelId: string,
+  promptTokens: number,
+  completionTokens: number,
+  reasoning?: boolean,
+): number {
+  const rates = getChatRates(modelId);
+  const pin = Math.max(0, promptTokens);
+  const cout = Math.max(0, completionTokens);
+  const outMul = reasoning ? API_USD.reasoningOutputMultiplier : 1;
+  const cost =
+    (pin / 1_000_000) * rates.input + (cout / 1_000_000) * rates.output * outMul;
+  // внутренне до 6 знаков, в UI — $1.00
+  return Math.round(cost * 1e6) / 1e6;
 }
 
 export function searchUsdCost(images?: boolean): number {
@@ -32,6 +54,12 @@ export function weatherUsdCost(): number {
   return API_USD.weather;
 }
 
+/** Баланс и суммы для пользователя: $1.00 */
 export function formatUsd(n: number): string {
-  return `$${n.toFixed(4)}`;
+  return `$${Number(n || 0).toFixed(2)}`;
+}
+
+/** Тарифы в кабинете: тоже в долларах с центами */
+export function formatUsdRatePer1M(n: number): string {
+  return `$${Number(n || 0).toFixed(2)} / 1M`;
 }

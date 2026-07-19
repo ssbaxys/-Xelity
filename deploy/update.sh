@@ -53,11 +53,16 @@ ensure_cli_and_timer() {
     install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.service" /etc/systemd/system/xelity-autoupdate.service
     install -m 644 "${APP_DIR}/deploy/xelity-autoupdate.timer" /etc/systemd/system/xelity-autoupdate.timer
     systemctl daemon-reload
-    if [[ ! -f /etc/xelity-autoupdate.disabled ]]; then
-      if ! systemctl is-enabled --quiet xelity-autoupdate.timer 2>/dev/null; then
-        systemctl enable --now xelity-autoupdate.timer
-        echo ">> autoupdate timer включён (каждые 2 мин)"
-      fi
+    if [[ -f /etc/xelity-autoupdate.disabled ]]; then
+      systemctl disable --now xelity-autoupdate.timer 2>/dev/null || true
+      echo ">> autoupdate выключен (/etc/xelity-autoupdate.disabled)"
+    else
+      # всегда enable+start: иначе timer «enabled», но не active — обновлений нет
+      systemctl enable xelity-autoupdate.timer
+      systemctl restart xelity-autoupdate.timer
+      systemctl start xelity-autoupdate.timer
+      echo ">> autoupdate timer: $(systemctl is-active xelity-autoupdate.timer 2>/dev/null || echo unknown) (каждые 2 мин)"
+      systemctl list-timers xelity-autoupdate.timer --no-pager 2>/dev/null | head -n 3 || true
     fi
   fi
 }
