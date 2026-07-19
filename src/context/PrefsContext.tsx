@@ -16,12 +16,15 @@ type Prefs = {
   language: AppLanguage;
   theme: AppTheme;
   uiScale: UiScale;
+  /** Показывать технические детали ошибок в чате */
+  debug: boolean;
 };
 
 type PrefsContextValue = Prefs & {
   setLanguage: (language: AppLanguage) => void;
   setTheme: (theme: AppTheme) => void;
   setUiScale: (uiScale: UiScale) => void;
+  setDebug: (debug: boolean) => void;
   t: (key: string) => string;
 };
 
@@ -31,6 +34,7 @@ const DEFAULTS: Prefs = {
   language: 'ru',
   theme: 'dark',
   uiScale: 'md',
+  debug: false,
 };
 
 const DICT: Record<AppLanguage, Record<string, string>> = {
@@ -61,6 +65,9 @@ const DICT: Record<AppLanguage, Record<string, string>> = {
     'chat.scale.sm': 'S',
     'chat.scale.md': 'M',
     'chat.scale.lg': 'L',
+    'chat.debug': 'Отладка',
+    'chat.debug.hint': 'Показывать детали ошибок сервера',
+    'chat.debug.details': 'Подробности',
     'chat.login': 'Войти',
     'chat.login.hint': 'Email или Google',
     'chat.logout': 'Выйти',
@@ -103,6 +110,9 @@ const DICT: Record<AppLanguage, Record<string, string>> = {
     'chat.scale.sm': 'S',
     'chat.scale.md': 'M',
     'chat.scale.lg': 'L',
+    'chat.debug': 'Debug',
+    'chat.debug.hint': 'Show server error details',
+    'chat.debug.details': 'Details',
     'chat.login': 'Log in',
     'chat.login.hint': 'Email or Google',
     'chat.logout': 'Log out',
@@ -131,6 +141,7 @@ function loadPrefs(): Prefs {
       language: parsed.language === 'en' ? 'en' : 'ru',
       theme: parsed.theme === 'light' ? 'light' : 'dark',
       uiScale: parsed.uiScale === 'sm' || parsed.uiScale === 'lg' ? parsed.uiScale : 'md',
+      debug: Boolean(parsed.debug),
     };
   } catch {
     return DEFAULTS;
@@ -165,14 +176,18 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     setPrefs((p) => ({ ...p, uiScale }));
   }, []);
 
+  const setDebug = useCallback((debug: boolean) => {
+    setPrefs((p) => ({ ...p, debug }));
+  }, []);
+
   const t = useCallback(
     (key: string) => DICT[prefs.language][key] ?? DICT.ru[key] ?? key,
     [prefs.language],
   );
 
   const value = useMemo(
-    () => ({ ...prefs, setLanguage, setTheme, setUiScale, t }),
-    [prefs, setLanguage, setTheme, setUiScale, t],
+    () => ({ ...prefs, setLanguage, setTheme, setUiScale, setDebug, t }),
+    [prefs, setLanguage, setTheme, setUiScale, setDebug, t],
   );
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;

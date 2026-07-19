@@ -298,9 +298,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
     language,
     theme,
     uiScale,
+    debug,
     setLanguage,
     setTheme,
     setUiScale,
+    setDebug,
     t,
   } = usePrefs();
   const [store, setStore] = useState<Store>(() => loadStore());
@@ -1559,6 +1561,28 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                   ))}
                 </div>
               </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--c-border)] px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-[var(--c-text)]">{t('chat.debug')}</p>
+                  <p className="text-[11px] text-[var(--c-faint)]">{t('chat.debug.hint')}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={debug}
+                  onClick={() => setDebug(!debug)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                    debug ? 'bg-[#c62828]' : 'bg-[var(--c-border-strong)]'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+                      debug ? 'left-5.5 translate-x-0 left-[1.35rem]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1701,6 +1725,8 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                               thinkingPhase={msg.thinkingPhase}
                               createdAt={msg.createdAt}
                               toolActivity={msg.toolActivity}
+                              errorDetail={msg.errorDetail}
+                              debug={debug}
                               live={Boolean(
                                 sending &&
                                   (!msg.content ||

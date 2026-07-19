@@ -47,6 +47,8 @@ export type ChatMessage = {
   usedReasoning?: boolean;
   /** шаги tools в режиме кодинга */
   toolActivity?: ToolActivity[];
+  /** техническая деталь ошибки (показывается только в debug) */
+  errorDetail?: string | null;
 };
 
 export type ChatThread = {
@@ -133,6 +135,8 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                       }))
                       .filter((t) => t.id && t.name)
                   : undefined,
+                errorDetail:
+                  typeof m.errorDetail === 'string' ? m.errorDetail.slice(0, 4000) : m.errorDetail ?? null,
               }))
             : [],
           manualTitle: Boolean(c.manualTitle),

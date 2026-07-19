@@ -3,6 +3,7 @@ import BlurMarkdown from './BlurMarkdown';
 import ReasoningPanel from './ReasoningPanel';
 import ToolActivityCards from './ToolActivityCards';
 import TypingDots from './TypingDots';
+import { usePrefs } from '../context/PrefsContext';
 import type { ToolActivity } from '../lib/chatStore';
 import { modelLabel, normalizeModelId, type ChatModelId } from '../lib/models';
 
@@ -17,6 +18,8 @@ type Props = {
   createdAt: number;
   live?: boolean;
   toolActivity?: ToolActivity[];
+  errorDetail?: string | null;
+  debug?: boolean;
 };
 
 /** Ответ: точки → мысли → карточки tools → markdown */
@@ -29,7 +32,10 @@ export default function AssistantReply({
   createdAt,
   live = false,
   toolActivity,
+  errorDetail,
+  debug = false,
 }: Props) {
+  const { t } = usePrefs();
   const hasContent = Boolean(content?.trim());
   const hasReasoning = Boolean(reasoning?.trim());
   const hasTools = Boolean(toolActivity?.length);
@@ -105,7 +111,23 @@ export default function AssistantReply({
 
       {showAnswer && hasContent && (
         <div className="assistant-answer-wrap">
-          <BlurMarkdown content={content} animate={animateAnswer} />
+          {errorDetail ? (
+            <div className="rounded-xl border border-[rgba(198,40,40,0.35)] bg-[rgba(198,40,40,0.08)] px-3.5 py-2.5 text-[14px] leading-relaxed text-[var(--c-text)]">
+              <p>{content}</p>
+              {debug && (
+                <details className="mt-2 border-t border-[var(--c-border)] pt-2">
+                  <summary className="cursor-pointer text-[11px] font-medium text-[var(--c-muted)] hover:text-[var(--c-text)]">
+                    {t('chat.debug.details')}
+                  </summary>
+                  <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-[var(--c-faint)]">
+                    {errorDetail}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ) : (
+            <BlurMarkdown content={content} animate={animateAnswer} />
+          )}
         </div>
       )}
     </div>

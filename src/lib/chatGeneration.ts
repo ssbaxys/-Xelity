@@ -7,6 +7,7 @@ import {
   type ChatStore,
   type ToolActivity,
 } from './chatStore';
+import { formatChatFailure } from './chatApiError';
 import { ensureReactSiteTemplate, runSandboxTool } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
 
@@ -511,15 +512,16 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
       );
       // списание кредитов — только на VPS
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Не удалось получить ответ';
+      const { content, errorDetail } = formatChatFailure(err);
       persistStore(
         upsertAssistantInStore(params.chatId, {
           id: assistantId,
           role: 'assistant',
-          content: `Не удалось ответить: ${message}`,
+          content,
           createdAt: Date.now(),
           modelId: params.modelId,
           thinkingPhase: null,
+          errorDetail,
         }),
         params.firebaseUid,
       );
