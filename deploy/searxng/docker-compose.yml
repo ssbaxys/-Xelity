@@ -1,24 +1,31 @@
-# SearXNG для Xelity agent tools (только 127.0.0.1)
+# SearXNG для Xelity (localhost API).
+# По мотивам https://github.com/searxng/searxng/blob/master/container/docker-compose.yml
+# Valkey не нужен — limiter выключен (приватный инстанс).
+name: xelity-searxng
+
 services:
   searxng:
-    image: docker.io/searxng/searxng:latest
     container_name: xelity-searxng
+    image: docker.io/searxng/searxng:${SEARXNG_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "127.0.0.1:8888:8080"
-    volumes:
-      - ./settings.yml:/etc/searxng/settings.yml:ro
+    env_file:
+      - ./.env
     environment:
       - SEARXNG_BASE_URL=http://127.0.0.1:8888/
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
-      - DAC_OVERRIDE
+      - SEARXNG_LIMITER=false
+      - SEARXNG_PUBLIC_INSTANCE=false
+      - FORCE_OWNERSHIP=true
+    volumes:
+      # каталог целиком — как в официальном container setup
+      - ./core-config/:/etc/searxng/:Z
+      - searxng-data:/var/cache/searxng/
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  searxng-data:
