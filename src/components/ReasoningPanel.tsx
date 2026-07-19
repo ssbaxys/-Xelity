@@ -58,8 +58,8 @@ export default function ReasoningPanel({
 
   const label = live
     ? thinkingPhase === 'answering'
-      ? `Думает… пишу ответ`
-      : `Думает… ${formatThinkDuration(liveElapsedMs)}`
+      ? `Думает пишу ответ…`
+      : `Думает ${formatThinkDuration(liveElapsedMs)}…`
     : `Думал ${formatThinkDuration(doneMs)}`;
 
   return (
