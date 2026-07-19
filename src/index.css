@@ -2110,6 +2110,16 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   }
 }
 
+/* Кодинг: карточки tools + светлая тема */
+html[data-theme='light'] .tool-diff-add {
+  background: rgba(46, 125, 50, 0.12);
+  color: #1b5e20;
+}
+html[data-theme='light'] .tool-diff-del {
+  background: rgba(198, 40, 40, 0.1);
+  color: #b71c1c;
+}
+
 .admin-stat {
   border-radius: 1rem;
   border: 1px solid var(--a-border);

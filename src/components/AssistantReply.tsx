@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import BlurMarkdown from './BlurMarkdown';
 import ReasoningPanel from './ReasoningPanel';
+import ToolActivityCards from './ToolActivityCards';
 import TypingDots from './TypingDots';
+import type { ToolActivity } from '../lib/chatStore';
 import { modelLabel, normalizeModelId, type ChatModelId } from '../lib/models';
 
 type ThinkingPhase = 'thinking' | 'answering' | null | undefined;
@@ -14,9 +16,10 @@ type Props = {
   thinkingPhase?: ThinkingPhase;
   createdAt: number;
   live?: boolean;
+  toolActivity?: ToolActivity[];
 };
 
-/** Ответ: точки → мысли → markdown сразу + blur → sharp */
+/** Ответ: точки → мысли → карточки tools → markdown */
 export default function AssistantReply({
   content,
   modelId,
@@ -25,9 +28,11 @@ export default function AssistantReply({
   thinkingPhase,
   createdAt,
   live = false,
+  toolActivity,
 }: Props) {
   const hasContent = Boolean(content?.trim());
   const hasReasoning = Boolean(reasoning?.trim());
+  const hasTools = Boolean(toolActivity?.length);
   const thinking = thinkingPhase === 'thinking' || thinkingPhase === 'answering';
 
   const [dotsExit, setDotsExit] = useState(false);
@@ -38,8 +43,8 @@ export default function AssistantReply({
   const seenRef = useRef<string | null>(hasContent && !live ? content : null);
 
   useEffect(() => {
-    // мысли / ответ уже на экране — точки не нужны
-    if (hasContent || hasReasoning || thinking) {
+    // мысли / tools / ответ уже на экране — точки не нужны
+    if (hasContent || hasReasoning || thinking || hasTools) {
       setDotsExit(true);
       const t = window.setTimeout(() => setShowDots(false), 180);
       return () => window.clearTimeout(t);
@@ -49,7 +54,7 @@ export default function AssistantReply({
       setShowDots(true);
       setDotsExit(false);
     }
-  }, [hasContent, hasReasoning, live, thinking]);
+  }, [hasContent, hasReasoning, live, thinking, hasTools]);
 
   useEffect(() => {
     if (!hasContent) {
@@ -90,11 +95,13 @@ export default function AssistantReply({
         />
       )}
 
-      {showDots && !hasContent && !hasReasoning && !thinking && (
+      {showDots && !hasContent && !hasReasoning && !thinking && !hasTools && (
         <div className="mt-1 min-h-[1.5rem]">
           <TypingDots exiting={dotsExit} />
         </div>
       )}
+
+      {hasTools && toolActivity && <ToolActivityCards items={toolActivity} />}
 
       {showAnswer && hasContent && (
         <div className="assistant-answer-wrap">

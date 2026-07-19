@@ -5,6 +5,25 @@ import { normalizeModelId, type ChatModelId } from './models';
 export type { ChatModelId } from './models';
 export type ChatRole = 'user' | 'assistant';
 
+export type ToolActivityKind = 'list' | 'read' | 'create' | 'edit' | 'delete';
+
+/** Карточка tool-шага в ответе (кодинг) */
+export type ToolActivity = {
+  id: string;
+  name: string;
+  kind: ToolActivityKind;
+  path?: string;
+  ok: boolean;
+  error?: string;
+  startLine?: number;
+  endLine?: number;
+  /** содержимое до записи (для diff) */
+  before?: string;
+  /** содержимое после записи / фрагмент чтения */
+  after?: string;
+  pending?: boolean;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
@@ -26,6 +45,8 @@ export type ChatMessage = {
   thinkingPhase?: 'thinking' | 'answering' | null;
   /** пользователь отправил с включённым режимом «Рассуждения» */
   usedReasoning?: boolean;
+  /** шаги tools в режиме кодинга */
+  toolActivity?: ToolActivity[];
 };
 
 export type ChatThread = {
@@ -90,6 +111,28 @@ export function normalizeChatStore(raw: unknown): ChatStore {
                     ? m.thinkingPhase
                     : null,
                 usedReasoning: Boolean(m.usedReasoning),
+                toolActivity: Array.isArray(m.toolActivity)
+                  ? m.toolActivity
+                      .filter((t) => t && typeof t === 'object')
+                      .map((t) => ({
+                        id: String(t.id || ''),
+                        name: String(t.name || ''),
+                        kind: (['list', 'read', 'create', 'edit', 'delete'] as const).includes(
+                          t.kind as ToolActivityKind,
+                        )
+                          ? (t.kind as ToolActivityKind)
+                          : 'edit',
+                        path: typeof t.path === 'string' ? t.path : undefined,
+                        ok: Boolean(t.ok),
+                        error: typeof t.error === 'string' ? t.error : undefined,
+                        startLine: typeof t.startLine === 'number' ? t.startLine : undefined,
+                        endLine: typeof t.endLine === 'number' ? t.endLine : undefined,
+                        before: typeof t.before === 'string' ? t.before.slice(0, 80_000) : undefined,
+                        after: typeof t.after === 'string' ? t.after.slice(0, 80_000) : undefined,
+                        pending: Boolean(t.pending),
+                      }))
+                      .filter((t) => t.id && t.name)
+                  : undefined,
               }))
             : [],
           manualTitle: Boolean(c.manualTitle),

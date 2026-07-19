@@ -1,11 +1,11 @@
-/** OpenAI-style tools for coding sandbox (static site files). */
+/** OpenAI-style tools for coding sandbox (React / static site files). */
 
 export const CODING_TOOLS = [
   {
     type: 'function' as const,
     function: {
       name: 'list_files',
-      description: 'List all files in the current chat site sandbox.',
+      description: 'List all files in the current chat project sandbox.',
       parameters: {
         type: 'object',
         properties: {},
@@ -17,13 +17,22 @@ export const CODING_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'read_file',
-      description: 'Read a file from the site sandbox by path (e.g. index.html, styles.css).',
+      description:
+        'Read a file from the sandbox. Optionally read only a line range (1-based inclusive). Prefer ranges for large files.',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Relative file path inside the sandbox',
+            description: 'Relative path, e.g. src/App.jsx',
+          },
+          start_line: {
+            type: 'integer',
+            description: 'First line to read (1-based). Optional.',
+          },
+          end_line: {
+            type: 'integer',
+            description: 'Last line to read (1-based). Optional.',
           },
         },
         required: ['path'],
@@ -36,13 +45,13 @@ export const CODING_TOOLS = [
     function: {
       name: 'write_file',
       description:
-        'Create or overwrite a file in the sandbox. Prefer compact static HTML/CSS/vanilla JS.',
+        'Create or overwrite a full file in the sandbox. Always pass the complete file contents.',
       parameters: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Relative file path (e.g. index.html, app.js)',
+            description: 'Relative path (e.g. src/App.jsx, src/styles.css)',
           },
           content: {
             type: 'string',
@@ -74,14 +83,17 @@ export const CODING_TOOLS = [
   },
 ];
 
-export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (песочница сайта в этом чате):
-У тебя есть tools: list_files, read_file, write_file, delete_file.
-- Файлы живут только в песочнице чата. Нет доступа к диску сервера и интернету пользователя.
-- Для сайтов предпочитай статический HTML + CSS + vanilla JS (один index.html или мало файлов). Без тяжёлых фреймворков и без лишних CDN, если можно проще.
-- Пиши оптимизированно: мало зависимостей, короткие ассеты, без фоновых polling/тяжёлых анимаций.
-- Сначала list/read при необходимости, затем write_file. После правок кратко опиши пользователю, что сделал и как открыть превью/скачать ZIP.
-- Не выдумывай успех tool без вызова. Если tool недоступен — скажи честно.
-- React/Vite-каркас можно отдать как файлы для скачивания, но live-превью рассчитано на статику.`;
+export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (песочница проекта в этом чате):
+У тебя ОБЯЗАТЕЛЬНО есть tools: list_files, read_file, write_file, delete_file.
+Файлы уже могут содержать стартовый React (Vite) шаблон — не описывай код «словами» вместо tools.
+
+ПРАВИЛА:
+1) Любое создание/правка/чтение кода — ТОЛЬКО через tools. Не притворяйся, что файл записан, если write_file не вызывался.
+2) Перед правкой существующего файла: read_file (можно start_line/end_line). Для больших файлов читай частями.
+3) После правок кратко опиши результат пользователю. Не вставляй огромные блоки кода в чат — код живёт в файлах.
+4) Предпочитай React (src/App.jsx, src/styles.css, src/main.jsx). Превью в UI умеет React через CDN.
+5) Пиши компактно, без лишних зависимостей. Не используй сеть/сервер пользователя.
+6) Если нужно много файлов — несколько write_file подряд, затем короткий итог.`;
 
 export type ToolCallFn = {
   id: string;

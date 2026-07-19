@@ -5,11 +5,12 @@ import {
   type ChatMessage,
   type ChatModelId,
   type ChatStore,
+  type ToolActivity,
 } from './chatStore';
-import { executeSandboxTool } from './projectSandbox';
+import { ensureReactSiteTemplate, runSandboxTool } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
 
-const MAX_TOOL_ROUNDS = 6;
+const MAX_TOOL_ROUNDS = 8;
 
 const PENDING_KEY = 'xelity-chat-pending-v1';
 const EVENT = 'xelity:chat-store-updated';
@@ -189,8 +190,57 @@ async function runWithCodingTools(params: {
   systemExtra?: string | null;
   reasoning?: boolean;
   reasoningPhase?: 'think' | 'answer';
-}): Promise<string> {
+  assistantId: string;
+  createdAt: number;
+  firebaseUid?: string | null;
+  titleIfNotManual?: string;
+  seedThoughts?: string | null;
+  seedReasoningMs?: number | null;
+  thinkingPhase?: ChatMessage['thinkingPhase'];
+}): Promise<{ content: string; toolActivity: ToolActivity[] }> {
+  const activities: ToolActivity[] = ensureReactSiteTemplate(params.chatId);
+
+  const pushAssistant = (partial: Partial<ChatMessage>) => {
+    persistStore(
+      upsertAssistantInStore(
+        params.chatId,
+        {
+          id: params.assistantId,
+          role: 'assistant',
+          content: partial.content ?? '',
+          createdAt: params.createdAt,
+          modelId: params.modelId,
+          thinkingPhase: partial.thinkingPhase ?? params.thinkingPhase ?? null,
+          reasoning: partial.reasoning ?? params.seedThoughts ?? null,
+          reasoningMs: partial.reasoningMs ?? params.seedReasoningMs ?? null,
+          toolActivity: partial.toolActivity ?? activities,
+        },
+        { titleIfNotManual: params.titleIfNotManual },
+      ),
+      params.firebaseUid,
+    );
+  };
+
+  if (activities.length) {
+    pushAssistant({
+      content: '',
+      toolActivity: activities,
+      thinkingPhase: params.thinkingPhase ?? 'answering',
+    });
+  }
+
   let messages = [...params.messages];
+  if (activities.length) {
+    messages = [
+      ...messages,
+      {
+        role: 'user',
+        content:
+          'В песочнице уже создан стартовый React (Vite) шаблон (package.json, vite.config.js, index.html, src/main.jsx, src/App.jsx, src/styles.css). Используй tools: list_files / read_file / write_file. Не дублируй шаблон с нуля — правь нужные файлы под запрос.',
+      },
+    ];
+  }
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const reply = await requestXlaudeReply({
       modelId: params.modelId,
@@ -200,12 +250,48 @@ async function runWithCodingTools(params: {
       reasoning: params.reasoning,
       reasoningPhase: params.reasoningPhase,
       codingTools: true,
-      // сервер списывает кредиты только когда нет tool_calls
     });
 
     const calls = reply.tool_calls || [];
     if (!calls.length) {
-      return reply.content.trim();
+      return { content: reply.content.trim(), toolActivity: activities };
+    }
+
+    const toolMsgs: ChatApiMessage[] = [];
+    for (const tc of calls as ToolCall[]) {
+      const pending: ToolActivity = {
+        id: tc.id || `p-${activities.length}`,
+        name: tc.function.name,
+        kind: tc.function.name === 'read_file' ? 'read' : tc.function.name === 'list_files' ? 'list' : 'edit',
+        pending: true,
+        ok: false,
+      };
+      try {
+        const args = JSON.parse(tc.function.arguments || '{}') as { path?: string };
+        if (args.path) pending.path = String(args.path);
+      } catch {
+        /* ignore */
+      }
+      activities.push(pending);
+      pushAssistant({ content: '', toolActivity: [...activities] });
+
+      const run = runSandboxTool(
+        params.chatId,
+        tc.function.name,
+        tc.function.arguments || '{}',
+        tc.id,
+      );
+      const idx = activities.findIndex((a) => a.id === pending.id);
+      if (idx >= 0) activities[idx] = run.activity;
+      else activities.push(run.activity);
+      pushAssistant({ content: '', toolActivity: [...activities] });
+
+      toolMsgs.push({
+        role: 'tool',
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: run.forModel,
+      });
     }
 
     messages = [
@@ -215,15 +301,13 @@ async function runWithCodingTools(params: {
         content: reply.content || '',
         tool_calls: calls,
       },
-      ...calls.map((tc: ToolCall) => ({
-        role: 'tool' as const,
-        tool_call_id: tc.id,
-        name: tc.function.name,
-        content: executeSandboxTool(params.chatId, tc.function.name, tc.function.arguments || '{}'),
-      })),
+      ...toolMsgs,
     ];
   }
-  return 'Слишком много шагов tools. Упрости задачу или продолжи в следующем сообщении.';
+  return {
+    content: 'Слишком много шагов tools. Упрости задачу или продолжи в следующем сообщении.',
+    toolActivity: activities,
+  };
 }
 
 export function generateAssistantInBackground(params: GenerateParams): Promise<void> {
@@ -306,26 +390,39 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
           },
         ];
 
-        const answerContent = params.codingTools
-          ? await runWithCodingTools({
-              chatId: params.chatId,
+        let answerContent = '';
+        let toolActivity: ToolActivity[] | undefined;
+        if (params.codingTools) {
+          const coded = await runWithCodingTools({
+            chatId: params.chatId,
+            modelId: params.modelId,
+            messages: answerMessages,
+            maxTokens: params.maxTokens,
+            systemExtra: params.systemExtra,
+            reasoning: true,
+            reasoningPhase: 'answer',
+            assistantId,
+            createdAt: thinkStarted,
+            firebaseUid: params.firebaseUid,
+            titleIfNotManual: params.titleIfNotManual,
+            seedThoughts: thoughts,
+            seedReasoningMs: reasoningMs,
+            thinkingPhase: 'answering',
+          });
+          answerContent = coded.content;
+          toolActivity = coded.toolActivity;
+        } else {
+          answerContent = (
+            await requestXlaudeReply({
               modelId: params.modelId,
               messages: answerMessages,
               maxTokens: params.maxTokens,
               systemExtra: params.systemExtra,
-              reasoning: true,
               reasoningPhase: 'answer',
+              reasoning: true,
             })
-          : (
-              await requestXlaudeReply({
-                modelId: params.modelId,
-                messages: answerMessages,
-                maxTokens: params.maxTokens,
-                systemExtra: params.systemExtra,
-                reasoningPhase: 'answer',
-                reasoning: true,
-              })
-            ).content.trim();
+          ).content.trim();
+        }
 
         persistStore(
           upsertAssistantInStore(
@@ -339,6 +436,7 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
               thinkingPhase: null,
               reasoning: thoughts,
               reasoningMs,
+              toolActivity,
             },
             { titleIfNotManual: params.titleIfNotManual },
           ),
@@ -365,24 +463,35 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
         params.firebaseUid,
       );
 
-      const replyContent = params.codingTools
-        ? await runWithCodingTools({
-            chatId: params.chatId,
+      let replyContent = '';
+      let toolActivity: ToolActivity[] | undefined;
+      if (params.codingTools) {
+        const coded = await runWithCodingTools({
+          chatId: params.chatId,
+          modelId: params.modelId,
+          messages: params.messages,
+          maxTokens: params.maxTokens,
+          systemExtra: params.systemExtra,
+          reasoning: false,
+          assistantId,
+          createdAt: waitStarted,
+          firebaseUid: params.firebaseUid,
+          titleIfNotManual: params.titleIfNotManual,
+          thinkingPhase: 'answering',
+        });
+        replyContent = coded.content;
+        toolActivity = coded.toolActivity;
+      } else {
+        replyContent = (
+          await requestXlaudeReply({
             modelId: params.modelId,
             messages: params.messages,
             maxTokens: params.maxTokens,
             systemExtra: params.systemExtra,
             reasoning: false,
           })
-        : (
-            await requestXlaudeReply({
-              modelId: params.modelId,
-              messages: params.messages,
-              maxTokens: params.maxTokens,
-              systemExtra: params.systemExtra,
-              reasoning: false,
-            })
-          ).content;
+        ).content;
+      }
 
       persistStore(
         upsertAssistantInStore(
@@ -393,6 +502,8 @@ export function generateAssistantInBackground(params: GenerateParams): Promise<v
             content: replyContent,
             createdAt: waitStarted,
             modelId: params.modelId,
+            thinkingPhase: null,
+            toolActivity,
           },
           { titleIfNotManual: params.titleIfNotManual },
         ),

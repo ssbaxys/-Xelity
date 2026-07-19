@@ -16,7 +16,7 @@ import { usePrefs, type AppLanguage, type AppTheme, type UiScale } from '../cont
 import { getPlan } from '../lib/plans';
 import LimitsModal from './LimitsModal';
 import ChatMarkdown from './ChatMarkdown';
-import CodingPanel from './CodingPanel';
+import CodingWorkbench from './CodingWorkbench';
 import {
   loadLocalChatStore,
   saveLocalChatStore,
@@ -328,7 +328,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
   const [limitsOpen, setLimitsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [codingPanelOpen, setCodingPanelOpen] = useState(false);
+  const [codingMobileOpen, setCodingMobileOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [limitHint, setLimitHint] = useState<string | null>(null);
   const [usageToday, setUsageToday] = useState(0);
@@ -727,7 +727,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         c.id === active.id ? { ...c, codingTools: on, updatedAt: Date.now() } : c,
       ),
     });
-    if (on) setCodingPanelOpen(true);
+    if (!on) setCodingMobileOpen(false);
   };
 
   const onDragStart = (e: DragEvent, id: string) => {
@@ -1615,10 +1615,11 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         />
       )}
 
-      {/* Main */}
-      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      {/* Main + optional coding dock */}
+      <section className="relative flex min-h-0 min-w-0 flex-1">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex h-12 shrink-0 items-center gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <button
               type="button"
               className="rounded-md p-1.5 text-[var(--c-muted)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text)] lg:hidden"
@@ -1631,6 +1632,16 @@ export default function ChatWorkspace({ homeSlot }: Props) {
               <p className="truncate text-[14px] font-medium text-[var(--c-text)]">{active.title}</p>
             )}
           </div>
+          {active?.codingTools && (
+            <button
+              type="button"
+              onClick={() => setCodingMobileOpen(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--c-border)] px-2 py-1 text-[11px] text-[var(--c-muted)] hover:text-[var(--c-text)] lg:hidden"
+            >
+              <IconCode className="h-3.5 w-3.5" />
+              Проект
+            </button>
+          )}
         </header>
 
         {!active ? (
@@ -1652,12 +1663,20 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         ) : (
           <>
             <div className="chat-thread-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-              <div className="mx-auto flex min-h-full max-w-[720px] flex-col px-4 py-4 sm:px-6">
+              <div
+                className={`mx-auto flex min-h-full flex-col px-4 py-4 sm:px-6 ${
+                  active.codingTools ? 'max-w-[640px]' : 'max-w-[720px]'
+                }`}
+              >
                 {!active.messages.length ? (
                   <div className="anim-pop flex flex-1 flex-col items-center justify-center text-center">
                     <IconChat className="mb-3 h-6 w-6 text-[var(--c-border-strong)]" />
                     <p className="text-[15px] text-[var(--c-text)]">{active.title}</p>
-                    <p className="mt-1 text-[13px] text-[var(--c-muted)]">{t('chat.first')}</p>
+                    <p className="mt-1 text-[13px] text-[var(--c-muted)]">
+                      {active.codingTools
+                        ? 'Включили «Кодинг» — напишите задачу, появится React-шаблон справа'
+                        : t('chat.first')}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-5 py-2">
@@ -1681,11 +1700,13 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                               reasoningMs={msg.reasoningMs}
                               thinkingPhase={msg.thinkingPhase}
                               createdAt={msg.createdAt}
+                              toolActivity={msg.toolActivity}
                               live={Boolean(
                                 sending &&
                                   (!msg.content ||
                                     msg.thinkingPhase === 'thinking' ||
-                                    msg.thinkingPhase === 'answering'),
+                                    msg.thinkingPhase === 'answering' ||
+                                    msg.toolActivity?.some((t) => t.pending)),
                               )}
                             />
                           </div>
@@ -1803,15 +1824,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = !active.codingTools;
-                          setCodingTools(next);
-                          if (!next) setCodingPanelOpen(false);
-                        }}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          if (active.codingTools) setCodingPanelOpen(true);
-                        }}
+                        onClick={() => setCodingTools(!active.codingTools)}
                         className={`inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md border text-[11px] font-medium transition-all duration-300 ease-out ${
                           active.codingTools
                             ? 'border-[var(--x-red,#c62828)]/50 bg-[var(--x-red-soft,rgba(198,40,40,0.12))] px-2 text-[var(--c-text)]'
@@ -1819,7 +1832,7 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                         }`}
                         aria-label="Кодинг"
                         aria-pressed={Boolean(active.codingTools)}
-                        title="Песочница сайта: ИИ пишет HTML/CSS/JS (ПКМ — панель файлов)"
+                        title="React-проект справа: tools + превью"
                       >
                         <IconCode className="h-3.5 w-3.5 shrink-0" />
                         <span
@@ -1832,16 +1845,6 @@ export default function ChatWorkspace({ homeSlot }: Props) {
                           Кодинг
                         </span>
                       </button>
-                      {active.codingTools && (
-                        <button
-                          type="button"
-                          onClick={() => setCodingPanelOpen(true)}
-                          className="hidden h-7 items-center rounded-md border border-[var(--c-border)] px-2 text-[11px] text-[var(--c-muted)] hover:border-[var(--c-border-strong)] hover:text-[var(--c-text)] sm:inline-flex"
-                          title="Файлы и превью"
-                        >
-                          Файлы
-                        </button>
-                      )}
                       <span
                         className={`text-[11px] tabular-nums transition-colors ${
                           draft.length > 1800 ? 'text-[#e57373]' : 'text-[var(--c-faint)]'
@@ -1865,6 +1868,15 @@ export default function ChatWorkspace({ homeSlot }: Props) {
             </div>
           </>
         )}
+        </div>
+
+        {active?.codingTools && (
+          <CodingWorkbench
+            chatId={active.id}
+            mobileOpen={codingMobileOpen}
+            onMobileClose={() => setCodingMobileOpen(false)}
+          />
+        )}
       </section>
 
       <LimitsModal
@@ -1881,14 +1893,6 @@ export default function ChatWorkspace({ homeSlot }: Props) {
         modelId={active?.modelId ?? DEFAULT_MODEL_ID}
         reasoning={Boolean(active?.reasoning)}
       />
-
-      {active && (
-        <CodingPanel
-          chatId={active.id}
-          open={codingPanelOpen && Boolean(active.codingTools)}
-          onClose={() => setCodingPanelOpen(false)}
-        />
-      )}
     </div>
   );
 }
