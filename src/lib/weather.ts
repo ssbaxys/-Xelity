@@ -65,7 +65,9 @@ export function weatherIconKind(code: number): WeatherIconKind {
 }
 
 export function formatWeatherPlace(w: WeatherPayload): string {
-  return [w.place, w.admin1, w.country].filter(Boolean).join(', ');
+  const admin = w.admin1?.trim();
+  // «Алтай» без уточнения путают с краем — для карточки оставляем как есть из API
+  return [w.place, admin, w.country].filter(Boolean).join(', ');
 }
 
 export function weekdayShortRu(isoDate: string): string {

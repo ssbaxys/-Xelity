@@ -150,21 +150,22 @@ export const WEB_TOOLS = [
     function: {
       name: 'get_weather',
       description:
-        'Get live weather and multi-day forecast via Open-Meteo (global, accurate). Use whenever the user asks about weather, temperature, rain, wind, or forecast for a place. Returns structured data for the UI weather card — do not invent numbers.',
+        'Get live weather and multi-day forecast via Open-Meteo. ALWAYS pass the place the user asked for in location (exact settlement). Do NOT reuse coordinates from a previous place. Do not invent numbers.',
       parameters: {
         type: 'object',
         properties: {
           location: {
             type: 'string',
-            description: 'City or place name, e.g. Москва, London, Tokyo',
+            description:
+              'Settlement name as the user meant it, e.g. «Усть-Кокса», «Горно-Алтайск», «Москва». Prefer «Name, Region» for small towns.',
           },
           latitude: {
             type: 'number',
-            description: 'Optional latitude if known',
+            description: 'Only if user gave exact coordinates; never copy from an earlier weather call',
           },
           longitude: {
             type: 'number',
-            description: 'Optional longitude if known',
+            description: 'Only if user gave exact coordinates; never copy from an earlier weather call',
           },
           days: {
             type: 'integer',
@@ -184,8 +185,9 @@ export const WEB_SYSTEM_EXTRA = `АГЕНТСКИЕ WEB-TOOLS (реальный 
 
 ПОГОДА:
 - Если пользователь спрашивает про погоду / температуру / дождь / прогноз — ОБЯЗАТЕЛЬНО вызови get_weather (не угадывай и не бери погоду из web_search).
-- Укажи location (город). UI покажет интерактивную карточку; в тексте дай краткий итог.
-- Источник данных: Open-Meteo.
+- В location передай ИМЕННО тот населённый пункт, о котором спросили (напр. «Усть-Кокса» / «Усть-Кокса, Республика Алтай»). Не подменяй на областной центр.
+- Не передавай latitude/longitude от прошлого запроса — только свежий location.
+- UI покажет карточку; в тексте — краткий итог по этим данным. Asia/Barnaul в TZ — пояс Алтая, это не город Барнаул.
 
 ЭКОНОМИЯ ТОКЕНОВ (поиск):
 1) web_search даёт список: номер, title, URL, snippet; иногда строку IMAGE: (прямая картинка).

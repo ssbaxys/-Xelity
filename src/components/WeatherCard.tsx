@@ -44,7 +44,8 @@ export default function WeatherCard({ weather, pending }: Props) {
         <div className="min-w-0">
           <p className="weather-card-place truncate">{place}</p>
           <p className="weather-card-meta">
-            {weather.timezone} · {weather.source}
+            {weather.latitude.toFixed(2)}°, {weather.longitude.toFixed(2)}° ·{' '}
+            {weather.source}
           </p>
         </div>
         <WeatherIcon
