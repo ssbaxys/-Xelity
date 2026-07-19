@@ -425,11 +425,11 @@ export default function AdminUsers() {
 
       {modal && liveUser && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex"
+          className="admin-modal-backdrop fixed inset-0 z-50"
           onClick={() => busy !== liveUser.uid && setModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
+            className="admin-modal-card rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-[var(--a-text)]">
@@ -663,11 +663,11 @@ export default function AdminUsers() {
 
       {banModal && (
         <div
-          className="admin-modal-backdrop fixed inset-0 z-50 flex"
+          className="admin-modal-backdrop fixed inset-0 z-50"
           onClick={() => busy !== banModal.user.uid && setBanModal(null)}
         >
           <div
-            className="admin-modal-card w-full max-w-md rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
+            className="admin-modal-card rounded-2xl border border-[var(--a-border)] bg-[var(--a-surface)] p-4 shadow-2xl sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-[var(--a-text)]">Заблокировать аккаунт</h3>

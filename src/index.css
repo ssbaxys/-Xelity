@@ -3472,19 +3472,15 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
 }
 
 .admin-modal-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   animation: admin-soft-in 0.2s ease;
   backdrop-filter: blur(6px);
   background: rgba(0, 0, 0, 0.7);
-  align-items: flex-start;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
-}
-
-@media (min-width: 640px) {
-  .admin-modal-backdrop {
-    align-items: center;
-  }
 }
 
 .admin-shell.is-light .admin-modal-backdrop {
@@ -3496,11 +3492,14 @@ html[data-theme='light'] .chat-range::-moz-range-thumb {
   background: var(--a-modal);
   border: 1px solid var(--a-border);
   color: var(--a-text);
+  width: 100%;
+  max-width: 28rem;
   max-height: min(90dvh, 720px);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  margin: auto 0;
+  margin: auto;
+  flex-shrink: 0;
 }
 
 .admin-select-trigger {
