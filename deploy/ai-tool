@@ -283,16 +283,22 @@ do_update() {
   need_root
   git config --global --add safe.directory "${APP_DIR}" 2>/dev/null || true
   chown -R root:root "${APP_DIR}/.git" 2>/dev/null || true
-  # сначала подтянуть свежие скрипты деплоя (даже если дерево грязное / старый ai-tool)
-  if git_safe fetch origin "${BRANCH}" --prune --force 2>/dev/null; then
-    git_safe checkout -f "origin/${BRANCH}" -- deploy/update.sh deploy/ai-tool 2>/dev/null || true
+  # один fetch здесь → update.sh не делает второй
+  local fetched=0
+  if git_safe fetch origin "${BRANCH}" --prune --force --quiet 2>/dev/null; then
+    fetched=1
+    git_safe checkout -f "origin/${BRANCH}" -- deploy/update.sh deploy/ai-tool deploy/ensure-searxng.sh 2>/dev/null || true
     if [[ -f "${APP_DIR}/deploy/ai-tool" ]]; then
       install -m 755 "${APP_DIR}/deploy/ai-tool" /usr/local/bin/ai-tool
     fi
   else
     c_warn "fetch не удался — пробую локальный update.sh"
   fi
-  bash "${APP_DIR}/deploy/update.sh"
+  if [[ "${fetched}" -eq 1 ]]; then
+    XELITY_SKIP_FETCH=1 bash "${APP_DIR}/deploy/update.sh"
+  else
+    bash "${APP_DIR}/deploy/update.sh"
+  fi
   echo
   c_ok "HEAD сейчас: $(git_safe rev-parse --short HEAD 2>/dev/null || echo '?')"
 }

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Ставит Docker (если нужно) и поднимает SearXNG по актуальной схеме upstream.
-# https://docs.searxng.org/admin/installation-docker.html
+# Ставит Docker (если нужно) и поднимает SearXNG.
+# По умолчанию быстрый путь: если контейнер уже здоров — ничего не тянем.
+#   bash ensure-searxng.sh           # quick
+#   bash ensure-searxng.sh --force   # pull + recreate
+#   SEARXNG_FORCE=1 bash ensure-searxng.sh
 set -euo pipefail
 
 APP_DIR="${XELITY_DIR:-/opt/xelity}"
@@ -13,6 +16,16 @@ SEARX_ENV="${SEARX_DIR}/.env"
 APP_ENV="${APP_DIR}/.env"
 SEARX_URL="${SEARXNG_URL:-http://127.0.0.1:8888}"
 
+FORCE=0
+for arg in "$@"; do
+  case "${arg}" in
+    --force|-f) FORCE=1 ;;
+  esac
+done
+if [[ "${SEARXNG_FORCE:-0}" == "1" ]]; then
+  FORCE=1
+fi
+
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Запусти от root: sudo bash deploy/ensure-searxng.sh"
   exit 1
@@ -21,6 +34,40 @@ fi
 if [[ ! -f "${COMPOSE_FILE}" ]]; then
   echo "Нет ${COMPOSE_FILE} — пропуск SearXNG"
   exit 0
+fi
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "${COMPOSE_FILE}" --project-directory "${SEARX_DIR}" "$@"
+  else
+    docker-compose -f "${COMPOSE_FILE}" "$@"
+  fi
+}
+
+searx_healthy() {
+  curl -fsS --connect-timeout 1 --max-time 2 "${SEARX_URL}/" >/dev/null 2>&1 \
+    && curl -fsS --connect-timeout 1 --max-time 3 \
+      "${SEARX_URL}/search?q=xelity&format=json" \
+      -H 'Accept: application/json' 2>/dev/null | grep -q '"results"'
+}
+
+# ——— быстрый выход, если уже работает ———
+if [[ "${FORCE}" -eq 0 ]] && command -v docker >/dev/null 2>&1; then
+  if searx_healthy; then
+    echo ">> SearXNG уже работает — пропуск (для обновления образа: --force)"
+    exit 0
+  fi
+  # контейнер есть, но ещё стартует — up без pull
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qiE 'searx'; then
+    echo ">> SearXNG контейнер есть, ждём health…"
+    for i in $(seq 1 8); do
+      if searx_healthy; then
+        echo ">> SearXNG готов: ${SEARX_URL}"
+        exit 0
+      fi
+      sleep 1
+    done
+  fi
 fi
 
 ensure_docker() {
@@ -89,45 +136,33 @@ ensure_app_env() {
   fi
 }
 
-compose() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose -f "${COMPOSE_FILE}" --project-directory "${SEARX_DIR}" "$@"
-  else
-    docker-compose -f "${COMPOSE_FILE}" "$@"
-  fi
-}
-
 ensure_docker
 migrate_legacy_settings
 ensure_searx_env
 ensure_app_env
+chmod -R a+rX "${CONFIG_DIR}" 2>/dev/null || true
 
-# права: контейнер searxng (uid внутри образа) + FORCE_OWNERSHIP
-chmod -R a+rX "${CONFIG_DIR}" || true
-
-echo ">> SearXNG: docker compose up -d"
 cd "${SEARX_DIR}"
-compose pull || true
-compose up -d --remove-orphans --force-recreate
+if [[ "${FORCE}" -eq 1 ]]; then
+  echo ">> SearXNG: pull + recreate"
+  compose pull || true
+  compose up -d --remove-orphans --force-recreate
+else
+  echo ">> SearXNG: up -d (без pull)"
+  compose up -d --remove-orphans
+fi
 
-# healthcheck + тест JSON API
-# https://docs.searxng.org/dev/search_api.html
-for i in $(seq 1 20); do
-  if curl -fsS "${SEARX_URL}/" >/dev/null 2>&1; then
-    if curl -fsS "${SEARX_URL}/search?q=xelity&format=json" \
-      -H 'Accept: application/json' 2>/dev/null | grep -q '"results"'; then
-      echo ">> SearXNG готов (JSON): ${SEARX_URL}"
-      exit 0
-    fi
-    echo ">> SearXNG отвечает, ждём JSON… (${i})"
-  else
-    echo ">> ждём SearXNG… (${i})"
+for i in $(seq 1 15); do
+  if searx_healthy; then
+    echo ">> SearXNG готов (JSON): ${SEARX_URL}"
+    exit 0
   fi
-  sleep 2
+  echo ">> ждём SearXNG… (${i})"
+  sleep 1
 done
 
 echo "!! SearXNG ещё не отдаёт JSON. Логи:"
 compose ps || true
-compose logs --tail=60 || true
+compose logs --tail=40 || true
 echo "Поиск всё равно работает через DuckDuckGo/Wikipedia fallback в API."
 exit 0

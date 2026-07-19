@@ -39,6 +39,7 @@ jobs:
           command_timeout: 10m
           script: |
             set -euo pipefail
+            # быстрый путь: один fetch + точечный npm/build
             if [[ -x /usr/local/bin/ai-tool ]]; then
               /usr/local/bin/ai-tool update
             else
