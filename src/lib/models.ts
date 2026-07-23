@@ -11,7 +11,10 @@ export type ModelDef = {
   id: UiModelId;
   name: string;
   tab: string;
+  /** Короткая подпись в селекторе чата */
   desc: string;
+  /** Развёрнутое описание на лендинге */
+  blurb: string;
   generation: 'K1' | 'K2';
   /** стоимость одного ответа в кредитах */
   creditCost: number;
@@ -25,7 +28,9 @@ export const MODELS: ModelDef[] = [
     id: 'xlaude-mini-k1',
     name: 'Xlaude Mini K1',
     tab: 'Mini K1',
-    desc: 'Быстрый и простой',
+    desc: 'Быстрые ответы · 1 кр.',
+    blurb:
+      'Для повседневных задач: короткие ответы, черновики и быстрые вопросы без лишней нагрузки на лимит.',
     generation: 'K1',
     creditCost: 1,
     defaultMaxTokens: 1024,
@@ -35,7 +40,9 @@ export const MODELS: ModelDef[] = [
     id: 'xlaude-pro-k1',
     name: 'Xlaude Pro K1',
     tab: 'Pro K1',
-    desc: 'Профессиональная линейка',
+    desc: 'Документы и код · 2 кр.',
+    blurb:
+      'Деловой тон и структура: документы, код, разбор задач — когда нужен аккуратный рабочий результат.',
     generation: 'K1',
     creditCost: 2,
     defaultMaxTokens: 4096,
@@ -45,7 +52,9 @@ export const MODELS: ModelDef[] = [
     id: 'xlaude-mini-k2',
     name: 'Xlaude Mini K2',
     tab: 'Mini K2',
-    desc: 'Новое поколение',
+    desc: 'Сильнее контекст · 4 кр.',
+    blurb:
+      'Следующее поколение Mini: лучше держит длинный контекст, яснее структура и разбор сложных запросов.',
     generation: 'K2',
     creditCost: 4,
     defaultMaxTokens: 8192,
@@ -55,7 +64,9 @@ export const MODELS: ModelDef[] = [
     id: 'xlaude-pro-k2',
     name: 'Xlaude Pro K2',
     tab: 'Pro K2',
-    desc: 'Профессиональная линейка нового поколения',
+    desc: 'Глубина и код · 8 кр.',
+    blurb:
+      'Про-линейка K2: длинные документы, архитектура, стратегия и сложный код — максимум глубины в чате.',
     generation: 'K2',
     creditCost: 8,
     defaultMaxTokens: 12288,

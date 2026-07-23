@@ -41,7 +41,7 @@ export default function Hero() {
             isLight ? 'text-ink' : 'text-white'
           }`}
         >
-          Меньше театра. Больше ответа.
+          Чат и API на Xlaude
         </h1>
 
         <p
@@ -49,7 +49,7 @@ export default function Hero() {
             isLight ? 'text-slate' : 'text-white/70'
           }`}
         >
-          Xlaude Mini и Pro (K1/K2), Xelity Search и Weather — чат и API с виртуальными USD.
+          Модели Mini и Pro, поиск и погода — в чате и через API.
         </p>
 
         <div className="animate-rise delay-3 mt-7 flex w-full flex-col gap-2.5 sm:mt-10 sm:w-auto sm:flex-row sm:gap-3">

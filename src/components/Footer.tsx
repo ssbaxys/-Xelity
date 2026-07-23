@@ -74,7 +74,7 @@ export default function Footer() {
               <span className="font-display text-[15px] font-bold text-ink">Xelity</span>
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate">
-              Меньше театра. Больше ответа — линейка Xlaude без лишнего шоу.
+              Рабочее пространство вокруг моделей Xlaude.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
               <Link

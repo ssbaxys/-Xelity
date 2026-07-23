@@ -20,7 +20,7 @@ import {
   runSandboxTool,
 } from './projectSandbox';
 import { requestXlaudeReply, type ChatApiMessage, type ToolCall } from './xlaude';
-import { extractTextualToolCalls } from './parseTextToolCalls';
+import { extractTextualToolCalls, parseToolArgs, resolveToolPath } from './parseTextToolCalls';
 import {
   beginInterceptWindow,
   clearGodHold,
@@ -365,25 +365,21 @@ async function runWithAgentTools(params: {
         pending: true,
         ok: false,
       };
-      try {
-        const args = JSON.parse(argsJson) as {
-          path?: string;
-          query?: string;
-          url?: string;
-          urls?: string[];
-          location?: string;
-        };
-        if (args.path) pending.path = String(args.path);
-        else if (args.location) pending.path = String(args.location);
-        else if (args.query) pending.path = String(args.query);
-        else if (Array.isArray(args.urls) && args.urls.length > 1) {
+      {
+        const args = parseToolArgs(argsJson);
+        const filePath = resolveToolPath(args);
+        if (filePath) pending.path = filePath;
+        else if (typeof args.location === 'string' && args.location) {
+          pending.path = args.location;
+        } else if (typeof args.query === 'string' && args.query) {
+          pending.path = args.query;
+        } else if (Array.isArray(args.urls) && args.urls.length > 1) {
           pending.path = `${args.urls.length} стр.`;
-        } else if (args.url) pending.path = String(args.url);
-        else if (Array.isArray(args.urls) && args.urls[0]) {
-          pending.path = String(args.urls[0]);
+        } else if (typeof args.url === 'string' && args.url) {
+          pending.path = args.url;
+        } else if (Array.isArray(args.urls) && typeof args.urls[0] === 'string') {
+          pending.path = args.urls[0];
         }
-      } catch {
-        /* ignore */
       }
       activities.push(pending);
       pushAssistant({ content: '', toolActivity: [...activities] });

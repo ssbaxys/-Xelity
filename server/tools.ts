@@ -51,7 +51,8 @@ export const CODING_TOOLS = [
         properties: {
           path: {
             type: 'string',
-            description: 'Relative path (e.g. src/App.jsx, src/styles.css)',
+            description:
+              'Required relative path, never empty (e.g. src/App.jsx, src/styles.css). Always set this field.',
           },
           content: {
             type: 'string',
@@ -237,6 +238,7 @@ export const CODING_SYSTEM_EXTRA = `РЕЖИМ КОДИНГА (сайт в эт�
 
 ПОРЯДОК РАБОТЫ:
 1) read_file нужных файлов → 2) write_file полным содержимым → 3) check_build → 4) при ошибках снова правки → 5) краткий ответ.
+В write_file/read_file/delete_file поле path всегда обязано быть непустым (например src/App.jsx) — без path вызов бесполезен.
 Компактно, без лишних зависимостей.`;
 
 export const CODING_TOOL_NAMES = new Set(

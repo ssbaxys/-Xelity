@@ -1,6 +1,7 @@
 /** Песочница файлов сайта — на чат, в localStorage */
 
 import type { ToolActivity, ToolActivityKind } from './chatStore';
+import { parseToolArgs, resolveToolPath } from './parseTextToolCalls';
 import {
   buildReactPreviewDocument,
   buildStaticPreviewDocument,
@@ -483,10 +484,12 @@ export function runSandboxTool(
   callId?: string,
 ): SandboxToolRun {
   const id = callId || `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  let args: Record<string, unknown> = {};
-  try {
-    args = argsJson ? (JSON.parse(argsJson) as Record<string, unknown>) : {};
-  } catch {
+  const args = parseToolArgs(argsJson || '{}');
+  if (
+    argsJson?.trim() &&
+    argsJson.trim() !== '{}' &&
+    !Object.keys(args).length
+  ) {
     return {
       forModel: JSON.stringify({ error: 'Невалидный JSON arguments' }),
       activity: { id, name, kind: 'edit', ok: false, error: 'Невалидный JSON arguments' },
@@ -502,7 +505,7 @@ export function runSandboxTool(
   }
 
   if (name === 'read_file') {
-    const path = normalizePath(String(args.path || ''));
+    const path = normalizePath(resolveToolPath(args));
     const content = readSandboxFile(chatId, path);
     if (content == null) {
       return {
@@ -536,7 +539,7 @@ export function runSandboxTool(
   }
 
   if (name === 'write_file') {
-    const path = normalizePath(String(args.path || ''));
+    const path = normalizePath(resolveToolPath(args));
     const content = String(args.content ?? '');
     const before = readSandboxFile(chatId, path);
     const kind: ToolActivityKind = before == null ? 'create' : 'edit';
@@ -558,7 +561,7 @@ export function runSandboxTool(
   }
 
   if (name === 'delete_file') {
-    const path = normalizePath(String(args.path || ''));
+    const path = normalizePath(resolveToolPath(args));
     const before = readSandboxFile(chatId, path);
     const res = deleteSandboxFile(chatId, path);
     return {

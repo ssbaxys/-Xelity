@@ -66,7 +66,7 @@ export default function ApiCabinetPage() {
               </p>
               <h1 className="font-display text-3xl font-bold tracking-tight">API Xelity</h1>
               <p className="mt-1 text-sm text-slate">
-                Ключи, виртуальные USD, Xelity Search и Xelity Weather
+                Ключи API, баланс, Search и Weather
               </p>
             </div>
           </div>

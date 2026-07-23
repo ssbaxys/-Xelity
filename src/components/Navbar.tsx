@@ -354,7 +354,7 @@ export default function Navbar() {
             className="shrink-0 border-t border-line px-4 py-3 text-center text-[11px] text-slate"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
-            Меньше театра. Больше ответа.
+            xelity.ru
           </div>
         </div>
       </div>

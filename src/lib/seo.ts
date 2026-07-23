@@ -1,7 +1,7 @@
 const SITE = 'https://xelity.ru';
-const DEFAULT_TITLE = 'Xelity — меньше театра, больше ответа';
+const DEFAULT_TITLE = 'Xelity — чат и API на Xlaude';
 const DEFAULT_DESCRIPTION =
-  'Xelity — чат на моделях Xlaude Mini и Pro (K1 / K2). Ясные ответы, дневные кредиты и рабочее пространство без лишнего шума.';
+  'Чат на моделях Xlaude Mini и Pro, поиск и погода — в веб-чате и через API на xelity.ru.';
 
 type PageMeta = {
   title?: string;
