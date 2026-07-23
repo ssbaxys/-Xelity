@@ -56,8 +56,8 @@ export default function Models() {
             <Link to="/chat" className="btn-primary">
               Открыть чат
             </Link>
-            <Link to="/api" className="btn-ghost">
-              API моделей
+            <Link to="/#benchmarks" className="btn-ghost">
+              Оценки Eval Lab
             </Link>
             <Link to="/model" className="btn-ghost">
               Подробнее
