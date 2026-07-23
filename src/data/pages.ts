@@ -94,23 +94,23 @@ export const sitePages: SitePage[] = [
       },
       {
         type: 'h2',
-        text: 'Флагман Pro K2 (Xelity Eval Lab)',
+        text: 'Флагман Pro K2 (Xelity Eval Lab, класс ~31B)',
       },
       {
         type: 'ul',
         items: [
-          'Artificial Analysis Coding Agent Index — 71.6',
-          'SWE-Bench Pro — 66.2%',
-          'DeepSWE 1.1 — 63.9%',
-          'Terminal-Bench 2.1 — 81.4%',
-          'BrowseComp — 81.9%',
-          'OSWorld 2.0 — 57.8%',
-          'GPQA Diamond — 91.0%',
-          'FrontierMath Tier 1–3 — 77.5%; Tier 4 — 51.8%',
-          'MMMU Pro — 80.2%',
-          'Humanity’s Last Exam — 38.9% без tools / 52.4% с tools',
-          'GDPval-AA v2 — 1572 Elo',
-          'LiveCodeBench — 89.1%; MMLU-Pro — 86.8%',
+          'Artificial Analysis Intelligence Index v4.1 — 29 (~28 место из ~580)',
+          'Arena AI Text — 1452 Elo (срез 2 апреля 2026)',
+          'MMLU-Pro — 85.2%; MMMLU — 88.4%',
+          'GPQA Diamond — 84.3%',
+          'AIME 2026 (без tools) — 89.2%',
+          'LiveCodeBench v6 — 80.0%; Codeforces — 2150 Elo',
+          'τ²-bench — 76.9% среднее / Retail 86.4%',
+          'Humanity’s Last Exam — 19.5% без tools / 26.5% с поиском',
+          'BigBench Extra Hard — 74.4%',
+          'MMMU Pro — 76.9%; MATH-Vision — 85.6%',
+          'SWE-Bench Pro — ~41.2%; Terminal-Bench 2.1 — ~61.5%',
+          'Скорость ~34–38 tok/s; TTFT ~1.15 с',
         ],
       },
       {
@@ -120,9 +120,9 @@ export const sitePages: SitePage[] = [
       {
         type: 'ul',
         items: [
-          'Xelity Tool Loop — 86.3% (поиск, погода, многошаговые tools)',
-          'Xelity RU Desk — 91.7% (рабочие задачи на русском)',
-          'Xelity Code Preview — 84.6% (сборка сайта в песочнице чата)',
+          'Xelity Tool Loop — 72.6% (поиск, погода, многошаговые tools)',
+          'Xelity RU Desk — 81.2% (рабочие задачи на русском)',
+          'Xelity Code Preview — 67.8% (сборка сайта в песочнице чата)',
         ],
       },
       {
@@ -132,15 +132,15 @@ export const sitePages: SitePage[] = [
       {
         type: 'ul',
         items: [
-          'Mini K1 — короткие ответы и черновики, минимум кредитов (~96 tok/s)',
+          'Mini K1 — короткие ответы и черновики, минимум кредитов (~38 tok/s)',
           'Pro K1 — документы, код и деловой тон на поколении K1',
           'Mini K2 — сильнее контекст при цене ниже Pro K2',
-          'Pro K2 — архитектура, длинные документы, сложный код и агентные задачи',
+          'Pro K2 — длинные ответы, reasoning и агентные задачи',
         ],
       },
       {
         type: 'p',
-        text: 'Оценки — внутренние прогоны Xelity Eval Lab по открытым бенчмаркам и собственным наборам. Не независимый сторонний аудит. Другие цифры не выдумываем.',
+        text: 'Оценки — класс dense ~31B (контекст до 256K). Mini/Pro отличаются настройками продукта, а не «другой сверхмоделью». Не независимый сторонний аудит. Другие цифры не выдумываем.',
       },
       { type: 'cta', label: 'Открыть чат', to: '/chat' },
     ],

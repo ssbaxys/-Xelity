@@ -67,8 +67,8 @@ export default function Benchmarks() {
             Xelity Eval Lab
           </h2>
           <p className="mt-5 text-base leading-relaxed text-slate sm:text-lg">
-            {BENCH_META.asOf}: прогоны по открытым бенчмаркам и собственным наборам Xelity.
-            Pro K2 — флагман линейки; Mini — быстрее и дешевле по кредитам.
+            {BENCH_META.asOf}: оценки класса dense ~31B и продуктовые наборы Xelity. Pro K2 —
+            якорь линейки; Mini/Pro отличаются настройками, а не «другой сверхмоделью».
           </p>
         </Reveal>
 
